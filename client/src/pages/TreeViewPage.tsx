@@ -11,6 +11,8 @@ import FamilyTreeLayout from '../components/tree/FamilyTreeLayout';
 import PersonInfoPopup from '../components/tree/PersonInfoPopup';
 import AddPersonForm from '../components/tree/AddPersonForm';
 import type { AddPersonFormData } from '../components/tree/AddPersonForm';
+import EditPersonForm from '../components/tree/EditPersonForm';
+import type { CreatePersonData } from '../api/persons';
 import ConfirmDeleteDialog from '../components/tree/ConfirmDeleteDialog';
 import ZoomControls from '../components/tree/ZoomControls';
 import { useZoom } from '../hooks/useZoom';
@@ -24,6 +26,7 @@ export default function TreeViewPage() {
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [addTarget, setAddTarget] = useState<Person | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
+  const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Ref to detect drag vs click
@@ -204,6 +207,33 @@ export default function TreeViewPage() {
     }
   }, [treeId, deleteTarget, loadTree]);
 
+  // Edit person
+  const handleEditClick = useCallback((person: Person) => {
+    setSelectedPerson(null);
+    setEditingPerson(person);
+  }, []);
+
+  const handleEditSubmit = useCallback(async (data: Partial<CreatePersonData>, photoFile?: File) => {
+    if (!treeId || !editingPerson) return;
+    setSaving(true);
+
+    try {
+      await personsApi.updatePerson(treeId, editingPerson.id, data);
+
+      if (photoFile) {
+        await personsApi.uploadPersonPhoto(treeId, editingPerson.id, photoFile);
+      }
+
+      setEditingPerson(null);
+      loadTree();
+    } catch (err: any) {
+      console.error('Failed to update person:', err);
+      alert(err.response?.data?.error || 'Ошибка при обновлении');
+    } finally {
+      setSaving(false);
+    }
+  }, [treeId, editingPerson, loadTree]);
+
   if (loading) {
     return (
       <div className="loading-screen">
@@ -280,7 +310,7 @@ export default function TreeViewPage() {
         <PersonInfoPopup
           person={selectedPerson}
           onClose={() => setSelectedPerson(null)}
-          onEdit={() => {/* TODO */}}
+          onEdit={handleEditClick}
           onDelete={handleDeleteClick}
         />
       )}
@@ -304,6 +334,16 @@ export default function TreeViewPage() {
           saving={saving}
           onSubmit={handleAddSubmit}
           onClose={() => setAddTarget(null)}
+        />
+      )}
+
+      {editingPerson && treeId && (
+        <EditPersonForm
+          person={editingPerson}
+          treeId={treeId}
+          saving={saving}
+          onSubmit={handleEditSubmit}
+          onClose={() => setEditingPerson(null)}
         />
       )}
     </div>
