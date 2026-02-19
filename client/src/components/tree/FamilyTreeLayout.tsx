@@ -64,7 +64,39 @@ export default function FamilyTreeLayout({
     const nodes = transformToTreeNodes(persons, relationships);
 
     try {
-      return calcTree(nodes as any, { rootId });
+      // Try with preferred rootId first
+      const result = calcTree(nodes as any, { rootId });
+      const placedIds = new Set(result.nodes.map((n: { id: string }) => n.id));
+
+      // If all nodes placed — great, done
+      if (placedIds.size >= nodes.length) {
+        return result;
+      }
+
+      // Try other roots to find one that covers ALL nodes
+      let bestResult = result;
+      let bestCount = placedIds.size;
+
+      for (const node of nodes) {
+        if (node.id === rootId) continue; // already tried
+        try {
+          const alt = calcTree(nodes as any, { rootId: node.id });
+          const altCount = alt.nodes.length;
+          if (altCount > bestCount) {
+            bestResult = alt;
+            bestCount = altCount;
+            if (bestCount >= nodes.length) break; // found perfect root
+          }
+        } catch {
+          // skip invalid roots
+        }
+      }
+
+      if (bestCount < nodes.length) {
+        console.warn(`[calcTree] Best root covers ${bestCount}/${nodes.length} nodes`);
+      }
+
+      return bestResult;
     } catch (err) {
       console.error('calcTree error:', err);
       return null;
