@@ -44,15 +44,14 @@ export default function TreeViewPage() {
   }, [loadTree]);
 
   // Zoom hook (react-zoom-pan-pinch)
-  const { zoomIn, zoomOut, zoomReset, setTransformRef } = useZoom();
+  const { zoomIn, zoomOut, setTransformRef, transformRef } = useZoom();
 
-  // Center on owner person after initial load
-  const centerOnOwner = useCallback((ref: ReactZoomPanPinchRef) => {
+  // Center on owner person (used on init + reset button)
+  const centerOnOwner = useCallback((ref: ReactZoomPanPinchRef, animationTime = 0) => {
     if (!fullTree) return;
     const ownerId = fullTree.tree.ownerPersonId;
     if (!ownerId) return;
 
-    // Find the owner card element
     const wrapper = ref.instance.wrapperComponent;
     const content = ref.instance.contentComponent;
     if (!wrapper || !content) return;
@@ -62,26 +61,36 @@ export default function TreeViewPage() {
     ) as HTMLElement | null;
     if (!ownerEl) return;
 
-    // Calculate center position
+    // Reset scale to 1 first, then calculate position
+    // Use the natural (unscaled) position of the owner element
+    const currentScale = ref.state.scale;
     const contentRect = content.getBoundingClientRect();
     const ownerRect = ownerEl.getBoundingClientRect();
     const wrapperRect = wrapper.getBoundingClientRect();
 
-    const ownerCenterX = (ownerRect.left + ownerRect.right) / 2 - contentRect.left;
-    const ownerCenterY = (ownerRect.top + ownerRect.bottom) / 2 - contentRect.top;
+    // Get unscaled center of owner relative to content
+    const ownerCenterX = ((ownerRect.left + ownerRect.right) / 2 - contentRect.left) / currentScale;
+    const ownerCenterY = ((ownerRect.top + ownerRect.bottom) / 2 - contentRect.top) / currentScale;
 
     const offsetX = wrapperRect.width / 2 - ownerCenterX;
     const offsetY = wrapperRect.height / 2 - ownerCenterY;
 
-    ref.setTransform(offsetX, offsetY, 1, 0);
+    ref.setTransform(offsetX, offsetY, 1, animationTime);
   }, [fullTree]);
 
   // Handle library init
   const handleInit = useCallback((ref: ReactZoomPanPinchRef) => {
     setTransformRef(ref);
     // Center on owner after a short delay for layout to settle
-    setTimeout(() => centerOnOwner(ref), 150);
+    setTimeout(() => centerOnOwner(ref, 0), 150);
   }, [setTransformRef, centerOnOwner]);
+
+  // Reset zoom + center on owner
+  const handleZoomReset = useCallback(() => {
+    const ref = transformRef.current;
+    if (!ref) return;
+    centerOnOwner(ref, 300);
+  }, [centerOnOwner, transformRef]);
 
   // Track panning to distinguish drag from click
   const handlePanningStart = useCallback(() => {
@@ -264,7 +273,7 @@ export default function TreeViewPage() {
       <ZoomControls
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
-        onZoomReset={zoomReset}
+        onZoomReset={handleZoomReset}
       />
 
       {selectedPerson && (
