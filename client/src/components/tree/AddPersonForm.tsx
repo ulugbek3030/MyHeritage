@@ -50,6 +50,8 @@ export interface AddPersonFormData {
   secondParentId: string | null;
   /** For __new__ second parent: their name */
   newParentName: string;
+  /** For sibling: which parent IDs to share (default = all target's parents) */
+  siblingParentIds: string[];
   /** Optional photo file */
   photoFile?: File;
 }
@@ -165,6 +167,32 @@ export default function AddPersonForm({
     }
   };
 
+  // --- Find parents of the target person (for sibling mode) ---
+  const targetParents = useMemo(() => {
+    const result: { id: string; name: string }[] = [];
+    for (const rel of relationships) {
+      if (rel.category !== 'parent_child' || rel.person2Id !== targetPerson.id) continue;
+      const parent = persons.find((p) => p.id === rel.person1Id);
+      if (parent) {
+        result.push({
+          id: parent.id,
+          name: [parent.firstName, parent.lastName].filter(Boolean).join(' '),
+        });
+      }
+    }
+    return result;
+  }, [targetPerson.id, persons, relationships]);
+
+  // Sibling parent selection: by default all target's parents are selected
+  const [siblingParentIds, setSiblingParentIds] = useState<string[]>([]);
+
+  // Initialize sibling parents when switching to sibling mode
+  useEffect(() => {
+    if (relType === 'sibling') {
+      setSiblingParentIds(targetParents.map((p) => p.id));
+    }
+  }, [relType, targetParents]);
+
   // --- Find existing partners for the target person ---
   const partners = useMemo(() => {
     const result: { id: string; name: string; divorced: boolean }[] = [];
@@ -231,6 +259,7 @@ export default function AddPersonForm({
       childRelation: relType === 'child' ? childRelation : null,
       secondParentId: relType === 'child' ? effectiveSecondParent : null,
       newParentName: newParentName.trim(),
+      siblingParentIds: relType === 'sibling' ? siblingParentIds : [],
       photoFile: photoFile || undefined,
     });
   };
@@ -294,6 +323,37 @@ export default function AddPersonForm({
                     value={coupleStatus}
                     onChange={setCoupleStatus}
                   />
+                </div>
+              )}
+
+              {/* Sibling: parent selection */}
+              {relType === 'sibling' && targetParents.length > 0 && (
+                <div className="form-conditional">
+                  <label className="form-label" style={{ marginTop: 10 }}>
+                    Общие родители
+                  </label>
+                  <div className="second-parent-hint">
+                    Укажите, какие родители будут общими с {targetName}:
+                  </div>
+                  {targetParents.map((parent) => {
+                    const isSelected = siblingParentIds.includes(parent.id);
+                    return (
+                      <label key={parent.id} className="sibling-parent-check">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {
+                            setSiblingParentIds((prev) =>
+                              isSelected
+                                ? prev.filter((id) => id !== parent.id)
+                                : [...prev, parent.id]
+                            );
+                          }}
+                        />
+                        <span>{parent.name}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               )}
 

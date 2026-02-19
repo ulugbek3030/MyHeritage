@@ -926,6 +926,30 @@
   margin-bottom: 8px;
 }
 
+.sibling-parent-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.sibling-parent-check:hover {
+  background: rgba(255,255,255,0.12);
+}
+.sibling-parent-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #4a6cf7;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 .form-conditional {
   margin-top: 10px;
   animation: fadeSlide 0.25s ease;

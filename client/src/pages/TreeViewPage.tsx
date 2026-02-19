@@ -143,13 +143,11 @@ export default function TreeViewPage() {
       } else if (data.relType === 'parent') {
         // handled after creation
       } else if (data.relType === 'sibling') {
-        const parentRels = fullTree?.relationships.filter(
-          (r) => r.category === 'parent_child' && r.person2Id === addTarget.id
-        ) || [];
-        for (const rel of parentRels) {
+        // Use selected parent IDs from the form (user can uncheck parents for half-siblings)
+        for (const parentId of data.siblingParentIds) {
           relationships.push({
             category: 'parent_child',
-            relatedPersonId: rel.person1Id,
+            relatedPersonId: parentId,
             childRelation: data.childRelation || 'biological',
           });
         }
