@@ -1,9 +1,10 @@
 import fs from 'fs';
 import { query } from '../db/pool.js';
 import { NotFoundError } from '../utils/errors.js';
+import { processAvatar } from '../utils/imageProcessor.js';
 
 /**
- * Upload photo — store binary data directly in PostgreSQL.
+ * Upload photo — smart-crop, resize, compress, store in PostgreSQL.
  * No filesystem dependency — survives container redeployments.
  */
 export async function uploadPhoto(treeId: string, personId: string, file: Express.Multer.File) {
@@ -14,19 +15,22 @@ export async function uploadPhoto(treeId: string, personId: string, file: Expres
   );
   if (personRes.rows.length === 0) throw new NotFoundError('Person');
 
-  // Read file from multer temp location
-  const photoData = fs.readFileSync(file.path);
+  // Read raw file from multer temp location
+  const rawData = fs.readFileSync(file.path);
 
   // Clean up temp file
   try { fs.unlinkSync(file.path); } catch { /* ignore */ }
 
-  // Store in database
+  // Process: smart crop around face/interesting area → resize 256×256 → JPEG 85%
+  const processed = await processAvatar(rawData);
+
+  // Store optimized avatar in database
   const photoUrl = `/api/trees/${treeId}/persons/${personId}/photo`;
   await query(
     `UPDATE persons
      SET photo_data = $1, photo_mime = $2, photo_url = $3, updated_at = NOW()
      WHERE id = $4`,
-    [photoData, file.mimetype, photoUrl, personId]
+    [processed.data, processed.mime, photoUrl, personId]
   );
 
   return { photoUrl };
