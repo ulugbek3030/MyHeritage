@@ -6,7 +6,7 @@ import { UnauthorizedError } from '../utils/errors.js';
 export interface AuthRequest extends Request {
   user?: {
     id: string;
-    email: string;
+    phone: string;
   };
 }
 
@@ -20,8 +20,8 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, authConfig.jwtSecret) as { id: string; email: string };
-    req.user = { id: decoded.id, email: decoded.email };
+    const decoded = jwt.verify(token, authConfig.jwtSecret) as { id: string; phone: string };
+    req.user = { id: decoded.id, phone: decoded.phone };
     next();
   } catch (err) {
     next(new UnauthorizedError('Invalid or expired token'));

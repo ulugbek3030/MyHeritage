@@ -1,8 +1,7 @@
 // ═══════════ User ═══════════
 export interface User {
   id: string;
-  email: string;
-  displayName: string;
+  phone: string;
   avatarUrl: string | null;
 }
 
@@ -14,15 +13,14 @@ export interface AuthResponse {
 }
 
 export interface LoginData {
-  email: string;
+  phone: string;
   password: string;
   rememberMe?: boolean;
 }
 
 export interface RegisterData {
-  email: string;
+  phone: string;
   password: string;
-  displayName: string;
 }
 
 // ═══════════ Tree ═══════════

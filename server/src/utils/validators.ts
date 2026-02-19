@@ -1,15 +1,14 @@
 import { z } from 'zod';
 
-// Auth
+// Auth (phone-based)
 export const registerSchema = z.object({
-  email: z.string().email('Invalid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  displayName: z.string().min(1, 'Display name is required').max(100),
+  phone: z.string().regex(/^\+?\d{7,15}$/, 'Неверный формат номера телефона'),
+  password: z.string().min(6, 'Пароль должен быть не менее 6 символов'),
 });
 
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email'),
-  password: z.string().min(1, 'Password is required'),
+  phone: z.string().regex(/^\+?\d{7,15}$/, 'Неверный формат номера телефона'),
+  password: z.string().min(1, 'Введите пароль'),
 });
 
 // Trees

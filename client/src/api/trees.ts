@@ -16,7 +16,7 @@ export async function getTree(id: string): Promise<Tree> {
   return res.data;
 }
 
-export async function updateTree(id: string, data: { name?: string; description?: string }): Promise<Tree> {
+export async function updateTree(id: string, data: { name?: string; description?: string; ownerPersonId?: string | null }): Promise<Tree> {
   const res = await client.put<Tree>(`/trees/${id}`, data);
   return res.data;
 }

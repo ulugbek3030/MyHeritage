@@ -6,7 +6,7 @@ import '../styles/auth.css';
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
@@ -17,7 +17,7 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login({ email, password, rememberMe });
+      await login({ phone, password, rememberMe });
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Ошибка входа');
@@ -38,13 +38,13 @@ export default function LoginPage() {
           {error && <div className="auth-error">{error}</div>}
 
           <div className="form-group">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="phone">Телефон</label>
             <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+998XXXXXXXXX"
               required
               autoFocus
             />

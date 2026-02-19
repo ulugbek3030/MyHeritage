@@ -9,8 +9,8 @@ const router = Router();
 // POST /api/auth/register
 router.post('/register', validate(registerSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, displayName } = req.body;
-    const result = await authService.registerUser(email, password, displayName);
+    const { phone, password } = req.body;
+    const result = await authService.registerUser(phone, password);
     res.status(201).json(result);
   } catch (err) {
     next(err);
@@ -20,8 +20,8 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
 // POST /api/auth/login
 router.post('/login', validate(loginSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
-    const result = await authService.loginUser(email, password);
+    const { phone, password } = req.body;
+    const result = await authService.loginUser(phone, password);
     res.json(result);
   } catch (err) {
     next(err);

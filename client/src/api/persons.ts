@@ -37,6 +37,21 @@ export async function deletePerson(treeId: string, personId: string): Promise<vo
   await client.delete(`/trees/${treeId}/persons/${personId}`);
 }
 
+export async function uploadPersonPhoto(
+  treeId: string,
+  personId: string,
+  file: File
+): Promise<{ photoUrl: string }> {
+  const formData = new FormData();
+  formData.append('photo', file);
+  const res = await client.post<{ photoUrl: string }>(
+    `/trees/${treeId}/persons/${personId}/photo`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return res.data;
+}
+
 export async function createRelationship(
   treeId: string,
   data: {

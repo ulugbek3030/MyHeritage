@@ -3,11 +3,13 @@ import { databaseUrl, dbConfig } from '../config/database.js';
 
 const { Pool } = pg;
 
-// Use DATABASE_URL (Supabase / production) if set, otherwise individual fields
+// Use DATABASE_URL if set, otherwise individual fields.
+// Enable SSL only for remote (non-localhost) connections.
+const isRemote = databaseUrl && !databaseUrl.includes('localhost') && !databaseUrl.includes('127.0.0.1');
 const poolConfig = process.env.DATABASE_URL
   ? {
       connectionString: databaseUrl,
-      ssl: { rejectUnauthorized: false },
+      ...(isRemote ? { ssl: { rejectUnauthorized: false } } : {}),
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,

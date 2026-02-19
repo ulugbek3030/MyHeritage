@@ -219,3 +219,222 @@
   background: #fef2f2;
   color: var(--color-danger);
 }
+
+/* ═══════════ OnboardingForm ═══════════ */
+.onboarding-card {
+  max-width: 500px;
+  margin: 0 auto;
+  background: var(--color-card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 32px;
+}
+
+.onboarding-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.onboarding-icon {
+  font-size: 40px;
+  margin-bottom: 8px;
+}
+
+.onboarding-header h2 {
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.onboarding-header p {
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.onboarding-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.onboarding-error {
+  background: #fef2f2;
+  color: var(--color-danger);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Photo upload */
+.onb-photo-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.onb-photo-circle {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 2.5px dashed var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s, background 0.2s;
+  background: var(--color-bg);
+}
+
+.onb-photo-circle:hover {
+  border-color: var(--color-primary);
+  background: #f0f5ff;
+}
+
+.onb-photo-circle.has-photo {
+  border-style: solid;
+  border-color: var(--color-primary);
+}
+
+.onb-photo-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.onb-photo-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-muted);
+}
+
+.onb-photo-placeholder span {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.onb-photo-remove {
+  background: none;
+  border: none;
+  font-family: var(--font-family);
+  font-size: 12px;
+  color: var(--color-danger);
+  cursor: pointer;
+  padding: 2px 8px;
+}
+
+.onb-photo-remove:hover {
+  text-decoration: underline;
+}
+
+/* Field */
+.onb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.onb-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.onb-input {
+  padding: 10px 14px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: var(--font-family);
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.onb-input:focus {
+  border-color: var(--color-primary);
+}
+
+/* Chips */
+.onb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.onb-chips-sm {
+  gap: 6px;
+}
+
+.onb-chip {
+  padding: 8px 18px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-card-bg);
+  font-family: var(--font-family);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--color-text-muted);
+}
+
+.onb-chips-sm .onb-chip {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.onb-chip:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.onb-chip.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.onb-chip.male-chip.active {
+  background: #4a90d9;
+  border-color: #4a90d9;
+}
+
+.onb-chip.female-chip.active {
+  background: #e87ba8;
+  border-color: #e87ba8;
+}
+
+/* Submit button */
+.onb-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 8px;
+}
+
+.onb-submit:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.onb-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

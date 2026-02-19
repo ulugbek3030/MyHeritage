@@ -11,7 +11,7 @@ npm run dev:client    # Vite :5176
 npm run db:migrate    # миграции
 npm run db:seed       # тестовые данные
 ```
-Тестовый аккаунт: `test@example.com` / `test123`
+Тестовый аккаунт: `+9980000001` / `test123`
 
 ## Стек
 - Frontend: React 19 + TypeScript + Vite 7
@@ -49,13 +49,24 @@ npm run db:seed       # тестовые данные
 - Lerp: LERP=0.15, SETTLE=0.0005, MAX_SCALE=1.8
 - Dynamic MIN_SCALE = fitTree into viewport
 - transform-origin: top center, will-change: transform
-- Trackpad: Ctrl+Wheel + gesturestart/gesturechange (macOS)
-- **ОБЯЗАТЕЛЬНО**: useEffect для wheel/gesture listeners ДОЛЖЕН иметь **пустой массив зависимостей `[]`**
+- **УНИВЕРСАЛЬНЫЙ ЗУМ** — работает на ВСЕХ устройствах:
+  1. Desktop trackpad pinch: Ctrl+Wheel (Chrome/Firefox/Edge)
+  2. macOS Safari trackpad: gesturestart/gesturechange
+  3. Mobile iOS/Android: touchstart/touchmove/touchend (2 пальца, pinch-to-zoom)
+- CSS `.tree-viewport` ДОЛЖЕН иметь `touch-action: none` — JS обрабатывает ВСЁ
+- При pinch (2 пальца) на viewport ставится `dataset.pinching = '1'`, useDrag это проверяет и не тащит во время pinch
+- **ОБЯЗАТЕЛЬНО**: useEffect для listeners ДОЛЖЕН иметь **пустой массив зависимостей `[]`**
 - Внутри useEffect обработчики ДОЛЖНЫ использовать **только refs и DOM-элементы** (НЕ useCallback функции)
 - Логика clamp/loop/startAnim определяется **inline внутри useEffect**, а НЕ через внешние useCallback
 - onScaleChange хранится в `onScaleChangeRef` (ref) чтобы handler читал свежее значение
-- **ПРИЧИНА**: если deps содержат [clampScale, startZoomAnim], React пересоздаёт listeners при каждом рендере → трекпад зум ломается
-- **НИКОГДА не добавлять clampScale, startZoomAnim или другие useCallback в deps массив useEffect для wheel**
+- **ПРИЧИНА**: если deps содержат [clampScale, startZoomAnim], React пересоздаёт listeners при каждом рендере → зум ломается
+- **НИКОГДА не добавлять clampScale, startZoomAnim или другие useCallback в deps массив useEffect**
+
+### Drag Engine (useDrag.ts)
+- Mouse drag: mousedown/mousemove/mouseup (desktop)
+- Touch drag: touchstart/touchmove/touchend (mobile, 1 палец)
+- Проверяет `viewport.dataset.pinching` — если pinch идёт, touch-drag отключается
+- Touch listeners ДОЛЖНЫ быть `{ passive: true }` — НЕ мешают useZoom touch handlers
 
 ### Relationships в БД
 - parent_child: person1_id = РОДИТЕЛЬ, person2_id = РЕБЁНОК

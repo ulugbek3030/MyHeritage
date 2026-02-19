@@ -6,8 +6,7 @@ import '../styles/auth.css';
 export default function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
-  const [displayName, setDisplayName] = useState('');
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -29,7 +28,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await register({ email, password, displayName });
+      await register({ phone, password });
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Ошибка регистрации');
@@ -50,27 +49,15 @@ export default function RegisterPage() {
           {error && <div className="auth-error">{error}</div>}
 
           <div className="form-group">
-            <label htmlFor="displayName">Имя</label>
+            <label htmlFor="phone">Телефон</label>
             <input
-              id="displayName"
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Ваше имя"
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+998XXXXXXXXX"
               required
               autoFocus
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              required
             />
           </div>
 

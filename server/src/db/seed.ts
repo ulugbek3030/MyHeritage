@@ -10,14 +10,14 @@ async function seed() {
   try {
     await client.query('BEGIN');
 
-    // 1. Create test user
+    // 1. Create test user (phone-based auth)
     const passwordHash = await bcrypt.hash('test123', authConfig.bcryptRounds);
     const userRes = await client.query(
-      `INSERT INTO users (id, email, password_hash, display_name)
-       VALUES (gen_random_uuid(), $1, $2, $3)
-       ON CONFLICT (email) DO UPDATE SET display_name = $3
+      `INSERT INTO users (id, phone, password_hash)
+       VALUES (gen_random_uuid(), $1, $2)
+       ON CONFLICT (phone) DO UPDATE SET password_hash = $2
        RETURNING id`,
-      ['test@example.com', passwordHash, 'Улугбек Рустамов']
+      ['+9980000001', passwordHash]
     );
     const userId = userRes.rows[0].id;
     console.log('  👤 User created:', userId);
