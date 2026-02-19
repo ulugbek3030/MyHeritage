@@ -581,6 +581,34 @@
   margin-bottom: 10px;
 }
 
+/* Relationship rows */
+.popup-relations {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.popup-relation-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #f0f4ff;
+  border-radius: 10px;
+}
+.popup-relation-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6366f1;
+  min-width: 90px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.popup-relation-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
 .popup-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

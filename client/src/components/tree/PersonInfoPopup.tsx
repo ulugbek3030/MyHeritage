@@ -1,4 +1,4 @@
-import type { Person } from '../../types';
+import type { Person, Relationship } from '../../types';
 
 const MaleIconLg = () => (
   <svg viewBox="0 0 24 24" fill="currentColor">
@@ -30,9 +30,95 @@ const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'h
 
 interface PersonInfoPopupProps {
   person: Person;
+  allPersons?: Person[];
+  relationships?: Relationship[];
   onClose: () => void;
   onEdit?: (person: Person) => void;
   onDelete?: (person: Person) => void;
+}
+
+/** Derive family connections for a person */
+function getRelationships(
+  person: Person,
+  allPersons: Person[],
+  relationships: Relationship[]
+) {
+  const personMap = new Map(allPersons.map(p => [p.id, p]));
+  const getName = (id: string) => {
+    const p = personMap.get(id);
+    if (!p) return '?';
+    const parts = [p.firstName];
+    if (p.lastName) parts.push(p.lastName);
+    return parts.join(' ');
+  };
+
+  const parents: { name: string; role: string }[] = [];
+  const children: { name: string }[] = [];
+  const spouses: { name: string; status: string }[] = [];
+
+  for (const rel of relationships) {
+    if (rel.category === 'parent_child') {
+      // person1Id = parent, person2Id = child
+      if (rel.person2Id === person.id) {
+        // This person is the child → person1Id is a parent
+        const parent = personMap.get(rel.person1Id);
+        if (parent) {
+          parents.push({
+            name: getName(rel.person1Id),
+            role: parent.gender === 'male' ? 'Отец' : 'Мать',
+          });
+        }
+      }
+      if (rel.person1Id === person.id) {
+        // This person is the parent → person2Id is a child
+        children.push({ name: getName(rel.person2Id) });
+      }
+    }
+
+    if (rel.category === 'couple') {
+      let spouseId: string | null = null;
+      if (rel.person1Id === person.id) spouseId = rel.person2Id;
+      if (rel.person2Id === person.id) spouseId = rel.person1Id;
+      if (spouseId) {
+        const statusLabels: Record<string, string> = {
+          married: 'Супруг(а)',
+          civil: 'Гр. брак',
+          dating: 'Партнёр',
+          divorced: 'Бывш. супруг(а)',
+          widowed: 'Вдовец/Вдова',
+          other: 'Партнёр',
+        };
+        spouses.push({
+          name: getName(spouseId),
+          status: statusLabels[rel.coupleStatus || 'married'] || 'Супруг(а)',
+        });
+      }
+    }
+  }
+
+  // Siblings: find persons who share at least one parent with this person
+  const parentIds = relationships
+    .filter(r => r.category === 'parent_child' && r.person2Id === person.id)
+    .map(r => r.person1Id);
+
+  const siblings: { name: string }[] = [];
+  if (parentIds.length > 0) {
+    const siblingIds = new Set<string>();
+    for (const rel of relationships) {
+      if (
+        rel.category === 'parent_child' &&
+        parentIds.includes(rel.person1Id) &&
+        rel.person2Id !== person.id
+      ) {
+        siblingIds.add(rel.person2Id);
+      }
+    }
+    for (const sibId of siblingIds) {
+      siblings.push({ name: getName(sibId) });
+    }
+  }
+
+  return { parents, children, spouses, siblings };
 }
 
 function formatDate(dateStr: string | null, yearOnly: number | null, dateKnown: boolean): string {
@@ -57,10 +143,16 @@ function fullName(person: Person): string {
 
 export default function PersonInfoPopup({
   person,
+  allPersons,
+  relationships,
   onClose,
   onEdit,
   onDelete,
 }: PersonInfoPopupProps) {
+  // Derive family connections
+  const familyInfo = allPersons && relationships
+    ? getRelationships(person, allPersons, relationships)
+    : null;
   const photoSrc = person.photoUrl
     ? (person.photoUrl.startsWith('http') ? person.photoUrl : `${API_BASE}${person.photoUrl}`)
     : null;
@@ -89,6 +181,39 @@ export default function PersonInfoPopup({
 
         {/* Body */}
         <div className="popup-body">
+          {/* Family relationships */}
+          {familyInfo && (familyInfo.parents.length > 0 || familyInfo.children.length > 0 || familyInfo.spouses.length > 0 || familyInfo.siblings.length > 0) && (
+            <div className="popup-section">
+              <div className="popup-section-title">Родственные связи</div>
+              <div className="popup-relations">
+                {familyInfo.parents.map((p, i) => (
+                  <div key={`parent-${i}`} className="popup-relation-row">
+                    <span className="popup-relation-label">{p.role}</span>
+                    <span className="popup-relation-name">{p.name}</span>
+                  </div>
+                ))}
+                {familyInfo.spouses.map((s, i) => (
+                  <div key={`spouse-${i}`} className="popup-relation-row">
+                    <span className="popup-relation-label">{s.status}</span>
+                    <span className="popup-relation-name">{s.name}</span>
+                  </div>
+                ))}
+                {familyInfo.siblings.map((s, i) => (
+                  <div key={`sibling-${i}`} className="popup-relation-row">
+                    <span className="popup-relation-label">{i === 0 ? 'Брат/Сестра' : ''}</span>
+                    <span className="popup-relation-name">{s.name}</span>
+                  </div>
+                ))}
+                {familyInfo.children.map((c, i) => (
+                  <div key={`child-${i}`} className="popup-relation-row">
+                    <span className="popup-relation-label">{i === 0 ? 'Дети' : ''}</span>
+                    <span className="popup-relation-name">{c.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Basic info */}
           <div className="popup-section">
             <div className="popup-section-title">Основная информация</div>

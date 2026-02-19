@@ -347,6 +347,8 @@ export default function TreeViewPage() {
       {selectedPerson && (
         <PersonInfoPopup
           person={selectedPerson}
+          allPersons={fullTree.persons}
+          relationships={fullTree.relationships}
           onClose={() => setSelectedPerson(null)}
           onEdit={handleEditClick}
           onDelete={handleDeleteClick}
