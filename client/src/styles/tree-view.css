@@ -166,18 +166,8 @@
   z-index: 1;
 }
 
-/* ============ COUPLE ============ */
-.couple {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-  position: relative;
-}
+/* ============ COUPLE DECORATIONS ============ */
 .couple-heart {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   width: 28px; height: 28px;
   background: #fff;
   border-radius: 50%;
@@ -185,24 +175,26 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  z-index: 10;
   font-size: 13px;
 }
+.couple-badge-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 .couple-badge-divorced {
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
   background: #fee2e2;
   color: #dc2626;
   font-size: 8px;
   font-weight: 800;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 8px;
   white-space: nowrap;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  z-index: 11;
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 /* ============ CARD ============ */
