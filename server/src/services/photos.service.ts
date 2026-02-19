@@ -1,60 +1,65 @@
-import path from 'path';
 import fs from 'fs';
 import { query } from '../db/pool.js';
-import { NotFoundError, ValidationError } from '../utils/errors.js';
+import { NotFoundError } from '../utils/errors.js';
 
-const UPLOADS_DIR = path.resolve(__dirname, '../../uploads');
-
+/**
+ * Upload photo — store binary data directly in PostgreSQL.
+ * No filesystem dependency — survives container redeployments.
+ */
 export async function uploadPhoto(treeId: string, personId: string, file: Express.Multer.File) {
   // Verify person exists
   const personRes = await query(
-    'SELECT id, photo_url FROM persons WHERE id = $1 AND tree_id = $2',
+    'SELECT id FROM persons WHERE id = $1 AND tree_id = $2',
     [personId, treeId]
   );
   if (personRes.rows.length === 0) throw new NotFoundError('Person');
 
-  // Delete old photo if exists
-  const oldUrl = personRes.rows[0].photo_url;
-  if (oldUrl && oldUrl.startsWith('/uploads/')) {
-    const oldPath = path.join(UPLOADS_DIR, '..', oldUrl);
-    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-  }
+  // Read file from multer temp location
+  const photoData = fs.readFileSync(file.path);
 
-  // Ensure directory exists
-  const dir = path.join(UPLOADS_DIR, treeId);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  // Clean up temp file
+  try { fs.unlinkSync(file.path); } catch { /* ignore */ }
 
-  // Move file
-  const ext = path.extname(file.originalname) || '.jpg';
-  const filename = `${personId}${ext}`;
-  const dest = path.join(dir, filename);
-  fs.renameSync(file.path, dest);
-
-  // Update person
-  const photoUrl = `/uploads/${treeId}/${filename}`;
+  // Store in database
+  const photoUrl = `/api/trees/${treeId}/persons/${personId}/photo`;
   await query(
-    'UPDATE persons SET photo_url = $1, updated_at = NOW() WHERE id = $2',
-    [photoUrl, personId]
+    `UPDATE persons
+     SET photo_data = $1, photo_mime = $2, photo_url = $3, updated_at = NOW()
+     WHERE id = $4`,
+    [photoData, file.mimetype, photoUrl, personId]
   );
 
   return { photoUrl };
 }
 
+/**
+ * Get photo binary data from database.
+ */
+export async function getPhoto(treeId: string, personId: string) {
+  const res = await query(
+    'SELECT photo_data, photo_mime FROM persons WHERE id = $1 AND tree_id = $2',
+    [personId, treeId]
+  );
+  if (res.rows.length === 0) throw new NotFoundError('Person');
+
+  const { photo_data, photo_mime } = res.rows[0];
+  if (!photo_data) return null;
+
+  return { data: photo_data as Buffer, mime: photo_mime as string };
+}
+
+/**
+ * Delete photo — clear binary data from database.
+ */
 export async function deletePhoto(treeId: string, personId: string) {
   const personRes = await query(
-    'SELECT id, photo_url FROM persons WHERE id = $1 AND tree_id = $2',
+    'SELECT id FROM persons WHERE id = $1 AND tree_id = $2',
     [personId, treeId]
   );
   if (personRes.rows.length === 0) throw new NotFoundError('Person');
 
-  const photoUrl = personRes.rows[0].photo_url;
-  if (photoUrl && photoUrl.startsWith('/uploads/')) {
-    const filePath = path.join(UPLOADS_DIR, '..', photoUrl);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  }
-
   await query(
-    'UPDATE persons SET photo_url = NULL, updated_at = NOW() WHERE id = $1',
+    'UPDATE persons SET photo_data = NULL, photo_mime = NULL, photo_url = NULL, updated_at = NOW() WHERE id = $1',
     [personId]
   );
 

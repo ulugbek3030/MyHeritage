@@ -1,13 +1,13 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import path from 'path';
+import os from 'os';
 import { authenticate } from '../middleware/authenticate.js';
 import { authorizeTree, TreeRequest } from '../middleware/authorize.js';
 import { ValidationError } from '../utils/errors.js';
 import * as photosService from '../services/photos.service.js';
 
 const upload = multer({
-  dest: path.resolve(__dirname, '../../uploads/tmp'),
+  dest: os.tmpdir(), // Use OS temp dir (works on any host, no filesystem dependency)
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp'];
@@ -21,6 +21,25 @@ const upload = multer({
 
 const router = Router({ mergeParams: true });
 
+// GET photo — public (no auth required), serves binary from DB
+// Must be BEFORE authenticate middleware
+router.get('/:personId/photo', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const treeId = req.params.treeId as string;
+    const personId = req.params.personId as string;
+    const photo = await photosService.getPhoto(treeId, personId);
+
+    if (!photo) {
+      return res.status(404).json({ error: 'No photo' });
+    }
+
+    res.set('Content-Type', photo.mime);
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(photo.data);
+  } catch (err) { next(err); }
+});
+
+// Auth required for upload/delete
 router.use(authenticate);
 router.use(authorizeTree);
 
