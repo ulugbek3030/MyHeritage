@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as treesApi from '../api/trees';
 import * as personsApi from '../api/persons';
+import { processAvatarClient } from '../utils/imageProcessor';
 
 type BirthMode = 'unknown' | 'year' | 'full';
 
@@ -60,13 +61,24 @@ export default function OnboardingForm({ onComplete }: OnboardingFormProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPhotoFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setPhotoPreview(reader.result as string);
-    reader.readAsDataURL(file);
+
+    try {
+      // Smart crop + resize + compress on client side
+      const processed = await processAvatarClient(file);
+      setPhotoFile(processed);
+      const reader = new FileReader();
+      reader.onload = () => setPhotoPreview(reader.result as string);
+      reader.readAsDataURL(processed);
+    } catch {
+      // Fallback: use original file
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onload = () => setPhotoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
   };
 
   const removePhoto = () => {

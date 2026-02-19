@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Person } from '../../types';
 import type { CreatePersonData } from '../../api/persons';
+import { processAvatarClient } from '../../utils/imageProcessor';
 
 const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:3001');
 
@@ -124,12 +125,21 @@ export default function EditPersonForm({
     };
   }, [photoPreview]);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (photoPreview) URL.revokeObjectURL(photoPreview);
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+
+    try {
+      // Smart crop + resize + compress on client side
+      const processed = await processAvatarClient(file);
+      setPhotoFile(processed);
+      setPhotoPreview(URL.createObjectURL(processed));
+    } catch {
+      // Fallback: use original file if processing fails
+      setPhotoFile(file);
+      setPhotoPreview(URL.createObjectURL(file));
+    }
   };
 
   // --- Handle submit ---
