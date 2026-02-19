@@ -64,25 +64,36 @@
   letter-spacing: 0.5px;
 }
 .tree-header-back {
-  position: absolute;
-  top: 8px;
-  left: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   background: rgba(255,255,255,0.15);
   border: none;
   border-radius: 8px;
-  padding: 4px 12px;
   color: rgba(255,255,255,0.8);
   font-family: var(--font-family);
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
   text-decoration: none;
+  flex-shrink: 0;
 }
 .tree-header-back:hover {
   background: rgba(255,255,255,0.25);
   color: #fff;
   text-decoration: none;
+}
+.tree-header-info {
+  min-width: 0; /* allow text truncation */
+}
+.tree-header-title,
+.tree-header-subtitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ============ VIEWPORT ============ */
@@ -964,20 +975,74 @@
   animation: spin 0.6s linear infinite;
 }
 
-/* ============ RESPONSIVE ============ */
+/* ============ RESPONSIVE — TABLET ============ */
 @media (max-width: 768px) {
-  .tree-header { padding: 24px 14px 16px; }
-  .tree-header-inner { flex-wrap: wrap; gap: 8px; }
+  .tree-header { padding: 14px 14px 12px; }
+  .tree-header-back { width: 28px; height: 28px; font-size: 14px; border-radius: 6px; }
+  .tree-header-inner { flex-wrap: nowrap; gap: 8px; }
   .tree-header-title { font-size: 16px; }
-  .tree-header-icon { width: 36px; height: 36px; }
-  .tree-header-icon svg { width: 20px; height: 20px; }
-  .tree-header-left { gap: 10px; }
-  .tree-header-stats { gap: 14px; }
-  .tree-stat-num { font-size: 18px; }
-  .tree-stat-label { font-size: 9px; }
+  .tree-header-icon { width: 34px; height: 34px; }
+  .tree-header-icon svg { width: 18px; height: 18px; }
+  .tree-header-left { gap: 8px; }
+  .tree-header-stats { gap: 12px; }
+  .tree-stat-num { font-size: 16px; }
+  .tree-stat-label { font-size: 8px; }
+  .tree-container { padding: 20px 30px 60px; }
+  .generation { gap: 60px; }
   .generation.gen-3 { gap: 10px; }
-  .card { width: 150px; }
+  .card { width: 150px; min-height: 190px; }
   .card-name { min-height: 32px; }
   .card-name-first { font-size: 12px; }
   .card-name-rest { font-size: 10px; }
+  .zoom-controls { bottom: 16px; right: 16px; }
+  .ctrl-btn { width: 36px; height: 36px; font-size: 16px; border-radius: 10px; }
+}
+
+/* ============ RESPONSIVE — MOBILE (iPhone etc) ============ */
+@media (max-width: 480px) {
+  .tree-header { padding: 10px 10px 8px; }
+  .tree-header-back { width: 26px; height: 26px; font-size: 13px; border-radius: 6px; }
+  .tree-header-inner { gap: 6px; }
+  .tree-header-left { gap: 6px; }
+  .tree-header-icon { width: 30px; height: 30px; border-width: 1.5px; }
+  .tree-header-icon svg { width: 16px; height: 16px; }
+  .tree-header-icon img { width: 100%; height: 100%; object-fit: cover; }
+  .tree-header-title { font-size: 14px; }
+  .tree-header-subtitle { font-size: 10px; }
+  .tree-header-stats { gap: 10px; }
+  .tree-stat-num { font-size: 14px; }
+  .tree-stat-label { font-size: 7px; letter-spacing: 0.3px; }
+  .tree-container { padding: 16px 16px 60px; }
+  .generation { gap: 30px; margin-bottom: 10px; }
+  .generation.gen-3 { gap: 6px; }
+  .couple { gap: 12px; }
+  .couple-heart { width: 22px; height: 22px; font-size: 10px; }
+  .card { width: 130px; min-height: 170px; border-radius: 12px; }
+  .card-body { padding: 12px 8px 4px; }
+  .avatar { width: 48px; height: 48px; margin-bottom: 6px; border-width: 2px; }
+  .avatar svg { width: 24px; height: 24px; }
+  .card-name { min-height: 28px; }
+  .card-name-first { font-size: 11px; }
+  .card-name-rest { font-size: 9px; }
+  .card-years { font-size: 10px; }
+  .badge-deceased { font-size: 8px; padding: 2px 7px; }
+  .badge-owner { font-size: 7px; padding: 2px 7px; }
+  .plus-tab { width: 38px; height: 18px; bottom: -18px; }
+  .plus-tab svg { width: 10px; height: 10px; }
+  .connector-space { height: 40px; }
+  .gen-label span { font-size: 9px; padding: 4px 14px; letter-spacing: 1.5px; }
+  .zoom-controls { bottom: 12px; right: 10px; gap: 4px; }
+  .ctrl-btn { width: 32px; height: 32px; font-size: 14px; border-radius: 8px; }
+  .ctrl-btn svg { width: 14px; height: 14px; }
+
+  /* Popup mobile */
+  .popup { border-radius: 18px; max-width: 95vw; max-height: 90vh; }
+  .popup-header { padding: 20px 16px 14px; }
+  .popup-avatar-lg { width: 64px; height: 64px; }
+  .popup-avatar-lg svg { width: 32px; height: 32px; }
+  .popup-name { font-size: 17px; }
+  .popup-body { padding: 14px 16px 18px; }
+  .popup-actions { padding: 14px 16px 16px; }
+  .popup-act-btn { font-size: 13px; padding: 10px 12px; }
+  .add-form-popup { max-width: 95vw; }
 }

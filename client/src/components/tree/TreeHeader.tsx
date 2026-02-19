@@ -25,11 +25,10 @@ export default function TreeHeader({ fullTree, ownerPerson }: TreeHeaderProps) {
     : fullTree.tree.name;
 
   return (
-    <header className="tree-header" style={{ position: 'relative' }}>
-      <Link to="/" className="tree-header-back">&larr; Назад</Link>
-
+    <header className="tree-header">
       <div className="tree-header-inner">
         <div className="tree-header-left">
+          <Link to="/" className="tree-header-back">&larr;</Link>
           <div className="tree-header-icon">
             {photoSrc ? (
               <img src={photoSrc} alt={ownerPerson?.firstName} />
@@ -37,7 +36,7 @@ export default function TreeHeader({ fullTree, ownerPerson }: TreeHeaderProps) {
               <TreeIcon />
             )}
           </div>
-          <div>
+          <div className="tree-header-info">
             <div className="tree-header-title">Семейное Древо</div>
             <div className="tree-header-subtitle">{ownerName}</div>
           </div>
