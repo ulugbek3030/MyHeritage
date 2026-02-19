@@ -15,6 +15,7 @@ import treesRoutes from './routes/trees.routes.js';
 import personsRoutes from './routes/persons.routes.js';
 import relationshipsRoutes from './routes/relationships.routes.js';
 import photosRoutes from './routes/photos.routes.js';
+import * as photosService from './services/photos.service.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
@@ -56,10 +57,22 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Routes
+// Public endpoint: serve photos without auth (needed for <img src="...">)
+// Must be BEFORE treesRoutes which applies authenticate middleware to all /api/trees/*
+app.get('/api/trees/:treeId/persons/:personId/photo', async (req, res, next) => {
+  try {
+    const photo = await photosService.getPhoto(req.params.treeId, req.params.personId);
+    if (!photo) return res.status(404).json({ error: 'No photo' });
+    res.set('Content-Type', photo.mime);
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(photo.data);
+  } catch (err) { next(err); }
+});
+
+// Routes (all require auth)
 app.use('/api/auth', authRoutes);
 app.use('/api/trees', treesRoutes);
-app.use('/api/trees/:treeId/persons', photosRoutes);   // photo GET is public — must be BEFORE personsRoutes
+app.use('/api/trees/:treeId/persons', photosRoutes);
 app.use('/api/trees/:treeId/persons', personsRoutes);
 app.use('/api/trees/:treeId/relationships', relationshipsRoutes);
 
