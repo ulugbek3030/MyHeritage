@@ -9,9 +9,8 @@
  *   - "Разведены" badge for divorced couples
  */
 import { useMemo } from 'react';
-import calcTree from 'relatives-tree';
 import type { Person, Relationship } from '../../types';
-import { transformToTreeNodes } from '../../utils/treeTransform';
+import { customCalcTree } from '../../utils/customCalcTree';
 import PersonCard from './PersonCard';
 
 // Node dimensions (including spacing between nodes)
@@ -57,51 +56,17 @@ export default function FamilyTreeLayout({
   onEditClick,
   onDeleteClick,
 }: FamilyTreeLayoutProps) {
-  // Transform data and compute layout
+  // Transform data and compute layout using custom engine
   const treeData = useMemo(() => {
     if (persons.length === 0) return null;
 
-    const nodes = transformToTreeNodes(persons, relationships);
-
     try {
-      // Try with preferred rootId first
-      const result = calcTree(nodes as any, { rootId });
-      const placedIds = new Set(result.nodes.map((n: { id: string }) => n.id));
-
-      // If all nodes placed — great, done
-      if (placedIds.size >= nodes.length) {
-        return result;
-      }
-
-      // Try other roots to find one that covers ALL nodes
-      let bestResult = result;
-      let bestCount = placedIds.size;
-
-      for (const node of nodes) {
-        if (node.id === rootId) continue; // already tried
-        try {
-          const alt = calcTree(nodes as any, { rootId: node.id });
-          const altCount = alt.nodes.length;
-          if (altCount > bestCount) {
-            bestResult = alt;
-            bestCount = altCount;
-            if (bestCount >= nodes.length) break; // found perfect root
-          }
-        } catch {
-          // skip invalid roots
-        }
-      }
-
-      if (bestCount < nodes.length) {
-        console.warn(`[calcTree] Best root covers ${bestCount}/${nodes.length} nodes`);
-      }
-
-      return bestResult;
+      return customCalcTree(persons, relationships, ownerPersonId || rootId);
     } catch (err) {
-      console.error('calcTree error:', err);
+      console.error('customCalcTree error:', err);
       return null;
     }
-  }, [persons, relationships, rootId]);
+  }, [persons, relationships, ownerPersonId, rootId]);
 
   const personMap = useMemo(
     () => new Map(persons.map(p => [p.id, p])),
