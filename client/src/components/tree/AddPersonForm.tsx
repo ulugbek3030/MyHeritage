@@ -108,6 +108,13 @@ export default function AddPersonForm({
   onSubmit,
   onClose,
 }: AddPersonFormProps) {
+  // --- Check if target person has parents (needed for sibling option) ---
+  const hasParents = useMemo(() => {
+    return relationships.some(
+      (r) => r.category === 'parent_child' && r.person2Id === targetPerson.id
+    );
+  }, [relationships, targetPerson.id]);
+
   // --- Form state ---
   const [relType, setRelType] = useState<RelType>('child');
   const [coupleStatus, setCoupleStatus] = useState<CoupleStatus>('married');
@@ -251,7 +258,10 @@ export default function AddPersonForm({
                 options={[
                   { value: 'child' as RelType, label: 'Ребёнок' },
                   { value: 'pair' as RelType, label: 'Пара' },
-                  { value: 'sibling' as RelType, label: 'Брат/Сестра' },
+                  // Sibling only available if target has parents in tree
+                  ...(hasParents
+                    ? [{ value: 'sibling' as RelType, label: 'Брат/Сестра' }]
+                    : []),
                   { value: 'parent' as RelType, label: 'Родитель' },
                 ]}
                 value={relType}
