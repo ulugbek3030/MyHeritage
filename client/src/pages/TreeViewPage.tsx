@@ -180,6 +180,15 @@ export default function TreeViewPage() {
         });
       }
 
+      // Upload photo if provided
+      if (data.photoFile) {
+        try {
+          await personsApi.uploadPersonPhoto(treeId, newPerson.id, data.photoFile);
+        } catch {
+          console.warn('Photo upload failed, skipping');
+        }
+      }
+
       setAddTarget(null);
       loadTree();
     } catch (err: any) {

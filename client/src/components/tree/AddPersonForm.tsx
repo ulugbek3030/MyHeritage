@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import type {
   Person,
   Relationship,
@@ -48,6 +48,8 @@ export interface AddPersonFormData {
   secondParentId: string | null;
   /** For __new__ second parent: their name */
   newParentName: string;
+  /** Optional photo file */
+  photoFile?: File;
 }
 
 /* ───── Chip selector helper ───── */
@@ -80,6 +82,22 @@ function ChipGroup<T extends string>({
   );
 }
 
+/* ───── Camera icon SVG ───── */
+const CameraIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+    <circle cx="12" cy="13" r="4"/>
+  </svg>
+);
+
+/* ───── Person avatar placeholder SVG ───── */
+const PersonIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+
 /* ───── Main component ───── */
 export default function AddPersonForm({
   targetPerson,
@@ -107,6 +125,26 @@ export default function AddPersonForm({
   const [note, setNote] = useState('');
   const [secondParentId, setSecondParentId] = useState<string>('');
   const [newParentName, setNewParentName] = useState('');
+
+  // --- Photo state ---
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Clean up object URL on unmount
+  useEffect(() => {
+    return () => {
+      if (photoPreview) URL.revokeObjectURL(photoPreview);
+    };
+  }, [photoPreview]);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
 
   // --- Find existing partners for the target person ---
   const partners = useMemo(() => {
@@ -173,6 +211,7 @@ export default function AddPersonForm({
       childRelation: relType === 'child' ? childRelation : null,
       secondParentId: relType === 'child' ? effectiveSecondParent : null,
       newParentName: newParentName.trim(),
+      photoFile: photoFile || undefined,
     });
   };
 
@@ -291,6 +330,37 @@ export default function AddPersonForm({
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* === Photo === */}
+            <div className="form-group edit-photo-section">
+              <div
+                className={`edit-photo-preview ${gender}`}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Фото" />
+                ) : (
+                  <PersonIcon />
+                )}
+                <div className="edit-photo-overlay">
+                  <CameraIcon />
+                </div>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handlePhotoChange}
+              />
+              <button
+                type="button"
+                className="edit-photo-btn"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {photoPreview ? 'Изменить фото' : 'Добавить фото'}
+              </button>
             </div>
 
             {/* === Gender === */}
