@@ -6,7 +6,9 @@
 
 - **Язык интерфейса**: Русский (lang="ru")
 - **Шрифт**: Nunito (Google Fonts)
-- **Текущие тестовые данные**: семья Рустамовых-Усмановых, 19 человек, 4 поколения
+- **Текущие тестовые данные**: семья Рустамовых-Усмановых, 13 человек, 4 поколения
+- **Деплой**: https://myheritage.onrender.com (Render.com)
+- **GitHub**: https://github.com/ulugbek3030/MyHeritage.git
 
 ---
 
@@ -20,7 +22,7 @@
 | Auth | JWT (access + refresh tokens) + bcrypt |
 | Layout Engine | `relatives-tree` v3.2.2 (MIT, 3KB) |
 | HTTP Client | Axios (с auto-refresh interceptor) |
-| Image Processing | Sharp |
+| Image Processing | smartcrop (client-side, browser Canvas API) |
 | File Upload | Multer |
 | Validation | Zod |
 | CSS | Custom CSS Variables + BEM-like |
@@ -42,7 +44,7 @@ npm run db:migrate   # Миграции
 npm run db:seed      # Тестовые данные
 ```
 
-**Тестовый аккаунт**: `test@example.com` / `test123`
+**Тестовый аккаунт**: `+9980000001` / `test123`
 
 **Переменные окружения** (`.env` в корне):
 ```
@@ -83,9 +85,8 @@ MyHeritage/
 ├── server/
 │   ├── package.json
 │   ├── tsconfig.json
-│   ├── uploads/.gitkeep
 │   └── src/
-│       ├── app.ts                          # Express entry point, порт 3001
+│       ├── app.ts                          # Express entry point, порт 3001 (ВАЖНО: public photo GET registered BEFORE treesRoutes!)
 │       ├── config/
 │       │   ├── auth.ts                     # JWT настройки
 │       │   └── database.ts                 # PG connection config
@@ -109,7 +110,7 @@ MyHeritage/
 │       │   ├── trees.service.ts            # CRUD + getFullTree + BFS generations
 │       │   ├── persons.service.ts          # CRUD + relationship creation in transaction
 │       │   ├── relationships.service.ts    # CRUD
-│       │   └── photos.service.ts           # Upload (Sharp) + delete
+│       │   └── photos.service.ts           # Upload (stores as-is, no processing) + getPhoto + delete
 │       └── utils/
 │           ├── errors.ts                   # AppError, NotFoundError, UnauthorizedError, etc.
 │           └── validators.ts               # Zod schemas
@@ -135,8 +136,8 @@ MyHeritage/
         │   ├── useDrag.ts                   # Drag-to-pan viewport
         │   └── useConnectors.ts             # SVG line drawing (legacy, не используется с relatives-tree)
         ├── pages/
-        │   ├── LoginPage.tsx                # Email + пароль + "Запомнить меня"
-        │   ├── RegisterPage.tsx             # Имя + email + пароль + подтверждение
+        │   ├── LoginPage.tsx                # Телефон + пароль + "Запомнить меня"
+        │   ├── RegisterPage.tsx             # Телефон + пароль
         │   ├── TreesListPage.tsx            # Главная: карточка дерева или кнопка создания
         │   └── TreeViewPage.tsx             # Основная страница дерева
         ├── components/
@@ -147,11 +148,13 @@ MyHeritage/
         │       ├── FamilyTreeLayout.tsx      # relatives-tree layout + SVG lines
         │       ├── PersonCard.tsx            # Карточка персоны (174px)
         │       ├── PersonInfoPopup.tsx       # Popup с деталями персоны
-        │       ├── AddPersonForm.tsx         # Форма добавления родственника
+        │       ├── AddPersonForm.tsx         # Форма добавления родственника (sibling hidden if no parents)
+        │       ├── EditPersonForm.tsx        # Форма редактирования персоны
         │       ├── ConfirmDeleteDialog.tsx   # Диалог подтверждения удаления
         │       └── ZoomControls.tsx          # Кнопки +/−/↺
         ├── utils/
-        │   └── treeTransform.ts             # DB data → relatives-tree Node[] format
+        │   ├── treeTransform.ts             # DB data → relatives-tree Node[] format
+        │   └── imageProcessor.ts            # processAvatarClient() — smartcrop + canvas resize on client
         └── styles/
             ├── global.css                    # Reset, spinner, font import
             ├── variables.css                 # CSS custom properties
@@ -167,9 +170,8 @@ MyHeritage/
 ### users
 ```sql
 id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
-email           VARCHAR(255) UNIQUE NOT NULL
+phone           VARCHAR(20) UNIQUE NOT NULL    -- (migration 007: email → phone auth)
 password_hash   VARCHAR(255) NOT NULL
-display_name    VARCHAR(100) NOT NULL
 avatar_url      VARCHAR(500)
 created_at      TIMESTAMPTZ DEFAULT NOW()
 updated_at      TIMESTAMPTZ DEFAULT NOW()
@@ -202,7 +204,9 @@ is_alive        BOOLEAN DEFAULT true
 death_date      DATE
 death_year      SMALLINT
 death_date_known BOOLEAN DEFAULT false
-photo_url       VARCHAR(500)
+photo_url       VARCHAR(500)           -- URL path: /api/trees/:treeId/persons/:personId/photo
+photo_data      BYTEA                  -- (migration 008: photos stored in DB as binary)
+photo_mime      VARCHAR(50)            -- e.g. 'image/jpeg'
 note            TEXT
 created_at      TIMESTAMPTZ DEFAULT NOW()
 updated_at      TIMESTAMPTZ DEFAULT NOW()
@@ -238,8 +242,8 @@ updated_at      TIMESTAMPTZ DEFAULT NOW()
 ### Auth (`/api/auth`)
 | Method | Endpoint | Описание |
 |--------|----------|----------|
-| POST | /auth/register | Регистрация (email, password, displayName) |
-| POST | /auth/login | Вход (email, password) → {user, accessToken, refreshToken} |
+| POST | /auth/register | Регистрация (phone, password) |
+| POST | /auth/login | Вход (phone, password) → {user, accessToken, refreshToken} |
 | GET | /auth/me | Профиль текущего пользователя |
 | POST | /auth/refresh | Обновление токенов {refreshToken} → {accessToken, refreshToken} |
 | POST | /auth/logout | Выход |
@@ -274,8 +278,9 @@ updated_at      TIMESTAMPTZ DEFAULT NOW()
 ### Photos (`/api/trees/:treeId/persons/:personId`)
 | Method | Endpoint | Описание |
 |--------|----------|----------|
-| POST | /persons/:personId/photo | Upload (multipart, max 5MB, jpeg/png/webp) |
-| DELETE | /persons/:personId/photo | Удалить фото |
+| GET | /persons/:personId/photo | **PUBLIC** (no auth!) — serve photo from DB BYTEA. Registered in app.ts BEFORE treesRoutes |
+| POST | /persons/:personId/photo | Upload (multipart, max 5MB, jpeg/png/webp). Auth required |
+| DELETE | /persons/:personId/photo | Удалить фото. Auth required |
 
 ---
 
@@ -284,21 +289,19 @@ updated_at      TIMESTAMPTZ DEFAULT NOW()
 ```typescript
 interface User {
   id: string;
-  email: string;
-  displayName: string;
+  phone: string;
   avatarUrl: string | null;
 }
 
 interface LoginData {
-  email: string;
+  phone: string;
   password: string;
   rememberMe?: boolean;    // true → localStorage, false → sessionStorage
 }
 
 interface RegisterData {
-  email: string;
+  phone: string;
   password: string;
-  displayName: string;
 }
 
 interface Tree {
@@ -414,12 +417,14 @@ interface TreeNode {
 - `wasDragged()` — используется в handleCardClick для предотвращения открытия popup после drag
 
 ### AddPersonForm.tsx
-- **Типы связей (chips)**: Ребёнок, Пара, Брат/Сестра, Родитель
+- **Типы связей (chips)**: Ребёнок, Пара, Брат/Сестра (только если есть родители!), Родитель
 - **Пара**: выбор coupleStatus (Муж/Жена, Гражданский брак, Встречаются, Разведены, Смерть супруга, Другое)
 - **Ребёнок**: выбор childRelation + dropdown второго родителя (существующий партнёр / новый / без второго)
+- **Брат/Сестра**: `hasParents` проверка — скрыто если target person без родителей (предотвращает orphan)
 - **Пол**: подписи меняются в зависимости от relType (Сын/Дочь vs Мужской/Женский)
 - **Дата рождения**: 3 режима (Не знаю / Только год / Полная дата)
 - **Статус**: Жив(а) / Умер(ла) + дата смерти
+- **Фото**: processAvatarClient() — smartcrop + resize на клиенте при выборе файла
 
 ### ConfirmDeleteDialog.tsx
 - BFS поиск "сирот" — персон, которые станут недостижимы от owner
@@ -533,7 +538,7 @@ BFS от owner (`generation=0`):
 Request → CORS → JSON parser → [authenticate] → [authorize (tree ownership)] → Route Handler → Error Handler
 ```
 
-- `authenticate`: JWT verify из `Authorization: Bearer <token>` → `req.user = {id, email}`
+- `authenticate`: JWT verify из `Authorization: Bearer <token>` → `req.user = {id, phone}`
 - `authorizeTree`: Проверяет что tree.user_id === req.user.id → `req.tree`
 - `validate(zodSchema)`: Парсит body через Zod, 400 с деталями ошибок при невалидности
 - `errorHandler`: AppError → statusCode, ValidationError → 400 + errors[], unknown → 500
@@ -543,8 +548,8 @@ Request → CORS → JSON parser → [authenticate] → [authorize (tree ownersh
 ## Zod-схемы валидации (validators.ts)
 
 ```typescript
-registerSchema:  email (valid), password (min 6), displayName (1-100)
-loginSchema:     email, password (required)
+registerSchema:  phone (required), password (min 6)
+loginSchema:     phone, password (required)
 createTreeSchema: name (1-200), description (optional)
 createPersonSchema: firstName (required), gender (male|female), birth/death fields, relationships[]
 createRelationshipSchema: category, person1Id (UUID), person2Id (UUID), coupleStatus/childRelation
@@ -552,21 +557,52 @@ createRelationshipSchema: category, person1Id (UUID), person2Id (UUID), coupleSt
 
 ---
 
-## Фото-загрузка (photos.service.ts)
+## Фото-загрузка (полный pipeline)
 
-- Multer: `/uploads/tmp`, max 5MB, jpeg/png/webp
-- Путь хранения: `/uploads/{treeId}/{personId}.{ext}`
-- Старое фото удаляется при загрузке нового
-- URL в БД: `/uploads/{treeId}/{personId}.ext`
-- Статика: Express serves `/uploads` directory
+### Client-side (imageProcessor.ts)
+- `processAvatarClient(file)` → smartcrop + canvas resize (256x256) + JPEG 85% quality
+- Используется в AddPersonForm, EditPersonForm, OnboardingForm
+- Fallback: если smartcrop fails, отправляет оригинал
+
+### Server-side (photos.service.ts)
+- Multer: temp file, max 5MB, jpeg/png/webp
+- Хранение: PostgreSQL BYTEA column (`photo_data` + `photo_mime` в таблице persons)
+- **НЕТ** обработки на сервере — файл сохраняется as-is (обработка на клиенте)
+- URL в БД: `/api/trees/:treeId/persons/:personId/photo`
+
+### КРИТИЧНО: Route ordering в app.ts
+- Photo GET — **PUBLIC** (без auth), зарегистрирован как `app.get()` ПЕРЕД `treesRoutes`
+- `treesRoutes` применяет `router.use(authenticate)` ко всем `/api/trees/*`
+- Если photo GET будет ПОСЛЕ treesRoutes → 401 для `<img src="...">` (браузер не шлёт JWT)
+- Photo POST/DELETE — через `photosRoutes` (с auth)
 
 ---
 
 ## Что НЕ реализовано (TODO)
 
-1. **EditPersonForm** — кнопка "Редактировать" в popup ведёт на `{/* TODO */}`
-2. **Фото-загрузка в UI** — бэкенд API готов, фронтенд формы нет
-3. **Удаление дерева** — API есть, кнопки в UI нет
-4. **Drag-and-drop** для реорганизации
-5. **Экспорт** (PDF/изображение)
-6. **Мобильная адаптация** — есть базовый responsive breakpoint на 768px
+1. **Удаление дерева** — API есть, кнопки в UI нет
+2. **Drag-and-drop** для реорганизации
+3. **Экспорт** (PDF/изображение)
+4. **Мобильная адаптация** — есть базовый responsive breakpoints (768px, 480px)
+
+## Решённые проблемы (НЕ ВОЗВРАЩАТЬСЯ к ним)
+
+### Photo 401 — РЕШЕНО (commit c61fba6)
+- **Проблема**: `<img src="/api/trees/.../photo">` получал 401 потому что `treesRoutes` с `router.use(authenticate)` перехватывал ВСЕ `/api/trees/*` запросы
+- **Решение**: Photo GET зарегистрирован как `app.get()` прямо в app.ts ПЕРЕД treesRoutes
+- **НЕ ЛОМАТЬ**: порядок регистрации роутов в app.ts критичен
+
+### Image processing — на клиенте, НЕ на сервере (commit 2ee4097)
+- smartcrop + canvas resize выполняются в браузере (`client/src/utils/imageProcessor.ts`)
+- Сервер хранит файл as-is в PostgreSQL BYTEA
+- `server/src/utils/imageProcessor.ts` — УДАЛЁН
+
+### Sibling creation — hidden for persons without parents (commit e43a5dd)
+- Опция "Брат/Сестра" в AddPersonForm скрыта если у target person нет родителей в дереве
+- Причина: sibling-логика копирует parent_child связи; если родителей нет → orphan
+- `hasParents` useMemo check в AddPersonForm.tsx
+
+### Header pinned — flex-shrink: 0, NOT sticky (commit 4d91c7d)
+- `.tree-header` использует `position: relative; flex-shrink: 0;` — НЕ sticky
+- sticky не работает в `overflow: hidden` контейнерах
+- `.tree-page` = `height: 100dvh; display: flex; flex-direction: column; overflow: hidden;`

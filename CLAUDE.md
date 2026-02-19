@@ -73,7 +73,22 @@ npm run db:seed       # тестовые данные
 - Все связи в relatives-tree БИДИРЕКЦИОНАЛЬНЫЕ
 - Siblings вычисляются автоматически по общим родителям
 
+## Фото Pipeline — КРИТИЧЕСКИ ВАЖНО
+- Обработка (smartcrop + resize) — ТОЛЬКО на клиенте (`client/src/utils/imageProcessor.ts`)
+- Сервер хранит файл as-is в PostgreSQL BYTEA (НЕТ Sharp, НЕТ обработки на сервере)
+- `server/src/utils/imageProcessor.ts` — УДАЛЁН, НЕ СУЩЕСТВУЕТ
+- Photo GET — PUBLIC endpoint в `app.ts` ПЕРЕД treesRoutes (иначе 401!)
+- Photo POST/DELETE — через photosRoutes (с auth)
+
+## Header Layout — НЕ ИСПОЛЬЗОВАТЬ STICKY!
+- `.tree-header`: `position: relative; flex-shrink: 0;` — НЕ sticky, НЕ fixed
+- `.tree-page`: `height: 100dvh; display: flex; flex-direction: column; overflow: hidden;`
+- sticky не работает внутри overflow:hidden
+
+## Sibling Logic — hasParents check
+- В AddPersonForm: опция "Брат/Сестра" скрыта если у target person нет родителей
+- Причина: sibling-логика копирует parent_child связи → без родителей = orphan
+
 ## TODO (нереализованное)
-- EditPersonForm (кнопка "Редактировать" → TODO stub)
-- Фото-загрузка в UI (API готов, формы нет)
-- Мобильная адаптация (базовый breakpoint 768px есть)
+- Удаление дерева в UI (API есть)
+- Мобильная адаптация (базовый breakpoint 768px, 480px есть)
