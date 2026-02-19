@@ -417,11 +417,14 @@ interface TreeNode {
 - `wasDragged()` — используется в handleCardClick для предотвращения открытия popup после drag
 
 ### AddPersonForm.tsx
-- **Типы связей (chips)**: Ребёнок, Пара, Брат/Сестра (только если есть родители!), Родитель
+- **RelType**: `'child' | 'pair' | 'sibling' | 'father' | 'mother'` (НЕТ общего 'parent')
+- **Типы связей (chips)**: Ребёнок, Пара, Брат/Сестра (только если есть родители!), Отец, Мать
 - **Пара**: выбор coupleStatus (Муж/Жена, Гражданский брак, Встречаются, Разведены, Смерть супруга, Другое)
 - **Ребёнок**: выбор childRelation + dropdown второго родителя (существующий партнёр / новый / без второго)
-- **Брат/Сестра**: `hasParents` проверка — скрыто если target person без родителей (предотвращает orphan)
-- **Пол**: подписи меняются в зависимости от relType (Сын/Дочь vs Мужской/Женский)
+- **Брат/Сестра**: `hasParents` проверка — скрыто если target person без родителей. Чекбоксы для выбора общих родителей (half-sibling support)
+- **Отец/Мать**: gender авто-устанавливается, selector скрыт. Авто-couple при наличии другого родителя
+- **Девичья фамилия**: показывается только для female
+- **Пол**: подписи меняются в зависимости от relType (Сын/Дочь vs Мужской/Женский). Скрыт для Отец/Мать
 - **Дата рождения**: 3 режима (Не знаю / Только год / Полная дата)
 - **Статус**: Жив(а) / Умер(ла) + дата смерти
 - **Фото**: processAvatarClient() — smartcrop + resize на клиенте при выборе файла
@@ -606,3 +609,18 @@ createRelationshipSchema: category, person1Id (UUID), person2Id (UUID), coupleSt
 - `.tree-header` использует `position: relative; flex-shrink: 0;` — НЕ sticky
 - sticky не работает в `overflow: hidden` контейнерах
 - `.tree-page` = `height: 100dvh; display: flex; flex-direction: column; overflow: hidden;`
+
+### Parent split — "Отец"/"Мать" + авто-couple (commit eb4ef8c)
+- RelType `'parent'` заменён на `'father' | 'mother'`
+- При выборе "Отец" → gender=male, "Мать" → gender=female, Gender selector скрыт
+- Авто-couple: если у ребёнка уже есть родитель другого пола → auto couple (married)
+- Работает рекурсивно для бабушек/дедушек
+
+### Sibling parent selection — half-sibling support (commit 1cf7451)
+- Чекбоксы для выбора общих родителей при добавлении брата/сестры
+- По умолчанию все выбраны, можно снять для half-sibling
+- `siblingParentIds` в AddPersonFormData, используется в TreeViewPage handleAddSubmit
+
+### Maiden name — female only (commit ba578b2)
+- Поле "Девичья фамилия" в AddPersonForm и EditPersonForm
+- Показывается только при `gender === 'female'`

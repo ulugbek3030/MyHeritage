@@ -88,6 +88,19 @@ npm run db:seed       # тестовые данные
 ## Sibling Logic — hasParents check
 - В AddPersonForm: опция "Брат/Сестра" скрыта если у target person нет родителей
 - Причина: sibling-логика копирует parent_child связи → без родителей = orphan
+- При добавлении sibling — чекбоксы для выбора общих родителей (half-sibling support)
+
+## AddPersonForm — Типы связей (RelType)
+- `type RelType = 'child' | 'pair' | 'sibling' | 'father' | 'mother'`
+- **НЕТ** общего 'parent' — разделён на 'father' (мужской) и 'mother' (женский)
+- При выборе "Отец" → gender авто-male, "Мать" → авто-female, Gender selector скрыт
+- **Авто-couple**: при добавлении отца/матери, если у ребёнка уже есть родитель ДРУГОГО пола → автоматически создаётся couple (married) между ними
+- Логика авто-couple в TreeViewPage.tsx handleAddSubmit (post-creation блок)
+- Работает рекурсивно для бабушек/дедушек
+
+## Maiden Name (девичья фамилия)
+- Поле показывается только для `gender === 'female'` в обоих формах (Add + Edit)
+- В handleSubmit: `maidenName: gender === 'female' ? maidenName.trim() : ''`
 
 ## TODO (нереализованное)
 - Удаление дерева в UI (API есть)
