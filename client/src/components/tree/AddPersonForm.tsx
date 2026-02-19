@@ -32,6 +32,7 @@ export interface AddPersonFormData {
   firstName: string;
   lastName: string;
   middleName: string;
+  maidenName: string;
   gender: 'male' | 'female';
   birthDate: string | null;
   birthYear: number | null;
@@ -123,6 +124,7 @@ export default function AddPersonForm({
   const [lastName, setLastName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
+  const [maidenName, setMaidenName] = useState('');
   const [birthMode, setBirthMode] = useState<BirthMode>('unknown');
   const [birthYear, setBirthYear] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -214,6 +216,7 @@ export default function AddPersonForm({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       middleName: middleName.trim(),
+      maidenName: gender === 'female' ? maidenName.trim() : '',
       gender,
       birthDate: birthMode === 'full' && birthDate ? birthDate : null,
       birthYear: birthMode === 'year' && birthYear ? parseInt(birthYear) : null,
@@ -435,6 +438,20 @@ export default function AddPersonForm({
                 />
               </div>
             </div>
+            {gender === 'female' && (
+              <div className="form-row">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Девичья фамилия</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Если менялась"
+                    value={maidenName}
+                    onChange={(e) => setMaidenName(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="form-divider" />
 

@@ -159,6 +159,7 @@ export default function TreeViewPage() {
         firstName: data.firstName,
         lastName: data.lastName || null,
         middleName: data.middleName || null,
+        maidenName: data.maidenName || null,
         gender: data.gender,
         birthDate: data.birthDate,
         birthYear: data.birthYear,
