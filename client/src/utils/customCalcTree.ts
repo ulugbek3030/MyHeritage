@@ -12,12 +12,22 @@
  */
 import type { Person, Relationship } from '../types';
 
-// Grid constants
+// Grid constants (for node positioning)
 const NODE_SPAN = 2;    // node width in grid units
-const GAP = 1;           // gap between nodes
-const SLOT = NODE_SPAN + GAP; // total slot width (3)
-const ROW_HEIGHT = 3;    // vertical distance between generation rows (3 × 135px = 405px)
-// const COUPLE_GAP = 1;    // gap between couple partners
+const GAP = 0.5;         // gap between nodes (tighter for couples)
+const SLOT = NODE_SPAN + GAP; // total slot width (2.5)
+const ROW_HEIGHT = 3;    // vertical distance between generation rows
+
+// Pixel constants (for connector generation)
+// FamilyTreeLayout uses: NODE_WIDTH=210, NODE_HEIGHT=270, HALF_W=105, HALF_H=135
+const HALF_W = 105;
+const HALF_H = 135;
+const CARD_WIDTH = 174;   // actual card CSS width
+const CARD_HEIGHT = 210;  // actual card CSS min-height
+const PLUS_TAB_HEIGHT = 22;
+// Card is flex-centered in container: offset from container top to card top
+const CARD_OFFSET_Y = (NODE_SPAN * HALF_H - CARD_HEIGHT) / 2; // (270 - 210) / 2 = 30px
+// const CARD_OFFSET_X = (NODE_SPAN * HALF_W - CARD_WIDTH) / 2;  // (210 - 174) / 2 = 18px
 
 // ═══════════ Output types (compatible with relatives-tree) ═══════════
 
@@ -409,8 +419,18 @@ export function customCalcTree(
     height: maxTop + NODE_SPAN + 2,
   };
 
-  // ── Phase 7: Generate connectors ──
+  // ── Phase 7: Generate connectors (in PIXEL coordinates) ──
+  // Connectors are generated in pixels, NOT grid units.
+  // FamilyTreeLayout renders them directly without multiplication.
   const connectors: Array<readonly [number, number, number, number]> = [];
+
+  // Helper: grid position → pixel coordinates of actual card
+  const cardCenterX = (gridLeft: number) => gridLeft * HALF_W + HALF_W; // center of container = center of card
+  const cardBottomY = (gridTop: number) => gridTop * HALF_H + CARD_OFFSET_Y + CARD_HEIGHT + PLUS_TAB_HEIGHT;
+  const cardTopY = (gridTop: number) => gridTop * HALF_H + CARD_OFFSET_Y;
+  const cardCenterY = (gridTop: number) => gridTop * HALF_H + CARD_OFFSET_Y + CARD_HEIGHT / 2;
+  const cardRightX = (gridLeft: number) => gridLeft * HALF_W + HALF_W + CARD_WIDTH / 2;
+  const cardLeftX = (gridLeft: number) => gridLeft * HALF_W + HALF_W - CARD_WIDTH / 2;
 
   // Build family units for connector generation
   const processedChildSets = new Set<string>();
@@ -442,54 +462,43 @@ export function customCalcTree(
 
   // Parent → children connectors
   for (const unit of familyUnits) {
-    const parentPositions = unit.parents.map(id => positions.get(id)).filter(Boolean) as Array<{ left: number; top: number }>;
-    const childPositions = unit.children.map(id => positions.get(id)).filter(Boolean) as Array<{ left: number; top: number }>;
-    const childCenters = unit.children.map(id => {
-      const p = positions.get(id);
-      return p ? p.left + NODE_SPAN / 2 : 0;
-    }).filter((_, i) => positions.has(unit.children[i]));
+    const parentPos = unit.parents.map(id => positions.get(id)).filter(Boolean) as Array<{ left: number; top: number }>;
+    const childPos = unit.children.map(id => positions.get(id)).filter(Boolean) as Array<{ left: number; top: number }>;
+    const childCX = unit.children
+      .filter(id => positions.has(id))
+      .map(id => cardCenterX(positions.get(id)!.left));
 
-    if (parentPositions.length === 0 || childPositions.length === 0) continue;
+    if (parentPos.length === 0 || childPos.length === 0) continue;
 
-    // Parent drop point (midpoint between parents or single parent center)
-    const parentMinX = Math.min(...parentPositions.map(p => p.left));
-    const parentMaxX = Math.max(...parentPositions.map(p => p.left));
-    const dropStartX = (parentMinX + parentMaxX + NODE_SPAN) / 2;
-    const parentBottomY = parentPositions[0].top + NODE_SPAN;
-    const childTopY = childPositions[0].top;
-    const dropMidY = (parentBottomY + childTopY) / 2;
+    // Parent drop point X (midpoint between parents' centers in pixels)
+    const parentCenters = parentPos.map(p => cardCenterX(p.left));
+    const dropX = (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2;
+    const parentBotY = cardBottomY(parentPos[0].top);
+    const childTopYpx = cardTopY(childPos[0].top);
+    const midY = (parentBotY + childTopYpx) / 2;
 
-    // Vertical from parent center down to mid
-    connectors.push([dropStartX, parentBottomY, dropStartX, dropMidY] as const);
+    // Vertical drop from parents to midpoint
+    connectors.push([dropX, parentBotY, dropX, midY] as const);
 
-    if (childCenters.length === 1) {
-      // Single child: vertical or L-shaped
-      const cx = childCenters[0];
-      if (Math.abs(dropStartX - cx) > 0.1) {
-        connectors.push([dropStartX, dropMidY, cx, dropMidY] as const);
+    if (childCX.length === 1) {
+      const cx = childCX[0];
+      if (Math.abs(dropX - cx) > 1) {
+        connectors.push([dropX, midY, cx, midY] as const);
       }
-      connectors.push([cx, dropMidY, cx, childTopY] as const);
+      connectors.push([cx, midY, cx, childTopYpx] as const);
     } else {
-      // Multiple children: horizontal bar + drops
-      const leftX = Math.min(...childCenters);
-      const rightX = Math.max(...childCenters);
-      connectors.push([leftX, dropMidY, rightX, dropMidY] as const);
-
-      // Connect parent drop to bar if outside range
-      if (dropStartX < leftX) {
-        connectors.push([dropStartX, dropMidY, leftX, dropMidY] as const);
-      } else if (dropStartX > rightX) {
-        connectors.push([rightX, dropMidY, dropStartX, dropMidY] as const);
-      }
-
+      const leftX = Math.min(...childCX);
+      const rightX = Math.max(...childCX);
+      // Horizontal bar
+      connectors.push([Math.min(leftX, dropX), midY, Math.max(rightX, dropX), midY] as const);
       // Drops to each child
-      for (const cx of childCenters) {
-        connectors.push([cx, dropMidY, cx, childTopY] as const);
+      for (const cx of childCX) {
+        connectors.push([cx, midY, cx, childTopYpx] as const);
       }
     }
   }
 
-  // Couple connectors (horizontal line between spouses)
+  // Couple connectors (horizontal line between spouses at card center Y)
   for (const rel of relationships) {
     if (rel.category !== 'couple') continue;
     const p1 = positions.get(rel.person1Id);
@@ -497,12 +506,10 @@ export function customCalcTree(
     if (!p1 || !p2) continue;
     if (p1.top !== p2.top) continue; // only same-row couples
 
-    const y = p1.top + NODE_SPAN / 2;
-    const leftPerson = p1.left < p2.left ? p1 : p2;
-    const rightPerson = p1.left < p2.left ? p2 : p1;
-    const x1 = leftPerson.left + NODE_SPAN;
-    const x2 = rightPerson.left;
-    connectors.push([x1, y, x2, y] as const);
+    const y = cardCenterY(p1.top);
+    const left = p1.left < p2.left ? p1 : p2;
+    const right = p1.left < p2.left ? p2 : p1;
+    connectors.push([cardRightX(left.left), y, cardLeftX(right.left), y] as const);
   }
 
   // ── Build output ──

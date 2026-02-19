@@ -209,25 +209,24 @@ export default function FamilyTreeLayout({
           const [x1, y1, x2, y2] = connector;
 
           // Check if this connector is a horizontal line between divorced spouses
-          // (same Y, connecting two nodes on the same row)
           const isDivorcedLine = y1 === y2 && couplePairs.some(pair => {
             const p1 = nodePositionMap.get(pair.person1Id);
             const p2 = nodePositionMap.get(pair.person2Id);
             if (!p1 || !p2 || !pair.isDivorced) return false;
             if (p1.top !== p2.top) return false;
-            // Check if this horizontal line is at the spouse row level
-            // The connector Y should be near the node center Y
-            const nodeY = p1.top + 1; // approximate center in grid units
-            return Math.abs(y1 - nodeY) < 0.5;
+            // Connector Y should be near the card center Y (in pixels)
+            const cardCenterY = p1.top * HALF_H + (NODE_HEIGHT - 210) / 2 + 105;
+            return Math.abs(y1 - cardCenterY) < 20;
           });
 
+          // Connectors are already in pixel coordinates from customCalcTree
           return (
             <line
               key={idx}
-              x1={x1 * HALF_W}
-              y1={y1 * HALF_H}
-              x2={x2 * HALF_W}
-              y2={y2 * HALF_H}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
               stroke={LINE_COLOR}
               strokeWidth={LINE_WIDTH}
               strokeDasharray={isDivorcedLine ? '6,4' : undefined}
