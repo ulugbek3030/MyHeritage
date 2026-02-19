@@ -34,4 +34,5 @@ COPY --from=builder /app/database ./database
 
 EXPOSE 3001
 
-CMD ["node", "server/dist/app.js"]
+# Run migrations before starting the server
+CMD sh -c "node server/dist/db/migrate.js && node server/dist/app.js"
