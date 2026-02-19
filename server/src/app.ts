@@ -59,9 +59,9 @@ app.get('/api/health', async (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/trees', treesRoutes);
+app.use('/api/trees/:treeId/persons', photosRoutes);   // photo GET is public — must be BEFORE personsRoutes
 app.use('/api/trees/:treeId/persons', personsRoutes);
 app.use('/api/trees/:treeId/relationships', relationshipsRoutes);
-app.use('/api/trees/:treeId/persons', photosRoutes);
 
 // ── Production: serve React client ──────────────────────
 if (isProduction) {
