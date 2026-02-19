@@ -1,14 +1,12 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import type { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
-import calcTree from 'relatives-tree';
 import * as treesApi from '../api/trees';
 import * as personsApi from '../api/persons';
 import type { FullTree, Person } from '../types';
 import TreeHeader from '../components/tree/TreeHeader';
 import FamilyTreeLayout from '../components/tree/FamilyTreeLayout';
-import { transformToTreeNodes } from '../utils/treeTransform';
 
 import PersonInfoPopup from '../components/tree/PersonInfoPopup';
 import AddPersonForm from '../components/tree/AddPersonForm';
@@ -295,58 +293,8 @@ export default function TreeViewPage() {
     (p) => p.id === fullTree.tree.ownerPersonId
   );
 
-  // Root for relatives-tree: find the rootId that includes the most nodes.
-  // relatives-tree's internal traversal doesn't follow spouse→parents paths,
-  // so using owner as root may miss uncles/aunts (siblings of parents).
-  // Using a topmost ancestor as root may miss the other family line.
-  // Solution: try all root-level ancestors (persons with no parents) + owner,
-  // and pick the rootId that gives the maximum node coverage.
-  const rootId = useMemo(() => {
-    const ownerId = fullTree.tree.ownerPersonId || fullTree.persons[0]?.id;
-    if (!ownerId || fullTree.persons.length === 0) return ownerId || '';
-
-    // Find persons who have no parents (root ancestors)
-    const hasParent = new Set<string>();
-    for (const rel of fullTree.relationships) {
-      if (rel.category === 'parent_child') {
-        hasParent.add(rel.person2Id);
-      }
-    }
-    const rootCandidates = fullTree.persons
-      .filter(p => !hasParent.has(p.id))
-      .map(p => p.id);
-
-    // Always include owner as a candidate
-    if (!rootCandidates.includes(ownerId)) {
-      rootCandidates.push(ownerId);
-    }
-
-    // If only one candidate, use it
-    if (rootCandidates.length <= 1) {
-      return rootCandidates[0] || ownerId;
-    }
-
-    // Try each candidate and pick the one that covers most persons
-    const nodes = transformToTreeNodes(fullTree.persons, fullTree.relationships);
-    let bestRoot = ownerId;
-    let bestCount = 0;
-
-    for (const candidateId of rootCandidates) {
-      try {
-        const result = calcTree(nodes as any, { rootId: candidateId });
-        if (result.nodes.length > bestCount) {
-          bestCount = result.nodes.length;
-          bestRoot = candidateId;
-        }
-        // If we found a root that covers everyone, stop searching
-        if (bestCount === fullTree.persons.length) break;
-      } catch {
-        // Skip invalid roots
-      }
-    }
-
-    return bestRoot;
-  }, [fullTree]);
+  // Root for relatives-tree = owner person
+  const rootId = fullTree.tree.ownerPersonId || (fullTree.persons[0]?.id ?? '');
 
   return (
     <div className="tree-page">
