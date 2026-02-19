@@ -1,14 +1,14 @@
 # ── Stage 1: Build ──────────────────────────────────────
-FROM node:24-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
-# Copy workspace + package files
-COPY package*.json ./
+# Copy all package files (root + workspaces)
+COPY package.json package-lock.json ./
 COPY client/package.json client/
 COPY server/package.json server/
 
 # Install all deps (including devDependencies for build)
-RUN npm ci --workspaces
+RUN npm ci
 
 # Copy source
 COPY . .
@@ -17,18 +17,20 @@ COPY . .
 RUN npm run build
 
 # ── Stage 2: Production ────────────────────────────────
-FROM node:24-alpine
+FROM node:22-alpine
 WORKDIR /app
+
+# Copy package files for production install
+COPY package.json package-lock.json ./
+COPY server/package.json server/
+
+# Install production deps only
+RUN npm ci --workspace=server --omit=dev
 
 # Copy built artifacts
 COPY --from=builder /app/server/dist ./server/dist
-COPY --from=builder /app/server/package.json ./server/
 COPY --from=builder /app/client/dist ./client/dist
 COPY --from=builder /app/database ./database
-COPY --from=builder /app/package*.json ./
-
-# Install production deps only for server
-RUN npm ci --workspace=server --omit=dev
 
 EXPOSE 3001
 
