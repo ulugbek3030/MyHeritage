@@ -140,8 +140,8 @@ export default function TreeViewPage() {
           relatedPersonId: addTarget.id,
           coupleStatus: data.coupleStatus || 'married',
         });
-      } else if (data.relType === 'parent') {
-        // handled after creation
+      } else if (data.relType === 'father' || data.relType === 'mother') {
+        // handled after creation (need newPerson.id for parent_child + auto-couple)
       } else if (data.relType === 'sibling') {
         // Use selected parent IDs from the form (user can uncheck parents for half-siblings)
         for (const parentId of data.siblingParentIds) {
@@ -167,16 +167,46 @@ export default function TreeViewPage() {
         deathYear: data.deathYear,
         deathDateKnown: data.deathDateKnown,
         note: data.note || null,
-        relationships: data.relType !== 'parent' ? relationships : undefined,
+        relationships: (data.relType !== 'father' && data.relType !== 'mother') ? relationships : undefined,
       });
 
-      if (data.relType === 'parent') {
+      if (data.relType === 'father' || data.relType === 'mother') {
+        // 1. Create parent_child: new person (parent) → addTarget (child)
         await personsApi.createRelationship(treeId, {
           category: 'parent_child',
           person1Id: newPerson.id,
           person2Id: addTarget.id,
           childRelation: 'biological',
         });
+
+        // 2. Auto-couple: if child already has a parent of the OPPOSITE gender, link them as married
+        const otherGender = data.relType === 'father' ? 'female' : 'male';
+        const existingParentRels = fullTree!.relationships.filter(
+          (r) => r.category === 'parent_child' && r.person2Id === addTarget.id
+        );
+        for (const rel of existingParentRels) {
+          const otherParent = fullTree!.persons.find(
+            (p) => p.id === rel.person1Id && p.gender === otherGender
+          );
+          if (otherParent) {
+            // Guard against duplicate couple relationship
+            const alreadyCoupled = fullTree!.relationships.some(
+              (r) =>
+                r.category === 'couple' &&
+                ((r.person1Id === newPerson.id && r.person2Id === otherParent.id) ||
+                 (r.person1Id === otherParent.id && r.person2Id === newPerson.id))
+            );
+            if (!alreadyCoupled) {
+              await personsApi.createRelationship(treeId, {
+                category: 'couple',
+                person1Id: newPerson.id,
+                person2Id: otherParent.id,
+                coupleStatus: 'married',
+              });
+            }
+            break; // Link to first matching opposite-gender parent
+          }
+        }
       }
 
       // Upload photo if provided

@@ -8,7 +8,7 @@ import type {
 import { processAvatarClient } from '../../utils/imageProcessor';
 
 /* ───── Types ───── */
-type RelType = 'child' | 'pair' | 'sibling' | 'parent';
+type RelType = 'child' | 'pair' | 'sibling' | 'father' | 'mother';
 type BirthMode = 'unknown' | 'year' | 'full';
 type AliveStatus = 'alive' | 'deceased';
 type DeathMode = 'unknown' | 'year' | 'full';
@@ -294,12 +294,15 @@ export default function AddPersonForm({
                   ...(hasParents
                     ? [{ value: 'sibling' as RelType, label: 'Брат/Сестра' }]
                     : []),
-                  { value: 'parent' as RelType, label: 'Родитель' },
+                  { value: 'father' as RelType, label: 'Отец' },
+                  { value: 'mother' as RelType, label: 'Мать' },
                 ]}
                 value={relType}
                 onChange={(v) => {
                   setRelType(v);
                   if (v !== 'child') setSecondParentId('');
+                  if (v === 'father') setGender('male');
+                  if (v === 'mother') setGender('female');
                 }}
               />
 
@@ -446,19 +449,21 @@ export default function AddPersonForm({
               </button>
             </div>
 
-            {/* === Gender === */}
-            <div className="form-group">
-              <label className="form-label">Пол</label>
-              <ChipGroup
-                options={[
-                  { value: 'male' as const, label: genderLabels.male },
-                  { value: 'female' as const, label: genderLabels.female },
-                ]}
-                value={gender}
-                onChange={setGender}
-                chipClass={(v) => (v === 'male' ? 'male-chip' : 'female-chip')}
-              />
-            </div>
+            {/* === Gender (hidden for father/mother — auto-set) === */}
+            {relType !== 'father' && relType !== 'mother' && (
+              <div className="form-group">
+                <label className="form-label">Пол</label>
+                <ChipGroup
+                  options={[
+                    { value: 'male' as const, label: genderLabels.male },
+                    { value: 'female' as const, label: genderLabels.female },
+                  ]}
+                  value={gender}
+                  onChange={setGender}
+                  chipClass={(v) => (v === 'male' ? 'male-chip' : 'female-chip')}
+                />
+              </div>
+            )}
 
             <div className="form-divider" />
 
