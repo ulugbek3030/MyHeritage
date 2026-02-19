@@ -84,8 +84,16 @@ export function useZoom(
   // ---------------------------------------------------------------
   // Supports ALL platforms:
   //   1. Desktop trackpad pinch: Ctrl+Wheel (Chrome/Firefox/Edge)
-  //   2. macOS Safari trackpad: gesturestart/gesturechange
-  //   3. Mobile iOS/Android: touchstart/touchmove/touchend (2 fingers)
+  //   2. macOS/iOS Safari: gesturestart/gesturechange
+  //   3. Mobile Android + fallback: touchstart/touchmove/touchend
+  //
+  // iOS Safari SPECIFICS:
+  //   - iOS Safari fires gesturestart/gesturechange for pinch, NOT
+  //     regular touch events. So we handle BOTH gesture + touch.
+  //   - Global document-level gesturestart preventDefault blocks
+  //     native iOS page zoom before it starts.
+  //   - viewport meta: user-scalable=no, maximum-scale=1
+  //   - CSS: touch-action: none on .tree-viewport
   //
   // CRITICAL FIX: This effect MUST have empty deps [] so that
   // event listeners are attached ONCE and NEVER re-created.
@@ -134,6 +142,10 @@ export function useZoom(
       }
     }
 
+    // Track whether gesture events fired (iOS Safari) to avoid
+    // double-handling with touch events
+    let gestureActive = false;
+
     // ── 1. Desktop: Trackpad pinch (Ctrl+Wheel) and mouse Ctrl+Wheel ──
     function handleWheel(e: WheelEvent) {
       if (e.ctrlKey || e.metaKey) {
@@ -145,7 +157,16 @@ export function useZoom(
       }
     }
 
-    // ── 2. macOS Safari: native gesture events ──
+    // ── 2. Safari (macOS + iOS): gesture events ──
+    // On iOS Safari, pinch fires gesturestart/gesturechange instead of
+    // touch events. We handle it here and set gestureActive flag so
+    // touch handlers don't double-process.
+    function handleGestureStart(e: any) {
+      e.preventDefault();
+      gestureActive = true;
+      viewport!.dataset.pinching = '1';
+    }
+
     function handleGestureChange(e: any) {
       e.preventDefault();
       e.stopPropagation();
@@ -154,14 +175,22 @@ export function useZoom(
       startAnim();
     }
 
-    function handleGestureStart(e: Event) {
+    function handleGestureEnd(e: any) {
+      e.preventDefault();
+      gestureActive = false;
+      delete viewport!.dataset.pinching;
+    }
+
+    // Global document-level gesturestart handler to prevent iOS
+    // native page zoom from even starting
+    function handleDocGestureStart(e: Event) {
       e.preventDefault();
     }
 
-    // ── 3. Mobile (iOS / Android): touch pinch-to-zoom ──
-    // When 2 fingers are down, compute distance between them
-    // and zoom proportionally. Sets data-pinching on viewport
-    // so useDrag knows to ignore touch-drag during pinch.
+    // ── 3. Mobile (Android + iOS fallback): touch pinch-to-zoom ──
+    // On Android, pinch comes through touch events.
+    // On iOS, gesture events handle it (above), but we keep touch
+    // handlers as fallback. gestureActive flag prevents doubling.
     let initialPinchDist = 0;
     let pinchScaleBase = 1;
 
@@ -172,6 +201,7 @@ export function useZoom(
     }
 
     function handleTouchStart(e: TouchEvent) {
+      if (gestureActive) return; // iOS Safari handles via gesture events
       if (e.touches.length === 2) {
         e.preventDefault();
         initialPinchDist = getTouchDist(e.touches[0], e.touches[1]);
@@ -181,8 +211,16 @@ export function useZoom(
     }
 
     function handleTouchMove(e: TouchEvent) {
-      if (e.touches.length === 2 && initialPinchDist > 0) {
+      if (gestureActive) return; // iOS Safari handles via gesture events
+      if (e.touches.length === 2) {
         e.preventDefault();
+        if (initialPinchDist === 0) {
+          // Pinch started mid-gesture (first finger was already down)
+          initialPinchDist = getTouchDist(e.touches[0], e.touches[1]);
+          pinchScaleBase = targetScaleRef.current;
+          viewport!.dataset.pinching = '1';
+          return;
+        }
         const currentDist = getTouchDist(e.touches[0], e.touches[1]);
         const ratio = currentDist / initialPinchDist;
         targetScaleRef.current = clamp(pinchScaleBase * ratio);
@@ -193,13 +231,24 @@ export function useZoom(
     function handleTouchEnd(e: TouchEvent) {
       if (e.touches.length < 2) {
         initialPinchDist = 0;
-        delete viewport!.dataset.pinching;
+        if (!gestureActive) {
+          delete viewport!.dataset.pinching;
+        }
       }
     }
 
+    // Attach all listeners
     viewport.addEventListener('wheel', handleWheel, { passive: false });
+
+    // Gesture events (Safari macOS + iOS)
     viewport.addEventListener('gesturestart', handleGestureStart as EventListener, { passive: false });
     viewport.addEventListener('gesturechange', handleGestureChange as EventListener, { passive: false });
+    viewport.addEventListener('gestureend', handleGestureEnd as EventListener, { passive: false });
+
+    // Global gesturestart to block iOS native zoom entirely
+    document.addEventListener('gesturestart', handleDocGestureStart as EventListener, { passive: false });
+
+    // Touch events (Android + iOS fallback)
     viewport.addEventListener('touchstart', handleTouchStart, { passive: false });
     viewport.addEventListener('touchmove', handleTouchMove, { passive: false });
     viewport.addEventListener('touchend', handleTouchEnd);
@@ -208,6 +257,8 @@ export function useZoom(
       viewport.removeEventListener('wheel', handleWheel);
       viewport.removeEventListener('gesturestart', handleGestureStart as EventListener);
       viewport.removeEventListener('gesturechange', handleGestureChange as EventListener);
+      viewport.removeEventListener('gestureend', handleGestureEnd as EventListener);
+      document.removeEventListener('gesturestart', handleDocGestureStart as EventListener);
       viewport.removeEventListener('touchstart', handleTouchStart);
       viewport.removeEventListener('touchmove', handleTouchMove);
       viewport.removeEventListener('touchend', handleTouchEnd);
