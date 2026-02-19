@@ -16,7 +16,7 @@ import type { Person, Relationship } from '../types';
 const NODE_SPAN = 2;    // node width in grid units
 const GAP = 1;           // gap between nodes
 const SLOT = NODE_SPAN + GAP; // total slot width (3)
-const ROW_HEIGHT = 4;    // vertical distance between generation rows
+const ROW_HEIGHT = 3;    // vertical distance between generation rows (3 × 135px = 405px)
 // const COUPLE_GAP = 1;    // gap between couple partners
 
 // ═══════════ Output types (compatible with relatives-tree) ═══════════
