@@ -5,7 +5,7 @@ import * as personsApi from '../api/persons';
 import type { FullTree, Person } from '../types';
 import TreeHeader from '../components/tree/TreeHeader';
 import FamilyTreeLayout from '../components/tree/FamilyTreeLayout';
-import { HALF_W, HALF_H } from '../components/tree/FamilyTreeLayout';
+
 import PersonInfoPopup from '../components/tree/PersonInfoPopup';
 import AddPersonForm from '../components/tree/AddPersonForm';
 import type { AddPersonFormData } from '../components/tree/AddPersonForm';

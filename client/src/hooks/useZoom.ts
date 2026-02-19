@@ -12,7 +12,7 @@ export function useZoom(
   const scaleRef = useRef(1);
   const targetScaleRef = useRef(1);
   const animatingRef = useRef(false);
-  const drawTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const drawTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   /** Dynamic min scale: fit entire tree into viewport (no smaller) */
   const getMinScale = useCallback(() => {

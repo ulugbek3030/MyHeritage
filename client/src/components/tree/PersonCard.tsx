@@ -80,13 +80,6 @@ function formatYears(person: Person): string {
   return birth;
 }
 
-function formatFullName(person: Person): string {
-  const parts: string[] = [person.firstName];
-  if (person.lastName) parts.push(person.lastName);
-  if (person.middleName) parts.push(person.middleName);
-  if (person.maidenName) parts.push(`(${person.maidenName})`);
-  return parts.join(' ');
-}
 
 const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:3001');
 
