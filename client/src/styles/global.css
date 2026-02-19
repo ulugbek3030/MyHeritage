@@ -9,8 +9,6 @@
 
 html {
   scroll-behavior: smooth;
-  /* Prevent iOS Safari double-tap zoom */
-  touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -20,8 +18,6 @@ body {
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
-  /* Prevent iOS Safari callout/selection on long press */
-  -webkit-touch-callout: none;
 }
 
 a {

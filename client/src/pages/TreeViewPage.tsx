@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import type { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import * as treesApi from '../api/trees';
 import * as personsApi from '../api/persons';
 import type { FullTree, Person } from '../types';
@@ -12,7 +14,6 @@ import type { AddPersonFormData } from '../components/tree/AddPersonForm';
 import ConfirmDeleteDialog from '../components/tree/ConfirmDeleteDialog';
 import ZoomControls from '../components/tree/ZoomControls';
 import { useZoom } from '../hooks/useZoom';
-import { useDrag } from '../hooks/useDrag';
 import '../styles/tree-view.css';
 
 export default function TreeViewPage() {
@@ -25,9 +26,8 @@ export default function TreeViewPage() {
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Refs for viewport and container
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Ref to detect drag vs click
+  const dragMoved = useRef(false);
 
   // Load tree data
   const loadTree = useCallback(() => {
@@ -43,50 +43,60 @@ export default function TreeViewPage() {
     loadTree();
   }, [loadTree]);
 
-  // Zoom hook (no need for drawLines callback — connectors are React-rendered)
-  const { zoomIn, zoomOut, zoomReset } = useZoom(containerRef, viewportRef);
-
-  // Drag hook
-  const { wasDragged } = useDrag(viewportRef, !!fullTree);
+  // Zoom hook (react-zoom-pan-pinch)
+  const { zoomIn, zoomOut, zoomReset, setTransformRef } = useZoom();
 
   // Center on owner person after initial load
-  const centerOnOwner = useCallback(() => {
-    const viewport = viewportRef.current;
-    const container = containerRef.current;
-    if (!viewport || !container || !fullTree) return;
-
+  const centerOnOwner = useCallback((ref: ReactZoomPanPinchRef) => {
+    if (!fullTree) return;
     const ownerId = fullTree.tree.ownerPersonId;
     if (!ownerId) return;
 
-    const ownerEl = container.querySelector(
+    // Find the owner card element
+    const wrapper = ref.instance.wrapperComponent;
+    const content = ref.instance.contentComponent;
+    if (!wrapper || !content) return;
+
+    const ownerEl = content.querySelector(
       `[data-person-id="${ownerId}"]`
     ) as HTMLElement | null;
     if (!ownerEl) return;
 
-    const r = ownerEl.getBoundingClientRect();
-    const cRect = container.getBoundingClientRect();
-    const centerX = (r.left + r.right) / 2 - cRect.left;
-    const centerY = (r.top + r.bottom) / 2 - cRect.top;
+    // Calculate center position
+    const contentRect = content.getBoundingClientRect();
+    const ownerRect = ownerEl.getBoundingClientRect();
+    const wrapperRect = wrapper.getBoundingClientRect();
 
-    viewport.scrollLeft = centerX - viewport.clientWidth / 2;
-    viewport.scrollTop = centerY - viewport.clientHeight / 2;
+    const ownerCenterX = (ownerRect.left + ownerRect.right) / 2 - contentRect.left;
+    const ownerCenterY = (ownerRect.top + ownerRect.bottom) / 2 - contentRect.top;
+
+    const offsetX = wrapperRect.width / 2 - ownerCenterX;
+    const offsetY = wrapperRect.height / 2 - ownerCenterY;
+
+    ref.setTransform(offsetX, offsetY, 1, 0);
   }, [fullTree]);
 
-  // Center after tree renders
-  useEffect(() => {
-    if (!fullTree) return;
-    // Small delay for React to render the layout
-    const timer = setTimeout(() => {
-      centerOnOwner();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [fullTree, centerOnOwner]);
+  // Handle library init
+  const handleInit = useCallback((ref: ReactZoomPanPinchRef) => {
+    setTransformRef(ref);
+    // Center on owner after a short delay for layout to settle
+    setTimeout(() => centerOnOwner(ref), 150);
+  }, [setTransformRef, centerOnOwner]);
+
+  // Track panning to distinguish drag from click
+  const handlePanningStart = useCallback(() => {
+    dragMoved.current = false;
+  }, []);
+
+  const handlePanning = useCallback(() => {
+    dragMoved.current = true;
+  }, []);
 
   // Card click handler
   const handleCardClick = useCallback((person: Person) => {
-    if (wasDragged()) return;
+    if (dragMoved.current) return;
     setSelectedPerson(person);
-  }, [wasDragged]);
+  }, []);
 
   const handleAddClick = useCallback((person: Person) => {
     setAddTarget(person);
@@ -213,17 +223,42 @@ export default function TreeViewPage() {
     <div className="tree-page">
       <TreeHeader fullTree={fullTree} ownerPerson={ownerPerson} />
 
-      <div className="tree-viewport" ref={viewportRef}>
-        <div className="tree-container" ref={containerRef}>
-          <FamilyTreeLayout
-            persons={fullTree.persons}
-            relationships={fullTree.relationships}
-            rootId={rootId}
-            ownerPersonId={fullTree.tree.ownerPersonId}
-            onCardClick={handleCardClick}
-            onAddClick={handleAddClick}
-          />
-        </div>
+      <div className="tree-viewport">
+        <TransformWrapper
+          initialScale={1}
+          minScale={0.3}
+          maxScale={2.5}
+          centerOnInit={false}
+          limitToBounds={false}
+          panning={{ velocityDisabled: false }}
+          pinch={{ step: 5 }}
+          doubleClick={{ disabled: true }}
+          onInit={handleInit}
+          onPanningStart={handlePanningStart}
+          onPanning={handlePanning}
+        >
+          <TransformComponent
+            wrapperStyle={{
+              width: '100%',
+              height: '100%',
+            }}
+            contentStyle={{
+              width: 'fit-content',
+              height: 'fit-content',
+            }}
+          >
+            <div className="tree-container">
+              <FamilyTreeLayout
+                persons={fullTree.persons}
+                relationships={fullTree.relationships}
+                rootId={rootId}
+                ownerPersonId={fullTree.tree.ownerPersonId}
+                onCardClick={handleCardClick}
+                onAddClick={handleAddClick}
+              />
+            </div>
+          </TransformComponent>
+        </TransformWrapper>
       </div>
 
       <ZoomControls

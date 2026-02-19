@@ -100,13 +100,12 @@
 .tree-viewport {
   width: 100%;
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
   padding: 0;
-  cursor: grab;
   position: relative;
-  touch-action: none; /* JS handles all touch: one-finger pan + two-finger pinch */
+  /* react-zoom-pan-pinch handles all touch/mouse/gesture events */
+  touch-action: none;
 }
-.tree-viewport.dragging { cursor: grabbing; user-select: none; }
 
 .tree-page {
   height: 100vh;
@@ -120,8 +119,6 @@
   display: inline-block;
   min-width: 100%;
   padding: 32px 60px 80px;
-  transform-origin: top center;
-  will-change: transform;
 }
 
 /* ============ SVG LINES ============ */
