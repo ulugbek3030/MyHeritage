@@ -1,0 +1,44 @@
+:root {
+  /* Gender colors */
+  --male: #4a90d9;
+  --male-light: #e8f1fb;
+  --male-bg: linear-gradient(135deg, #dbeafe, #c3d9f7);
+  --female: #e87ba8;
+  --female-light: #fdf0f5;
+  --female-bg: linear-gradient(135deg, #fce7f3, #f9c8dd);
+
+  /* Base colors */
+  --bg: #f0f2f6;
+  --card-bg: #ffffff;
+  --text: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --border: #e2e8f0;
+
+  /* Shadows */
+  --shadow: 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-hover: 0 12px 36px rgba(0,0,0,0.12);
+
+  /* Radius */
+  --radius: 16px;
+  --radius-sm: 8px;
+
+  /* Lines */
+  --line-color: #cbd5e1;
+
+  /* Typography */
+  --font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Functional (used in auth/trees-list pages) */
+  --color-primary: #4a90d9;
+  --color-primary-hover: #3a7bc8;
+  --color-danger: #e74c3c;
+  --color-danger-hover: #c0392b;
+  --color-text: #1e293b;
+  --color-text-muted: #94a3b8;
+  --color-bg: #f0f2f6;
+  --color-card-bg: #ffffff;
+  --color-border: #e2e8f0;
+  --shadow-card: 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-popup: 0 4px 24px rgba(0,0,0,0.15);
+}

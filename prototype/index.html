@@ -1,0 +1,2080 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Семейное Древо</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --male: #4a90d9;
+  --male-light: #e8f1fb;
+  --male-bg: linear-gradient(135deg, #dbeafe, #c3d9f7);
+  --female: #e87ba8;
+  --female-light: #fdf0f5;
+  --female-bg: linear-gradient(135deg, #fce7f3, #f9c8dd);
+  --bg: #f0f2f6;
+  --card-bg: #ffffff;
+  --text: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --border: #e2e8f0;
+  --shadow: 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-hover: 0 12px 36px rgba(0,0,0,0.12);
+  --radius: 16px;
+  --line-color: #cbd5e1;
+}
+
+*, *::before, *::after {
+  margin: 0; padding: 0; box-sizing: border-box;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Nunito', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============ HEADER ============ */
+.header {
+  background: linear-gradient(135deg, #4a6cf7 0%, #7b68ee 50%, #a855f7 100%);
+  padding: 28px 24px 24px;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(74,108,247,0.3);
+}
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.header-icon {
+  width: 44px; height: 44px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 2px solid rgba(255,255,255,0.5);
+}
+.header-icon svg { width: 24px; height: 24px; color: #fff; }
+.header-icon img { width: 100%; height: 100%; object-fit: cover; }
+.header-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+.header-subtitle {
+  font-size: 12px;
+  color: rgba(255,255,255,0.75);
+  font-weight: 600;
+}
+.header-stats {
+  display: flex;
+  gap: 20px;
+}
+.stat {
+  text-align: center;
+  color: #fff;
+}
+.stat-num {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+}
+.stat-label {
+  font-size: 10px;
+  opacity: 0.75;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ============ VIEWPORT ============ */
+.tree-viewport {
+  width: 100%;
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+  cursor: grab;
+  position: relative;
+}
+.tree-viewport.dragging { cursor: grabbing; user-select: none; }
+
+.tree-container {
+  position: relative;
+  display: inline-block;
+  min-width: max(100%, 1280px);
+  padding: 32px 60px 80px;
+  transform-origin: top center;
+}
+
+/* ============ SVG LINES ============ */
+.connectors {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ============ GENERATION ============ */
+.gen-label {
+  text-align: center;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 5;
+}
+.gen-label span {
+  display: inline-block;
+  background: #fff;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  padding: 6px 20px;
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+}
+
+.generation {
+  display: flex;
+  justify-content: center;
+  gap: 100px;
+  position: relative;
+  z-index: 5;
+  margin-bottom: 16px;
+}
+
+.connector-space {
+  height: 64px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ============ COUPLE ============ */
+.couple {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  position: relative;
+}
+.couple-heart {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px; height: 28px;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 10;
+  font-size: 13px;
+}
+.couple-badge-divorced {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 8px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  z-index: 11;
+}
+
+/* ============ CARD ============ */
+.card {
+  width: 174px;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  text-align: center;
+  padding: 0;
+  padding-bottom: 8px;
+  position: relative;
+  transition: transform 0.35s cubic-bezier(.34,1.56,.64,1), box-shadow 0.35s ease;
+  box-shadow: var(--shadow);
+  z-index: 5;
+  overflow: visible;
+  margin-bottom: 22px;
+
+  /* Fixed height so + button always at bottom */
+  display: flex;
+  flex-direction: column;
+  min-height: 210px;
+
+  opacity: 0;
+  transform: translateY(24px) scale(0.96);
+  animation: cardIn 0.5s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+
+.card:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: var(--shadow-hover);
+  z-index: 20;
+}
+
+@keyframes cardIn {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* stagger */
+.gen-1 .couple:nth-child(1) .card:nth-child(1) { animation-delay: 0.08s; }
+.gen-1 .couple:nth-child(1) .card:nth-child(2) { animation-delay: 0.16s; }
+.gen-1 .couple:nth-child(2) .card:nth-child(1) { animation-delay: 0.24s; }
+.gen-1 .couple:nth-child(2) .card:nth-child(2) { animation-delay: 0.32s; }
+.gen-2 .card:nth-child(1) { animation-delay: 0.4s; }
+.gen-2 .card:nth-child(2) { animation-delay: 0.48s; }
+.gen-3 .card:nth-child(1) { animation-delay: 0.56s; }
+.gen-3 .card:nth-child(2) { animation-delay: 0.64s; }
+.gen-3 .card:nth-child(3) { animation-delay: 0.72s; }
+.gen-3 .card:nth-child(4) { animation-delay: 0.80s; }
+.gen-3 .card:nth-child(5) { animation-delay: 0.88s; }
+.gen-3 .card:nth-child(6) { animation-delay: 0.96s; }
+
+/* card top color bar — using border-top for perfect radius alignment */
+.card-bar { display: none; }
+.card.male { border-top: 5px solid var(--male); }
+.card.female { border-top: 5px solid var(--female); }
+
+.card-body {
+  padding: 16px 14px 6px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  cursor: pointer;
+  border-radius: var(--radius) var(--radius) 0 0;
+  transition: background 0.2s;
+}
+.card-body:hover { background: #fafbfd; }
+
+/* ============ AVATAR ============ */
+.avatar {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  margin: 0 auto 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+.card.male .avatar { background: var(--male-bg); }
+.card.female .avatar { background: var(--female-bg); }
+
+.avatar svg { width: 30px; height: 30px; }
+.card.male .avatar svg { color: var(--male); }
+.card.female .avatar svg { color: var(--female); }
+
+.avatar img {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* deceased ring + grayscale photo */
+.card.deceased .avatar {
+  border-color: var(--text-muted);
+  opacity: 0.85;
+}
+.card.deceased .avatar img {
+  filter: grayscale(100%);
+}
+.card.deceased .avatar::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px dashed var(--text-muted);
+}
+
+/* ============ CARD TEXT ============ */
+.card-name {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text);
+  margin-bottom: 3px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-years {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+/* ============ DECEASED BADGE ============ */
+.badge-deceased {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f1f5f9;
+  color: var(--text-muted);
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+.badge-deceased svg {
+  width: 10px; height: 10px;
+}
+
+/* ============ OWNER CARD ============ */
+.card.owner {
+  background: linear-gradient(180deg, #eef2ff 0%, #ffffff 40%);
+  border: 2.5px solid #4a6cf7;
+  box-shadow: 0 4px 16px rgba(74,108,247,0.18);
+}
+.card.owner:hover {
+  box-shadow: 0 8px 30px rgba(74,108,247,0.25);
+}
+/* owner card uses its own border (from .card.owner rule), no gender bar needed */
+.badge-owner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #4a6cf7, #7b68ee);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 10px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+.badge-owner svg {
+  width: 10px; height: 10px;
+}
+
+/* ============ RELATION BADGE (under card name) ============ */
+.card-relation {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-top: 1px;
+  margin-bottom: 2px;
+}
+
+/* ============ CARD ACTIONS (edit/delete) ============ */
+.card-actions {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  z-index: 15;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.card:hover .card-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.card-act-btn {
+  width: 28px; height: 28px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.card-act-btn svg {
+  width: 13px; height: 13px;
+}
+.card-act-btn.act-edit {
+  background: rgba(74, 108, 247, 0.15);
+  color: #4a6cf7;
+}
+.card-act-btn.act-edit:hover {
+  background: #4a6cf7;
+  color: #fff;
+  transform: scale(1.1);
+}
+.card-act-btn.act-delete {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+.card-act-btn.act-delete:hover {
+  background: #ef4444;
+  color: #fff;
+  transform: scale(1.1);
+}
+
+/* ============ PLUS TAB ============ */
+.plus-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 22px;
+  border: none;
+  border-radius: 0 0 10px 10px;
+  cursor: pointer;
+  position: absolute;
+  bottom: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  transition: all 0.25s cubic-bezier(.34,1.56,.64,1);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  z-index: 6;
+}
+.plus-tab svg {
+  width: 13px; height: 13px;
+  color: #fff;
+  transition: all 0.25s;
+}
+
+/* Always colored by gender */
+.card.male .plus-tab { background: var(--male); }
+.card.female .plus-tab { background: var(--female); }
+
+.card.male .plus-tab:hover { background: #3a7bc8; box-shadow: 0 4px 12px rgba(74,144,217,0.4); }
+.card.female .plus-tab:hover { background: #d4658f; box-shadow: 0 4px 12px rgba(232,123,168,0.4); }
+.plus-tab:hover svg { transform: rotate(90deg); }
+.plus-tab:active { transform: translateX(-50%) scale(0.9); }
+
+/* Subtle pulse to draw attention */
+@keyframes tabPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+.plus-tab { animation: tabPulse 2.5s ease-in-out 2s 3; }
+
+/* ============ GENERATION 3 ============ */
+.generation.gen-3 {
+  gap: 16px;
+  flex-wrap: nowrap;
+}
+
+/* ============ POPUP OVERLAY ============ */
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,0.4);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.popup-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.popup {
+  background: #fff;
+  border-radius: 24px;
+  width: 400px;
+  max-width: 92vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.2);
+  transform: scale(0.92) translateY(20px);
+  transition: transform 0.4s cubic-bezier(.34,1.56,.64,1);
+  position: relative;
+}
+.popup-overlay.active .popup {
+  transform: scale(1) translateY(0);
+}
+
+.popup-header {
+  padding: 28px 24px 20px;
+  text-align: center;
+  position: relative;
+  flex-shrink: 0;
+}
+.popup-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 24px; right: 24px;
+  height: 1px;
+  background: var(--border);
+}
+
+.popup-close {
+  position: absolute;
+  top: 16px; right: 16px;
+  width: 36px; height: 36px;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+.popup-close:hover { background: #e2e8f0; color: var(--text); transform: rotate(90deg); }
+
+.popup-avatar-lg {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid #fff;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+.popup-avatar-lg.male { background: var(--male-bg); }
+.popup-avatar-lg.female { background: var(--female-bg); }
+.popup-avatar-lg svg { width: 40px; height: 40px; }
+.popup-avatar-lg.male svg { color: var(--male); }
+.popup-avatar-lg.female svg { color: var(--female); }
+.popup-avatar-lg img {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.popup-avatar-lg.deceased-photo img {
+  filter: grayscale(100%);
+}
+
+.popup-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.popup-role {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.popup-body { padding: 20px 24px 24px; overflow-y: auto; flex: 1; min-height: 0; }
+
+.popup-section {
+  margin-bottom: 16px;
+}
+.popup-section-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 10px;
+}
+
+.popup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.popup-field {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 12px;
+}
+.popup-field.full {
+  grid-column: 1 / -1;
+}
+.popup-field-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.popup-field-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.popup-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.popup-status.alive {
+  background: #ecfdf5;
+  color: #059669;
+}
+.popup-status.deceased-status {
+  background: #f1f5f9;
+  color: var(--text-muted);
+}
+
+.popup-note {
+  background: #fefce8;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 13px;
+  color: #854d0e;
+  font-weight: 600;
+  line-height: 1.5;
+  border-left: 3px solid #facc15;
+}
+
+.popup-actions {
+  display: flex;
+  gap: 10px;
+  padding: 20px 24px 24px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.popup-act-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.popup-act-btn svg {
+  width: 16px; height: 16px;
+}
+.popup-act-btn.btn-edit {
+  background: rgba(74,108,247,0.1);
+  color: #4a6cf7;
+}
+.popup-act-btn.btn-edit:hover {
+  background: rgba(74,108,247,0.2);
+}
+.popup-act-btn.btn-delete {
+  background: rgba(239,68,68,0.08);
+  color: #ef4444;
+}
+.popup-act-btn.btn-delete:hover {
+  background: rgba(239,68,68,0.18);
+}
+
+/* ============ ZOOM CONTROLS ============ */
+.controls {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 200;
+}
+.ctrl-btn {
+  width: 42px; height: 42px;
+  border-radius: 12px;
+  border: none;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-family: 'Nunito', sans-serif;
+}
+.ctrl-btn:hover {
+  background: #4a6cf7;
+  color: #fff;
+  transform: scale(1.08);
+}
+.ctrl-btn svg { width: 18px; height: 18px; }
+
+/* ============ MINIMAP ============ */
+.minimap-toggle {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 200;
+}
+
+/* ============ TOOLTIP ============ */
+.tooltip {
+  position: fixed;
+  background: var(--text);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 500;
+  opacity: 0;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+.tooltip.visible { opacity: 1; }
+
+/* ============ ADD FORM ============ */
+.add-form-popup { max-width: 440px; }
+
+.add-form-header {
+  padding: 20px 24px 14px;
+  position: relative;
+  border-bottom: 1px solid var(--border);
+}
+.add-form-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+.add-form-subtitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.form-group { margin-bottom: 14px; }
+.form-row { display: flex; gap: 10px; }
+.form-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.form-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-input:focus { border-color: #4a6cf7; }
+.form-input::placeholder { color: #c0c8d4; }
+.form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+  cursor: pointer;
+}
+.form-select option { font-family: 'Nunito', sans-serif; padding: 8px; }
+.form-select option.select-divider { font-size: 1px; background: var(--border); }
+.form-textarea { resize: vertical; min-height: 50px; }
+
+.form-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 16px 0;
+}
+
+.form-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.form-chips-sm .chip { padding: 5px 11px; font-size: 11px; }
+
+.chip {
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 2px solid var(--border);
+  background: #fff;
+  font-family: 'Nunito', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.chip:hover { border-color: #4a6cf7; color: #4a6cf7; }
+.chip.active {
+  background: #4a6cf7;
+  border-color: #4a6cf7;
+  color: #fff;
+}
+.chip.male-chip.active { background: var(--male); border-color: var(--male); }
+.chip.female-chip.active { background: var(--female); border-color: var(--female); }
+.chip.alive-chip.active { background: #059669; border-color: #059669; }
+.chip.deceased-chip.active { background: #94a3b8; border-color: #94a3b8; }
+.chip.pair-chip.active { background: #e55b8a; border-color: #e55b8a; color: #fff; }
+.chip.pair-chip:hover { border-color: #e55b8a; color: #e55b8a; background: #fff; }
+.chip.pair-chip.active:hover { background: #d44a79; border-color: #d44a79; color: #fff; }
+.chip.child-chip.active { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+.chip.child-chip:hover { border-color: #f59e0b; color: #f59e0b; background: #fff; }
+.chip.child-chip.active:hover { background: #d97706; border-color: #d97706; color: #fff; }
+
+.second-parent-block {
+  margin-top: 10px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.second-parent-block .form-label { margin-bottom: 4px; }
+.second-parent-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.form-conditional {
+  margin-top: 10px;
+  animation: fadeSlide 0.25s ease;
+}
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.form-submit {
+  width: 100%;
+  padding: 13px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #4a6cf7, #7b68ee);
+  color: #fff;
+  font-family: 'Nunito', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.25s;
+  margin-top: 6px;
+}
+.form-submit:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(74,108,247,0.35); }
+.form-submit:active { transform: scale(0.98); }
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 768px) {
+  .header-stats { display: none; }
+  .header-title { font-size: 18px; }
+  .generation.gen-3 { gap: 10px; }
+  .card { width: 150px; }
+  .card-name { font-size: 12px; min-height: 32px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-inner">
+    <div class="header-left">
+      <div class="header-icon" id="headerAvatar"></div>
+      <div>
+        <div class="header-title">Семейное Древо</div>
+        <div class="header-subtitle" id="headerOwner"></div>
+      </div>
+    </div>
+    <div class="header-stats">
+      <div class="stat">
+        <div class="stat-num" id="statMembers">0</div>
+        <div class="stat-label">Членов</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="statGens">0</div>
+        <div class="stat-label">Поколения</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- TREE -->
+<div class="tree-viewport" id="viewport">
+  <div class="tree-container" id="treeContainer">
+    <svg class="connectors" id="svg"></svg>
+
+    <!-- === GEN 1 === -->
+    <div class="gen-label"><span>Дедушки и Бабушки</span></div>
+    <div class="generation gen-1" id="gen1">
+
+      <!-- Couple 1 -->
+      <div class="couple" id="couple1">
+        <div class="card male deceased" id="c-maksud">
+          <div class="card-bar"></div>
+          <div class="card-body">
+            <div class="avatar"><img src="https://randomuser.me/api/portraits/men/72.jpg" alt="Максуд"></div>
+            <div class="card-name">Рустамов Максуд</div>
+            <div class="card-years">—</div>
+            <div><span class="badge-deceased"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4m0 4h.01"/></svg>Умер</span></div>
+          </div>
+          <button class="plus-tab" onclick="openAddForm('maksud')" aria-label="Подробнее">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </button>
+        </div>
+
+        <div class="couple-heart">💕</div>
+
+        <div class="card female deceased" id="c-nasiba">
+          <div class="card-bar"></div>
+          <div class="card-body">
+            <div class="avatar"><img src="https://randomuser.me/api/portraits/women/75.jpg" alt="Насиба"></div>
+            <div class="card-name">Рустамова Насиба Тахировна</div>
+            <div class="card-years">—</div>
+            <div><span class="badge-deceased"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4m0 4h.01"/></svg>Умерла</span></div>
+          </div>
+          <button class="plus-tab" onclick="openAddForm('nasiba')" aria-label="Подробнее">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Couple 2 -->
+      <div class="couple" id="couple2">
+        <div class="card male deceased" id="c-hamid">
+          <div class="card-bar"></div>
+          <div class="card-body">
+            <div class="avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v1.2c0 .7.5 1.2 1.2 1.2h16.8c.7 0 1.2-.5 1.2-1.2v-1.2c0-3.2-6.4-4.8-9.6-4.8z"/></svg></div>
+            <div class="card-name">Усманов Хамид Гулямович</div>
+            <div class="card-years">1930</div>
+            <div><span class="badge-deceased"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4m0 4h.01"/></svg>Умер</span></div>
+          </div>
+          <button class="plus-tab" onclick="openAddForm('hamid')" aria-label="Подробнее">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </button>
+        </div>
+
+        <div class="couple-heart">💕</div>
+
+        <div class="card female deceased" id="c-salomat">
+          <div class="card-bar"></div>
+          <div class="card-body">
+            <div class="avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4c-1.5 0-2.7.5-3.6 1.3C7.9 3.5 7.4 3.4 6.8 3.4c-2.2 0-3.6 1.8-3.6 3.8 0 .8.2 1.5.5 2.1C2.7 10.5 2.4 12 2.4 12s1.2.6 2.4.6c.3 0 .6 0 .8-.1.8 1.4 2.3 3.1 4 3.9V18c-3.2.5-7.2 1.8-7.2 3.6v1.2h19.2v-1.2c0-1.8-4-3.1-7.2-3.6v-1.6c1.7-.8 3.2-2.5 4-3.9.3.1.5.1.8.1 1.2 0 2.4-.6 2.4-.6s-.3-1.5-1.3-2.7c.3-.6.5-1.3.5-2.1 0-2-1.4-3.8-3.6-3.8-.6 0-1.1.1-1.6.3-.9-.8-2.1-1.3-3.6-1.3z"/></svg></div>
+            <div class="card-name">Усманова Саломат</div>
+            <div class="card-years">1932</div>
+            <div><span class="badge-deceased"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4m0 4h.01"/></svg>Умерла</span></div>
+          </div>
+          <button class="plus-tab" onclick="openAddForm('salomat')" aria-label="Подробнее">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector-space"></div>
+
+    <!-- === GEN 2 === -->
+    <div class="gen-label"><span>Родители</span></div>
+    <div class="generation gen-2" id="gen2">
+      <div class="couple" id="couple3">
+        <div class="card male" id="c-shahzod">
+          <div class="card-bar"></div>
+          <div class="card-body">
+            <div class="avatar"><img src="https://randomuser.me/api/portraits/men/45.jpg" alt="Шахзод"></div>
+            <div class="card-name">Рустамов Шахзод Максудович</div>
+            <div class="card-years">1954</div>
+          </div>
+          <button class="plus-tab" onclick="openAddForm('shahzod')" aria-label="Подробнее">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </button>
+        </div>
+
+        <div class="couple-heart">💕</div>
+
+        <div class="card female" id="c-muattar">
+          <div class="card-bar"></div>
+          <div class="card-body">
+            <div class="avatar"><img src="https://randomuser.me/api/portraits/women/44.jpg" alt="Муаттар"></div>
+            <div class="card-name">Рустамова Муаттар Хамитовна</div>
+            <div class="card-years">1956</div>
+          </div>
+          <button class="plus-tab" onclick="openAddForm('muattar')" aria-label="Подробнее">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector-space"></div>
+
+    <!-- === GEN 3 === -->
+    <div class="gen-label"><span>Вы, Братья и Сёстры</span></div>
+    <div class="generation gen-3" id="gen3">
+
+      <div class="card female" id="c-nigora">
+        <div class="card-bar"></div>
+        <div class="card-body">
+          <div class="avatar"><img src="https://randomuser.me/api/portraits/women/19.jpg" alt="Нигора"></div>
+          <div class="card-name">Рахимова Нигора Рустамова</div>
+          <div class="card-years">1982</div>
+        </div>
+        <button class="plus-tab" onclick="openAddForm('nigora')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
+      </div>
+
+      <!-- Ex-wife Malika (divorced) -->
+      <div class="couple" id="coupleEx">
+        <div class="card female" id="c-malika">
+          <div class="card-bar"></div>
+          <div class="card-body">
+            <div class="avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4c-1.5 0-2.7.5-3.6 1.3C7.9 3.5 7.4 3.4 6.8 3.4c-2.2 0-3.6 1.8-3.6 3.8 0 .8.2 1.5.5 2.1C2.7 10.5 2.4 12 2.4 12s1.2.6 2.4.6c.3 0 .6 0 .8-.1.8 1.4 2.3 3.1 4 3.9V18c-3.2.5-7.2 1.8-7.2 3.6v1.2h19.2v-1.2c0-1.8-4-3.1-7.2-3.6v-1.6c1.7-.8 3.2-2.5 4-3.9.3.1.5.1.8.1 1.2 0 2.4-.6 2.4-.6s-.3-1.5-1.3-2.7c.3-.6.5-1.3.5-2.1 0-2-1.4-3.8-3.6-3.8-.6 0-1.1.1-1.6.3-.9-.8-2.1-1.3-3.6-1.3z"/></svg></div>
+            <div class="card-name">Малика</div>
+            <div class="card-years">1989</div>
+          </div>
+          <button class="plus-tab" onclick="openAddForm('malika')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
+        </div>
+
+        <div class="couple-badge-divorced">💔 Разведены</div>
+
+        <div class="card male owner" id="c-ulugbek">
+          <div class="card-bar"></div>
+          <div class="card-body">
+            <div class="avatar"><img src="https://randomuser.me/api/portraits/men/22.jpg" alt="Улугбек"></div>
+            <div class="card-name">Улугбек Рустамов</div>
+            <div class="card-years">1984</div>
+            <div><span class="badge-owner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Это вы</span></div>
+          </div>
+          <button class="plus-tab" onclick="openAddForm('ulugbek')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
+        </div>
+      </div>
+
+      <!-- Current wife Nigora Isaeva -->
+      <div class="card female" id="c-nigora2">
+        <div class="card-bar"></div>
+        <div class="card-body">
+          <div class="avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4c-1.5 0-2.7.5-3.6 1.3C7.9 3.5 7.4 3.4 6.8 3.4c-2.2 0-3.6 1.8-3.6 3.8 0 .8.2 1.5.5 2.1C2.7 10.5 2.4 12 2.4 12s1.2.6 2.4.6c.3 0 .6 0 .8-.1.8 1.4 2.3 3.1 4 3.9V18c-3.2.5-7.2 1.8-7.2 3.6v1.2h19.2v-1.2c0-1.8-4-3.1-7.2-3.6v-1.6c1.7-.8 3.2-2.5 4-3.9.3.1.5.1.8.1 1.2 0 2.4-.6 2.4-.6s-.3-1.5-1.3-2.7c.3-.6.5-1.3.5-2.1 0-2-1.4-3.8-3.6-3.8-.6 0-1.1.1-1.6.3-.9-.8-2.1-1.3-3.6-1.3z"/></svg></div>
+          <div class="card-name">Нигора Исаева</div>
+          <div class="card-years">1988</div>
+        </div>
+        <button class="plus-tab" onclick="openAddForm('nigora2')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
+      </div>
+
+      <div class="card male deceased" id="c-alisher">
+        <div class="card-bar"></div>
+        <div class="card-body">
+          <div class="avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v1.2c0 .7.5 1.2 1.2 1.2h16.8c.7 0 1.2-.5 1.2-1.2v-1.2c0-3.2-6.4-4.8-9.6-4.8z"/></svg></div>
+          <div class="card-name">Алишер Рустамов</div>
+          <div class="card-years">1987 — 2009</div>
+          <div><span class="badge-deceased"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4m0 4h.01"/></svg>Умер</span></div>
+        </div>
+        <button class="plus-tab" onclick="openAddForm('alisher')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
+      </div>
+
+      <div class="card male" id="c-nodir">
+        <div class="card-bar"></div>
+        <div class="card-body">
+          <div class="avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v1.2c0 .7.5 1.2 1.2 1.2h16.8c.7 0 1.2-.5 1.2-1.2v-1.2c0-3.2-6.4-4.8-9.6-4.8z"/></svg></div>
+          <div class="card-name">Нодир Хашимов Усманов</div>
+          <div class="card-years">—</div>
+        </div>
+        <button class="plus-tab" onclick="openAddForm('nodir')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- POPUP -->
+<div class="popup-overlay" id="popupOverlay">
+  <div class="popup" id="popup" onclick="event.stopPropagation()">
+    <div class="popup-header">
+      <button class="popup-close" id="popupClose" aria-label="Закрыть">&times;</button>
+      <div class="popup-avatar-lg" id="pAvatar"><svg id="pAvatarSvg" viewBox="0 0 24 24" fill="currentColor"></svg></div>
+      <div class="popup-name" id="pName"></div>
+      <div class="popup-role" id="pRole"></div>
+    </div>
+    <div class="popup-body" id="pBody"></div>
+    <div class="popup-actions" id="pActions">
+      <button class="popup-act-btn btn-edit" id="pBtnEdit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        Редактировать
+      </button>
+      <button class="popup-act-btn btn-delete" id="pBtnDelete">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Удалить
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD RELATIVE FORM -->
+<div class="popup-overlay" id="addOverlay">
+  <div class="popup add-form-popup" onclick="event.stopPropagation()">
+    <div class="add-form-header">
+      <button class="popup-close" onclick="closeAddForm()">&times;</button>
+      <div class="add-form-title">Новый родственник</div>
+      <div class="add-form-subtitle" id="addFormRelTo"></div>
+    </div>
+    <div class="popup-body">
+      <form id="addRelForm" onsubmit="submitAddForm(event)">
+
+        <div class="form-group">
+          <label class="form-label">Тип связи</label>
+          <div class="form-chips" id="relType">
+            <button type="button" class="chip active" data-val="child">Ребёнок</button>
+            <button type="button" class="chip" data-val="pair">Пара</button>
+            <button type="button" class="chip" data-val="sibling">Брат/Сестра</button>
+            <button type="button" class="chip" data-val="parent">Родитель</button>
+          </div>
+          <div class="form-conditional" id="pairSection" style="display:none;">
+            <label class="form-label" style="margin-top:10px;">Тип отношений</label>
+            <div class="form-chips form-chips-sm" id="pairType">
+              <button type="button" class="chip pair-chip active" data-val="married">Муж / Жена</button>
+              <button type="button" class="chip pair-chip" data-val="civil">Гражданский брак</button>
+              <button type="button" class="chip pair-chip" data-val="dating">Встречаются</button>
+              <button type="button" class="chip pair-chip" data-val="divorced">Разведены</button>
+              <button type="button" class="chip pair-chip" data-val="widowed">Смерть супруга(и)</button>
+              <button type="button" class="chip pair-chip" data-val="other">Другое</button>
+            </div>
+          </div>
+          <div class="form-conditional" id="childSection" style="display:none;">
+            <label class="form-label" style="margin-top:10px;">Тип ребёнка</label>
+            <div class="form-chips form-chips-sm" id="childType">
+              <button type="button" class="chip child-chip active" data-val="biological">Родной</button>
+              <button type="button" class="chip child-chip" data-val="adopted">Усыновлён / Удочерена</button>
+              <button type="button" class="chip child-chip" data-val="foster">Приёмный</button>
+              <button type="button" class="chip child-chip" data-val="guardianship">Опекунство</button>
+              <button type="button" class="chip child-chip" data-val="stepchild">Пасынок / Падчерица</button>
+            </div>
+            <div id="secondParentBlock" class="second-parent-block" style="margin-top:10px;">
+              <label class="form-label" id="secondParentLabel">Второй родитель</label>
+              <div class="second-parent-hint" id="secondParentHint"></div>
+              <select class="form-input form-select" id="addSecondParent">
+                <option value="">Выберите...</option>
+              </select>
+              <div id="newParentInput" style="display:none; margin-top:8px;">
+                <input type="text" class="form-input" id="addNewParentName" placeholder="ФИО нового родителя">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Пол</label>
+          <div class="form-chips" id="relGender">
+            <button type="button" class="chip male-chip active" data-val="male">Мужской</button>
+            <button type="button" class="chip female-chip" data-val="female">Женский</button>
+          </div>
+        </div>
+
+        <div class="form-divider"></div>
+
+        <div class="form-row">
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Фамилия</label>
+            <input type="text" class="form-input" id="addLastName" placeholder="Рустамов(а)">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Имя *</label>
+            <input type="text" class="form-input" id="addFirstName" placeholder="Имя" required>
+          </div>
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Отчество</label>
+            <input type="text" class="form-input" id="addMiddleName" placeholder="Отчество">
+          </div>
+        </div>
+
+        <div class="form-divider"></div>
+
+        <!-- BIRTH DATE -->
+        <div class="form-group">
+          <label class="form-label">Дата рождения</label>
+          <div class="form-chips form-chips-sm" id="birthType">
+            <button type="button" class="chip active" data-val="unknown">Не знаю</button>
+            <button type="button" class="chip" data-val="year">Только год</button>
+            <button type="button" class="chip" data-val="full">Полная дата</button>
+          </div>
+          <div class="form-conditional" id="birthFields"></div>
+        </div>
+
+        <!-- ALIVE / DEATH -->
+        <div class="form-group">
+          <label class="form-label">Статус</label>
+          <div class="form-chips" id="aliveStatus">
+            <button type="button" class="chip alive-chip active" data-val="alive">Жив(а)</button>
+            <button type="button" class="chip deceased-chip" data-val="deceased">Умер(ла)</button>
+          </div>
+          <div class="form-conditional" id="deathSection" style="display:none;">
+            <div class="form-chips form-chips-sm" id="deathType" style="margin-top:10px;">
+              <button type="button" class="chip active" data-val="unknown">Не знаю когда</button>
+              <button type="button" class="chip" data-val="year">Только год</button>
+              <button type="button" class="chip" data-val="full">Полная дата</button>
+            </div>
+            <div class="form-conditional" id="deathFields"></div>
+          </div>
+        </div>
+
+        <div class="form-divider"></div>
+
+        <div class="form-group">
+          <label class="form-label">Примечание</label>
+          <textarea class="form-input form-textarea" id="addNote" placeholder="Доп. информация..." rows="2"></textarea>
+        </div>
+
+        <button type="submit" class="form-submit">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Добавить
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ZOOM CONTROLS -->
+<div class="controls">
+  <button class="ctrl-btn" onclick="zoomIn()" title="Увеличить">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
+  </button>
+  <button class="ctrl-btn" onclick="zoomOut()" title="Уменьшить">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="12" x2="18" y2="12"/></svg>
+  </button>
+  <button class="ctrl-btn" onclick="zoomReset()" title="Сбросить">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+  </button>
+</div>
+
+<!-- TOOLTIP -->
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+/* ========== DATA ========== */
+const MALE_PATH = 'M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v1.2c0 .7.5 1.2 1.2 1.2h16.8c.7 0 1.2-.5 1.2-1.2v-1.2c0-3.2-6.4-4.8-9.6-4.8z';
+const FEMALE_PATH = 'M12 2.4c-1.5 0-2.7.5-3.6 1.3C7.9 3.5 7.4 3.4 6.8 3.4c-2.2 0-3.6 1.8-3.6 3.8 0 .8.2 1.5.5 2.1C2.7 10.5 2.4 12 2.4 12s1.2.6 2.4.6c.3 0 .6 0 .8-.1.8 1.4 2.3 3.1 4 3.9V18c-3.2.5-7.2 1.8-7.2 3.6v1.2h19.2v-1.2c0-1.8-4-3.1-7.2-3.6v-1.6c1.7-.8 3.2-2.5 4-3.9.3.1.5.1.8.1 1.2 0 2.4-.6 2.4-.6s-.3-1.5-1.3-2.7c.3-.6.5-1.3.5-2.1 0-2-1.4-3.8-3.6-3.8-.6 0-1.1.1-1.6.3-.9-.8-2.1-1.3-3.6-1.3z';
+
+const OWNER_ID = 'ulugbek';
+
+const DB = {
+  maksud: {
+    name:'Рустамов Максуд', gender:'male', birth:null, death:true,
+    photo:'https://randomuser.me/api/portraits/men/72.jpg',
+    relation:'Дедушка', role:'Дедушка (по отцу)', spouse:'Рустамова Насиба Тахировна',
+    children:'Рустамов Шахзод Максудович',
+    note:'Глава семьи Рустамовых. Точные годы жизни неизвестны.'
+  },
+  nasiba: {
+    name:'Рустамова Насиба Тахировна', gender:'female', birth:null, death:true,
+    photo:'https://randomuser.me/api/portraits/women/75.jpg',
+    relation:'Бабушка', role:'Бабушка (по отцу)', spouse:'Рустамов Максуд',
+    children:'Рустамов Шахзод Максудович',
+    note:'Мать Шахзода Максудовича.'
+  },
+  hamid: {
+    name:'Усманов Хамид Гулямович', gender:'male', birth:'1930', death:true,
+    relation:'Дедушка', role:'Дедушка (по матери)', spouse:'Усманова Саломат',
+    children:'Рустамова Муаттар Хамитовна (Усманова)',
+    note:'Глава семьи Усмановых. Родился в 1930 году.'
+  },
+  salomat: {
+    name:'Усманова Саломат', gender:'female', birth:'1932', death:true,
+    relation:'Бабушка', role:'Бабушка (по матери)', spouse:'Усманов Хамид Гулямович',
+    children:'Рустамова Муаттар Хамитовна (Усманова)',
+    note:'Мать Муаттар. Родилась в 1932 году.'
+  },
+  shahzod: {
+    name:'Рустамов Шахзод Максудович', gender:'male', birth:'1954', death:false,
+    photo:'https://randomuser.me/api/portraits/men/45.jpg',
+    relation:'Отец', role:'Отец', spouse:'Рустамова Муаттар Хамитовна',
+    parents:'Рустамов Максуд и Насиба Тахировна',
+    children:'Нигора, Улугбек, Алишер, Нодир',
+    note:'Сын Максуда и Насибы. Муж Муаттар.'
+  },
+  muattar: {
+    name:'Рустамова Муаттар Хамитовна', gender:'female', birth:'1956', death:false,
+    photo:'https://randomuser.me/api/portraits/women/44.jpg',
+    relation:'Мать', role:'Мать', maiden:'Усманова', spouse:'Рустамов Шахзод Максудович',
+    parents:'Усманов Хамид Гулямович и Саломат',
+    children:'Нигора, Улугбек, Алишер, Нодир',
+    note:'Дочь Хамида и Саломат. Жена Шахзода.'
+  },
+  nigora: {
+    name:'Рахимова Нигора Рустамова', gender:'female', birth:'1982', death:false,
+    photo:'https://randomuser.me/api/portraits/women/19.jpg',
+    relation:'Старшая сестра', role:'Старшая сестра', parents:'Шахзод и Муаттар Рустамовы',
+    note:'Первый ребёнок в семье. Род. 1982.'
+  },
+  ulugbek: {
+    name:'Улугбек Рустамов', gender:'male', birth:'1984', death:false,
+    photo:'https://randomuser.me/api/portraits/men/22.jpg',
+    relation:'Это вы', role:'Владелец дерева', spouse:'Нигора Исаева', parents:'Шахзод и Муаттар Рустамовы',
+    note:'Бывшая жена — Малика (разведены). Текущая жена — Нигора Исаева.'
+  },
+  alisher: {
+    name:'Алишер Рустамов', gender:'male', birth:'1987', death:'2009',
+    relation:'Младший брат', role:'Младший брат', parents:'Шахзод и Муаттар Рустамовы',
+    note:'Родился в 1987, умер в 2009 году.'
+  },
+  nigora2: {
+    name:'Нигора Исаева', gender:'female', birth:'1988', death:false,
+    relation:'Жена', role:'Жена', spouse:'Улугбек Рустамов',
+    note:'Текущая жена Улугбека Рустамова.'
+  },
+  malika: {
+    name:'Малика', gender:'female', birth:'1989', death:false,
+    relation:'Бывшая жена', role:'Бывшая жена', spouse:'Улугбек Рустамов (разведены)',
+    note:'Первая жена Улугбека Рустамова. В разводе.'
+  },
+  nodir: {
+    name:'Нодир Хашимов Усманов', gender:'male', birth:null, death:false,
+    relation:'Младший брат', role:'Младший брат', parents:'Шахзод и Муаттар Рустамовы',
+    note:'Младший в семье.'
+  }
+};
+
+/* ========== HEADER OWNER + STATS ========== */
+const ownerData = DB[OWNER_ID];
+document.getElementById('headerOwner').textContent = ownerData.name;
+const headerAv = document.getElementById('headerAvatar');
+if (ownerData.photo) {
+  headerAv.innerHTML = '<img src="' + ownerData.photo + '" alt="' + ownerData.name + '">';
+} else {
+  headerAv.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>';
+}
+
+// Stats
+document.getElementById('statMembers').textContent = Object.keys(DB).length;
+document.getElementById('statGens').textContent = document.querySelectorAll('.generation').length;
+
+/* ========== POPUP ========== */
+const overlay = document.getElementById('popupOverlay');
+const popupEl = document.getElementById('popup');
+
+let popupPersonId = null;
+
+function openPopup(id) {
+  const p = DB[id];
+  if (!p) return;
+  popupPersonId = id;
+
+  // avatar
+  const av = document.getElementById('pAvatar');
+  const isDeceased = !!p.death;
+  av.className = 'popup-avatar-lg ' + p.gender + (isDeceased && p.photo ? ' deceased-photo' : '');
+  if (p.photo) {
+    av.innerHTML = '<img src="' + p.photo + '" alt="' + p.name + '">';
+  } else {
+    av.innerHTML = '<svg id="pAvatarSvg" viewBox="0 0 24 24" fill="currentColor"><path d="' + (p.gender === 'male' ? MALE_PATH : FEMALE_PATH) + '"/></svg>';
+  }
+
+  document.getElementById('pName').textContent = p.name;
+  document.getElementById('pRole').textContent = p.role || '';
+
+  // body
+  const body = document.getElementById('pBody');
+  body.innerHTML = '';
+
+  // Info section
+  const sec = document.createElement('div');
+  sec.className = 'popup-section';
+  const title = document.createElement('div');
+  title.className = 'popup-section-title';
+  title.textContent = 'Информация';
+  sec.appendChild(title);
+
+  const grid = document.createElement('div');
+  grid.className = 'popup-grid';
+
+  const fields = [
+    {l:'Год рождения', v: p.birth || 'Неизвестен'},
+    {l:'Статус', v: '__status__'},
+    {l:'Супруг(а)', v: p.spouse, full: false},
+    {l:'Дев. фамилия', v: p.maiden},
+    {l:'Родители', v: p.parents, full: true},
+    {l:'Дети', v: p.children, full: true}
+  ];
+
+  fields.forEach(f => {
+    if (!f.v) return;
+    const el = document.createElement('div');
+    el.className = 'popup-field' + (f.full ? ' full' : '');
+
+    if (f.v === '__status__') {
+      const isDeceased = !!p.death;
+      const deathYear = typeof p.death === 'string' ? p.death : '';
+      const statusClass = isDeceased ? 'deceased-status' : 'alive';
+      const dot = isDeceased ? '⚫' : '🟢';
+      let statusText = isDeceased
+        ? (p.gender === 'female' ? 'Умерла' : 'Умер') + (deathYear ? ' (' + deathYear + ')' : '')
+        : 'Жив' + (p.gender === 'female' ? 'а' : '');
+      el.innerHTML =
+        '<div class="popup-field-label">' + f.l + '</div>' +
+        '<div><span class="popup-status ' + statusClass + '">' + dot + ' ' + statusText + '</span></div>';
+    } else {
+      el.innerHTML =
+        '<div class="popup-field-label">' + f.l + '</div>' +
+        '<div class="popup-field-value">' + f.v + '</div>';
+    }
+    grid.appendChild(el);
+  });
+
+  sec.appendChild(grid);
+  body.appendChild(sec);
+
+  // Note
+  if (p.note) {
+    const noteSec = document.createElement('div');
+    noteSec.className = 'popup-section';
+    const noteTitle = document.createElement('div');
+    noteTitle.className = 'popup-section-title';
+    noteTitle.textContent = 'Примечание';
+    noteSec.appendChild(noteTitle);
+    const noteBox = document.createElement('div');
+    noteBox.className = 'popup-note';
+    noteBox.textContent = p.note;
+    noteSec.appendChild(noteBox);
+    body.appendChild(noteSec);
+  }
+
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePopup() {
+  overlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+overlay.addEventListener('click', e => { if (e.target === overlay) closePopup(); });
+document.getElementById('popupClose').addEventListener('click', closePopup);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closePopup(); closeAddForm(); }
+});
+
+document.getElementById('pBtnEdit').addEventListener('click', () => {
+  if (popupPersonId) { closePopup(); editPerson(popupPersonId); }
+});
+document.getElementById('pBtnDelete').addEventListener('click', () => {
+  if (popupPersonId) { closePopup(); deletePerson(popupPersonId); }
+});
+
+/* ========== CARD BODY CLICK → INFO POPUP ========== */
+document.querySelectorAll('.card-body').forEach(body => {
+  body.addEventListener('click', e => {
+    if (dragMoved) return; // don't open after drag
+    const card = body.closest('.card');
+    if (!card) return;
+    const id = card.id.replace('c-', '');
+    if (DB[id]) openPopup(id);
+  });
+});
+
+/* ========== ADD RELATIVE FORM ========== */
+const addOverlay = document.getElementById('addOverlay');
+let addFormForPerson = null;
+
+function openAddForm(personId) {
+  addFormForPerson = personId;
+  const p = DB[personId];
+  if (!p) return;
+  document.getElementById('addFormRelTo').textContent = 'Связь с: ' + p.name;
+
+  // Reset form
+  document.getElementById('addRelForm').reset();
+  // Reset all chips to defaults
+  document.querySelectorAll('#relType .chip').forEach((c,i) => c.classList.toggle('active', i===0));
+  document.querySelectorAll('#relGender .chip').forEach((c,i) => c.classList.toggle('active', i===0));
+  document.querySelectorAll('#birthType .chip').forEach((c,i) => c.classList.toggle('active', i===0));
+  document.querySelectorAll('#aliveStatus .chip').forEach((c,i) => c.classList.toggle('active', i===0));
+  document.querySelectorAll('#deathType .chip').forEach((c,i) => c.classList.toggle('active', i===0));
+
+  // Reset conditional fields
+  document.getElementById('pairSection').style.display = 'none';
+  document.querySelectorAll('#pairType .chip').forEach((c,i) => c.classList.toggle('active', i===0));
+  // Child section: show by default since "Ребёнок" is the first chip
+  document.getElementById('childSection').style.display = 'block';
+  document.querySelectorAll('#childType .chip').forEach((c,i) => c.classList.toggle('active', i===0));
+  document.getElementById('newParentInput').style.display = 'none';
+  updateSecondParentHint();
+  document.getElementById('birthFields').innerHTML = '';
+  document.getElementById('deathSection').style.display = 'none';
+  document.getElementById('deathFields').innerHTML = '';
+
+  addOverlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAddForm() {
+  addOverlay.classList.remove('active');
+  document.body.style.overflow = '';
+  addFormForPerson = null;
+}
+
+addOverlay.addEventListener('click', e => { if (e.target === addOverlay) closeAddForm(); });
+
+// Chip toggle logic — generic for all chip groups
+document.querySelectorAll('.form-chips').forEach(group => {
+  group.addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    group.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+
+    // Handle conditional logic
+    const groupId = group.id;
+    if (groupId === 'relType') updateRelType(chip.dataset.val);
+    if (groupId === 'birthType') updateBirthFields(chip.dataset.val);
+    if (groupId === 'aliveStatus') updateAliveStatus(chip.dataset.val);
+    if (groupId === 'deathType') updateDeathFields(chip.dataset.val);
+  });
+});
+
+function updateRelType(val) {
+  const pairSec = document.getElementById('pairSection');
+  const childSec = document.getElementById('childSection');
+  const genderChips = document.querySelectorAll('#relGender .chip');
+  if (val === 'pair') {
+    pairSec.style.display = 'block';
+    childSec.style.display = 'none';
+    document.querySelectorAll('#pairType .chip').forEach((c,i) => c.classList.toggle('active', i===0));
+  } else if (val === 'child') {
+    pairSec.style.display = 'none';
+    childSec.style.display = 'block';
+    document.querySelectorAll('#childType .chip').forEach((c,i) => c.classList.toggle('active', i===0));
+    updateSecondParentHint();
+  } else {
+    pairSec.style.display = 'none';
+    childSec.style.display = 'none';
+  }
+  // Update gender chip labels based on relation type
+  if (val === 'child') {
+    genderChips[0].textContent = 'Сын';
+    genderChips[1].textContent = 'Дочь';
+  } else {
+    genderChips[0].textContent = 'Мужской';
+    genderChips[1].textContent = 'Женский';
+  }
+}
+
+function getPartners(personId) {
+  // Find all people linked as spouse/partner to this person in DB
+  const person = DB[personId];
+  if (!person) return [];
+  const partners = [];
+  for (const [id, p] of Object.entries(DB)) {
+    if (id === personId) continue;
+    // Check if this person's spouse field mentions our person, or vice versa
+    const personName = person.name.toLowerCase();
+    const pName = p.name.toLowerCase();
+    const isPartner =
+      (person.spouse && person.spouse.toLowerCase().includes(pName)) ||
+      (p.spouse && p.spouse.toLowerCase().includes(personName));
+    if (isPartner) {
+      const isDivorced = (p.spouse && p.spouse.includes('разведен')) ||
+                         (p.role && p.role.toLowerCase().includes('бывш'));
+      partners.push({ id, name: p.name, divorced: isDivorced });
+    }
+  }
+  return partners;
+}
+
+function updateSecondParentHint() {
+  const p = DB[addFormForPerson];
+  if (!p) return;
+  const label = document.getElementById('secondParentLabel');
+  const hint = document.getElementById('secondParentHint');
+  const select = document.getElementById('addSecondParent');
+  const newParentDiv = document.getElementById('newParentInput');
+
+  if (p.gender === 'male') {
+    label.textContent = 'Мать ребёнка';
+    hint.textContent = 'Вы добавляете ребёнка для ' + p.name + ' (отец). Укажите мать:';
+  } else {
+    label.textContent = 'Отец ребёнка';
+    hint.textContent = 'Вы добавляете ребёнка для ' + p.name + ' (мать). Укажите отца:';
+  }
+
+  // Build dropdown options
+  const partners = getPartners(addFormForPerson);
+  let html = '';
+
+  // Partner options
+  if (partners.length > 0) {
+    partners.forEach(pr => {
+      const suffix = pr.divorced ? ' (разведены)' : '';
+      html += '<option value="' + pr.id + '">' + pr.name + suffix + '</option>';
+    });
+    html += '<option disabled>───────────</option>';
+  }
+
+  // Action options
+  html += '<option value="__new__">+ Добавить нового родителя</option>';
+  html += '<option value="__none__">Без второго родителя</option>';
+
+  select.innerHTML = html;
+  newParentDiv.style.display = 'none';
+
+  // Auto-select first partner if exists
+  if (partners.length > 0) {
+    select.value = partners[0].id;
+  }
+
+  // Listen for changes
+  select.onchange = function() {
+    if (select.value === '__new__') {
+      newParentDiv.style.display = 'block';
+      document.getElementById('addNewParentName').value = '';
+      document.getElementById('addNewParentName').focus();
+    } else {
+      newParentDiv.style.display = 'none';
+    }
+  };
+}
+
+function buildYearInput(id, placeholder) {
+  return '<input type="number" class="form-input" id="' + id + '" placeholder="' + placeholder + '" min="1800" max="2030" style="margin-top:8px;">';
+}
+function buildFullDateInput(id) {
+  return '<input type="date" class="form-input" id="' + id + '" style="margin-top:8px;">';
+}
+
+function updateBirthFields(val) {
+  const el = document.getElementById('birthFields');
+  if (val === 'unknown') el.innerHTML = '';
+  else if (val === 'year') el.innerHTML = buildYearInput('addBirthYear', 'Год, напр. 1985');
+  else if (val === 'full') el.innerHTML = buildFullDateInput('addBirthDate');
+}
+
+function updateAliveStatus(val) {
+  const deathSec = document.getElementById('deathSection');
+  if (val === 'alive') {
+    deathSec.style.display = 'none';
+    document.getElementById('deathFields').innerHTML = '';
+  } else {
+    deathSec.style.display = 'block';
+    // Reset death type to first chip
+    document.querySelectorAll('#deathType .chip').forEach((c,i) => c.classList.toggle('active', i===0));
+    document.getElementById('deathFields').innerHTML = '';
+  }
+}
+
+function updateDeathFields(val) {
+  const el = document.getElementById('deathFields');
+  if (val === 'unknown') el.innerHTML = '';
+  else if (val === 'year') el.innerHTML = buildYearInput('addDeathYear', 'Год, напр. 2009');
+  else if (val === 'full') el.innerHTML = buildFullDateInput('addDeathDate');
+}
+
+function getChipVal(groupId) {
+  const active = document.querySelector('#' + groupId + ' .chip.active');
+  return active ? active.dataset.val : null;
+}
+
+function submitAddForm(e) {
+  e.preventDefault();
+  const relType = getChipVal('relType');
+  const gender = getChipVal('relGender');
+  const lastName = document.getElementById('addLastName').value.trim();
+  const firstName = document.getElementById('addFirstName').value.trim();
+  const middleName = document.getElementById('addMiddleName').value.trim();
+  const note = document.getElementById('addNote').value.trim();
+
+  if (!firstName) return;
+
+  // Birth
+  const birthMode = getChipVal('birthType');
+  let birthInfo = 'Не указана';
+  if (birthMode === 'year') { const v = document.getElementById('addBirthYear'); birthInfo = v ? v.value : ''; }
+  if (birthMode === 'full') { const v = document.getElementById('addBirthDate'); birthInfo = v ? v.value : ''; }
+
+  // Death
+  const alive = getChipVal('aliveStatus');
+  let deathInfo = 'Жив(а)';
+  if (alive === 'deceased') {
+    const deathMode = getChipVal('deathType');
+    if (deathMode === 'unknown') deathInfo = 'Умер(ла), дата неизвестна';
+    else if (deathMode === 'year') { const v = document.getElementById('addDeathYear'); deathInfo = 'Умер(ла) ' + (v ? v.value : ''); }
+    else if (deathMode === 'full') { const v = document.getElementById('addDeathDate'); deathInfo = 'Умер(ла) ' + (v ? v.value : ''); }
+  }
+
+  const fullName = [lastName, firstName, middleName].filter(Boolean).join(' ');
+
+  // Child extra info
+  let childInfo = '';
+  if (relType === 'child') {
+    const childTypeVal = getChipVal('childType');
+    const childTypeLabels = {biological:'Родной', adopted:'Усыновлён/Удочерена', foster:'Приёмный', guardianship:'Опекунство', stepchild:'Пасынок/Падчерица'};
+    childInfo = '\nТип ребёнка: ' + (childTypeLabels[childTypeVal] || childTypeVal);
+    const spVal = document.getElementById('addSecondParent').value;
+    if (spVal === '__new__') {
+      const newName = document.getElementById('addNewParentName').value.trim();
+      if (newName) childInfo += '\nВторой родитель (новый): ' + newName;
+    } else if (spVal === '__none__') {
+      childInfo += '\nВторой родитель: Без второго родителя';
+    } else if (spVal && DB[spVal]) {
+      childInfo += '\nВторой родитель: ' + DB[spVal].name;
+    }
+  }
+
+  alert(
+    'Новый родственник (демо):\n\n' +
+    'Имя: ' + fullName + '\n' +
+    'Пол: ' + (gender === 'male' ? 'Мужской' : 'Женский') + '\n' +
+    'Связь: ' + relType + (relType === 'pair' ? ' (' + getChipVal('pairType') + ')' : '') + ' → ' + DB[addFormForPerson].name + '\n' +
+    childInfo +
+    'Рождение: ' + birthInfo + '\n' +
+    'Статус: ' + deathInfo + '\n' +
+    (note ? 'Примечание: ' + note : '')
+  );
+
+  closeAddForm();
+}
+
+/* ========== SMOOTH ZOOM ENGINE (lerp + rAF) ========== */
+let scale = 1;
+let targetScale = 1;
+const tree = document.getElementById('treeContainer');
+const MAX_SCALE = 1.8;
+const LERP = 0.15;
+const SETTLE = 0.0005;
+let zoomAnimating = false;
+let drawTimer = null;
+
+tree.style.willChange = 'transform';
+
+function getMinScale() {
+  const vpEl = document.getElementById('viewport');
+  const vpW = vpEl.clientWidth;
+  const vpH = vpEl.clientHeight;
+  const treeW = tree.scrollWidth;
+  const treeH = tree.scrollHeight;
+  // Минимальный зум = чтобы всё дерево влезло в viewport (но не меньше 0.3)
+  const fitW = vpW / treeW;
+  const fitH = vpH / treeH;
+  return Math.max(Math.min(fitW, fitH), 0.3);
+}
+
+function applyTransform() {
+  tree.style.transform = 'scale(' + scale + ')';
+}
+
+function zoomLoop() {
+  const diff = targetScale - scale;
+  if (Math.abs(diff) < SETTLE) {
+    scale = targetScale;
+    applyTransform();
+    zoomAnimating = false;
+    clearTimeout(drawTimer);
+    drawTimer = setTimeout(drawLines, 50);
+    return;
+  }
+  scale += diff * LERP;
+  applyTransform();
+  requestAnimationFrame(zoomLoop);
+}
+
+function startZoomAnim() {
+  if (!zoomAnimating) {
+    zoomAnimating = true;
+    requestAnimationFrame(zoomLoop);
+  }
+}
+
+function clampScale(v) { return Math.min(MAX_SCALE, Math.max(getMinScale(), v)); }
+
+function zoomIn()  { targetScale = clampScale(targetScale + 0.15); startZoomAnim(); }
+function zoomOut() { targetScale = clampScale(targetScale - 0.15); startZoomAnim(); }
+function zoomReset() { targetScale = 1; startZoomAnim(); }
+
+/* ========== DRAG ========== */
+const vp = document.getElementById('viewport');
+let dragging = false, dragMoved = false, sx, sy, sl, st;
+
+vp.addEventListener('mousedown', e => {
+  if (e.target.closest('.plus-tab') || e.target.closest('.ctrl-btn') || e.target.closest('.popup')) return;
+  dragging = true;
+  dragMoved = false;
+  sx = e.pageX; sy = e.pageY;
+  sl = vp.scrollLeft; st = vp.scrollTop;
+  vp.classList.add('dragging');
+  e.preventDefault();
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  e.preventDefault();
+  const dx = e.pageX - sx;
+  const dy = e.pageY - sy;
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
+  vp.scrollLeft = sl - dx;
+  vp.scrollTop  = st - dy;
+});
+window.addEventListener('mouseup', () => {
+  dragging = false;
+  vp.classList.remove('dragging');
+});
+
+vp.addEventListener('wheel', e => {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    // Proportional zoom: multiply target by factor based on deltaY
+    const factor = 1 - e.deltaY * 0.004;
+    targetScale = clampScale(targetScale * factor);
+    startZoomAnim();
+  }
+}, {passive: false});
+
+/* ========== SVG CONNECTOR LINES ========== */
+function drawLines() {
+  const svg = document.getElementById('svg');
+
+  // Use offset-based positioning (ignores CSS scale, always accurate)
+  function getPos(el) {
+    let x = 0, y = 0;
+    let current = el;
+    while (current && current !== tree) {
+      x += current.offsetLeft;
+      y += current.offsetTop;
+      current = current.offsetParent;
+      if (current === tree) break;
+    }
+    return {
+      cx: x + el.offsetWidth / 2,   // center x
+      cy: y + el.offsetHeight / 2,   // center y
+      tx: x + el.offsetWidth / 2,    // top center x
+      ty: y,                          // top edge y
+      bx: x + el.offsetWidth / 2,    // bottom center x
+      by: y + el.offsetHeight         // bottom edge y
+    };
+  }
+
+  const pos = id => {
+    const el = document.getElementById(id);
+    if (!el) return {cx:0,cy:0,bx:0,by:0,tx:0,ty:0};
+    return getPos(el);
+  };
+
+  let d = '';
+  const line = (x1,y1,x2,y2) =>
+    `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>`;
+  const dash = (x1,y1,x2,y2) =>
+    `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="6,4" stroke-linecap="round"/>`;
+
+  // Couple 1 horizontal
+  let a = pos('c-maksud'), b = pos('c-nasiba');
+  d += line(a.cx, a.cy, b.cx, b.cy);
+
+  // Couple 2 horizontal
+  a = pos('c-hamid'); b = pos('c-salomat');
+  d += line(a.cx, a.cy, b.cx, b.cy);
+
+  // Couple 3 horizontal (parents)
+  a = pos('c-shahzod'); b = pos('c-muattar');
+  d += line(a.cx, a.cy, b.cx, b.cy);
+
+  // CoupleEx horizontal (Malika --- Ulugbek) — dashed = divorced
+  let mal = pos('c-malika'), u4 = pos('c-ulugbek');
+  d += dash(mal.cx, mal.cy, u4.cx, u4.cy);
+
+  // Couple 4 horizontal (Ulugbek + Nigora Isaeva)
+  let n4 = pos('c-nigora2');
+  d += line(u4.cx, u4.cy, n4.cx, n4.cy);
+
+  // ── Helper: draw parent→children connections ──
+  // Classic genealogy pattern:
+  //   father ↓   mother ↓
+  //   ────────────────────  ← parent rail (horizontal)
+  //           │              ← single vertical stem
+  //   ────────────────────  ← child rail (only if >1 child)
+  //    ↓   ↓   ↓   ↓       ← drops to each child
+  function drawParentToChildren(father, mother, children) {
+    const botY = Math.max(father.by, mother.by);
+    const childTopY = Math.min(...children.map(c => c.ty));
+    const gap = childTopY - botY;
+
+    // 1) Parent rail: 1/3 down from parents
+    const parentRailY = botY + gap * 0.3;
+    d += line(father.bx, father.by, father.bx, parentRailY);
+    d += line(mother.bx, mother.by, mother.bx, parentRailY);
+    d += line(father.bx, parentRailY, mother.bx, parentRailY);
+
+    // 2) Single vertical stem from midpoint
+    const midX = (father.bx + mother.bx) / 2;
+
+    if (children.length === 1) {
+      const child = children[0];
+      const turnY = parentRailY + gap * 0.5;
+      // vertical down from midpoint
+      d += line(midX, parentRailY, midX, turnY);
+      // horizontal to child X
+      d += line(midX, turnY, child.tx, turnY);
+      // vertical down to child
+      d += line(child.tx, turnY, child.tx, child.ty);
+    } else {
+      const childRailY = botY + gap * 0.7;
+      d += line(midX, parentRailY, midX, childRailY);
+
+      const allCX = children.map(c => c.tx);
+      d += line(Math.min(...allCX), childRailY, Math.max(...allCX), childRailY);
+
+      children.forEach(c => {
+        d += line(c.tx, childRailY, c.tx, c.ty);
+      });
+    }
+  }
+
+  // Couple 1 (Максуд + Насиба) → Шахзод
+  let m1 = pos('c-maksud'), n1 = pos('c-nasiba');
+  drawParentToChildren(m1, n1, [pos('c-shahzod')]);
+
+  // Couple 2 (Хамид + Саломат) → Муаттар
+  let m2 = pos('c-hamid'), n2 = pos('c-salomat');
+  drawParentToChildren(m2, n2, [pos('c-muattar')]);
+
+  // Couple 3 (Шахзод + Муаттар) → дети
+  let s3 = pos('c-shahzod'), m3a = pos('c-muattar');
+  drawParentToChildren(s3, m3a, [
+    pos('c-nigora'), pos('c-ulugbek'),
+    pos('c-alisher'), pos('c-nodir')
+  ]);
+
+  svg.innerHTML = d;
+  svg.style.width = tree.scrollWidth + 'px';
+  svg.style.height = tree.scrollHeight + 'px';
+}
+
+// Delayed draw to let animations finish, then center on main family
+setTimeout(() => {
+  drawLines();
+  centerOnFamily();
+}, 1200);
+window.addEventListener('resize', () => setTimeout(drawLines, 100));
+
+// Center viewport on the owner card
+function centerOnFamily() {
+  const ownerCard = document.getElementById('c-' + OWNER_ID);
+  if (!ownerCard) return;
+  const vp = document.getElementById('viewport');
+  const rect = ownerCard.getBoundingClientRect();
+  const vpRect = vp.getBoundingClientRect();
+
+  const targetX = vp.scrollLeft + rect.left - vpRect.left + rect.width / 2;
+  const targetY = vp.scrollTop + rect.top - vpRect.top + rect.height / 2;
+
+  vp.scrollLeft = targetX - vpRect.width / 2;
+  vp.scrollTop = targetY - vpRect.height / 2;
+}
+
+/* ========== CARD ACTION BUTTONS (edit / delete) + RELATION LABELS ========== */
+document.querySelectorAll('.card').forEach(card => {
+  const id = card.id.replace('c-', '');
+  const p = DB[id];
+
+  // Action buttons
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+  actions.innerHTML =
+    '<button class="card-act-btn act-edit" title="Редактировать" onclick="editPerson(\'' + id + '\')">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+    '</button>' +
+    '<button class="card-act-btn act-delete" title="Удалить" onclick="deletePerson(\'' + id + '\')">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
+    '</button>';
+  card.appendChild(actions);
+
+  // Relation label (under card-name, skip owner — already has badge)
+  if (p && p.relation && id !== OWNER_ID) {
+    const cardName = card.querySelector('.card-name');
+    if (cardName) {
+      const rel = document.createElement('div');
+      rel.className = 'card-relation';
+      rel.textContent = p.relation;
+      cardName.insertAdjacentElement('afterend', rel);
+    }
+  }
+});
+
+function editPerson(id) {
+  const p = DB[id];
+  if (!p) return;
+  alert('Редактирование: ' + p.name + '\n\n(В React-версии здесь откроется форма редактирования)');
+}
+
+function deletePerson(id) {
+  const p = DB[id];
+  if (!p) return;
+  if (confirm('Удалить ' + p.name + ' из дерева?')) {
+    alert('Удалено: ' + p.name + '\n\n(В React-версии элемент будет удалён из БД)');
+  }
+}
+
+/* ========== CARD TOOLTIPS ========== */
+const tip = document.getElementById('tooltip');
+document.querySelectorAll('.card').forEach(card => {
+  card.addEventListener('mouseenter', e => {
+    const id = card.id.replace('c-','');
+    const p = DB[id];
+    if (!p) return;
+    tip.textContent = p.name;
+    tip.classList.add('visible');
+  });
+  card.addEventListener('mousemove', e => {
+    tip.style.left = (e.clientX + 14) + 'px';
+    tip.style.top = (e.clientY - 36) + 'px';
+  });
+  card.addEventListener('mouseleave', () => {
+    tip.classList.remove('visible');
+  });
+});
+</script>
+
+</body>
+</html>
