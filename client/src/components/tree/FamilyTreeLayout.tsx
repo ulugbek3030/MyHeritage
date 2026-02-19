@@ -9,9 +9,9 @@
  *   - "Разведены" badge for divorced couples
  */
 import { useMemo } from 'react';
-import calcTree from 'relatives-tree';
 import type { Person, Relationship } from '../../types';
 import { transformToTreeNodes } from '../../utils/treeTransform';
+import { calcTreeFull } from '../../utils/calcTreeFull';
 import PersonCard from './PersonCard';
 
 // Node dimensions (including spacing between nodes)
@@ -57,16 +57,18 @@ export default function FamilyTreeLayout({
   onEditClick,
   onDeleteClick,
 }: FamilyTreeLayoutProps) {
-  // Transform data and compute layout
+  // Transform data and compute layout (multi-run to cover all persons)
   const treeData = useMemo(() => {
     if (persons.length === 0) return null;
 
     const nodes = transformToTreeNodes(persons, relationships);
 
     try {
-      return calcTree(nodes as any, { rootId });
+      const result = calcTreeFull(nodes, rootId);
+      if (result.nodes.length === 0) return null;
+      return result;
     } catch (err) {
-      console.error('calcTree error:', err);
+      console.error('calcTreeFull error:', err);
       return null;
     }
   }, [persons, relationships, rootId]);
