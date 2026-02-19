@@ -45,11 +45,17 @@ npm run db:seed       # тестовые данные
 - Линии: все solid, кроме divorced couple (dashed). Только H и V линии, NO диагональных
 - Карточка: 174px width, min-height 210px, border-radius 16px
 
-### Zoom Engine
+### Zoom Engine (useZoom.ts) — КРИТИЧЕСКИ ВАЖНО, НЕ ЛОМАТЬ!
 - Lerp: LERP=0.15, SETTLE=0.0005, MAX_SCALE=1.8
 - Dynamic MIN_SCALE = fitTree into viewport
 - transform-origin: top center, will-change: transform
 - Trackpad: Ctrl+Wheel + gesturestart/gesturechange (macOS)
+- **ОБЯЗАТЕЛЬНО**: useEffect для wheel/gesture listeners ДОЛЖЕН иметь **пустой массив зависимостей `[]`**
+- Внутри useEffect обработчики ДОЛЖНЫ использовать **только refs и DOM-элементы** (НЕ useCallback функции)
+- Логика clamp/loop/startAnim определяется **inline внутри useEffect**, а НЕ через внешние useCallback
+- onScaleChange хранится в `onScaleChangeRef` (ref) чтобы handler читал свежее значение
+- **ПРИЧИНА**: если deps содержат [clampScale, startZoomAnim], React пересоздаёт listeners при каждом рендере → трекпад зум ломается
+- **НИКОГДА не добавлять clampScale, startZoomAnim или другие useCallback в deps массив useEffect для wheel**
 
 ### Relationships в БД
 - parent_child: person1_id = РОДИТЕЛЬ, person2_id = РЕБЁНОК
