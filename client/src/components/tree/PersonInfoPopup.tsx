@@ -53,7 +53,7 @@ function getRelationships(
   };
 
   const parents: { name: string; role: string }[] = [];
-  const children: { name: string; gender: string }[] = [];
+  const children: { name: string }[] = [];
   const spouses: { name: string; status: string }[] = [];
 
   for (const rel of relationships) {
@@ -71,8 +71,7 @@ function getRelationships(
       }
       if (rel.person1Id === person.id) {
         // This person is the parent → person2Id is a child
-        const child = personMap.get(rel.person2Id);
-        children.push({ name: getName(rel.person2Id), gender: child?.gender || 'male' });
+        children.push({ name: getName(rel.person2Id) });
       }
     }
 
@@ -102,7 +101,7 @@ function getRelationships(
     .filter(r => r.category === 'parent_child' && r.person2Id === person.id)
     .map(r => r.person1Id);
 
-  const siblings: { name: string; gender: string }[] = [];
+  const siblings: { name: string }[] = [];
   if (parentIds.length > 0) {
     const siblingIds = new Set<string>();
     for (const rel of relationships) {
@@ -115,8 +114,7 @@ function getRelationships(
       }
     }
     for (const sibId of siblingIds) {
-      const sib = personMap.get(sibId);
-      siblings.push({ name: getName(sibId), gender: sib?.gender || 'male' });
+      siblings.push({ name: getName(sibId) });
     }
   }
 
@@ -202,13 +200,13 @@ export default function PersonInfoPopup({
                 ))}
                 {familyInfo.siblings.map((s, i) => (
                   <div key={`sibling-${i}`} className="popup-relation-row">
-                    <span className="popup-relation-label">{s.gender === 'male' ? 'Брат' : 'Сестра'}</span>
+                    <span className="popup-relation-label">{i === 0 ? 'Брат/Сестра' : ''}</span>
                     <span className="popup-relation-name">{s.name}</span>
                   </div>
                 ))}
                 {familyInfo.children.map((c, i) => (
                   <div key={`child-${i}`} className="popup-relation-row">
-                    <span className="popup-relation-label">{c.gender === 'male' ? 'Сын' : 'Дочь'}</span>
+                    <span className="popup-relation-label">{i === 0 ? 'Дети' : ''}</span>
                     <span className="popup-relation-name">{c.name}</span>
                   </div>
                 ))}

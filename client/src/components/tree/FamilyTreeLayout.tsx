@@ -9,8 +9,9 @@
  *   - "Разведены" badge for divorced couples
  */
 import { useMemo } from 'react';
+import calcTree from 'relatives-tree';
 import type { Person, Relationship } from '../../types';
-import { calcTreeMultiPass } from '../../utils/calcTreeMultiPass';
+import { transformToTreeNodes } from '../../utils/treeTransform';
 import PersonCard from './PersonCard';
 
 // Node dimensions (including spacing between nodes)
@@ -56,17 +57,19 @@ export default function FamilyTreeLayout({
   onEditClick,
   onDeleteClick,
 }: FamilyTreeLayoutProps) {
-  // Transform data and compute layout using relatives-tree with multi-pass
+  // Transform data and compute layout
   const treeData = useMemo(() => {
     if (persons.length === 0) return null;
 
+    const nodes = transformToTreeNodes(persons, relationships);
+
     try {
-      return calcTreeMultiPass(persons, relationships, ownerPersonId || rootId);
+      return calcTree(nodes as any, { rootId });
     } catch (err) {
-      console.error('calcTreeMultiPass error:', err);
+      console.error('calcTree error:', err);
       return null;
     }
-  }, [persons, relationships, ownerPersonId, rootId]);
+  }, [persons, relationships, rootId]);
 
   const personMap = useMemo(
     () => new Map(persons.map(p => [p.id, p])),
@@ -119,14 +122,14 @@ export default function FamilyTreeLayout({
     }
     if (diff < 0) {
       // Above owner (parents, grandparents...)
-      const level = Math.round(Math.abs(diff) / 3); // each generation is 3 units apart (ROW_HEIGHT=3)
+      const level = Math.round(Math.abs(diff) / 2); // each generation is ~2 units apart
       if (level >= 1 && level <= GEN_LABELS_ABOVE.length) {
         return GEN_LABELS_ABOVE[level - 1];
       }
       return `Поколение ${level + 1} (предки)`;
     }
     // Below owner (children, grandchildren...)
-    const level = Math.round(diff / 3);
+    const level = Math.round(diff / 2);
     if (level >= 1 && level <= GEN_LABELS_BELOW.length) {
       return GEN_LABELS_BELOW[level - 1];
     }
@@ -209,27 +212,18 @@ export default function FamilyTreeLayout({
           const [x1, y1, x2, y2] = connector;
 
           // Check if this connector is a horizontal line between divorced spouses
-          // Must match EXACT couple position (not just Y level) to avoid marking
-          // other couple connectors on the same row as dashed
+          // (same Y, connecting two nodes on the same row)
           const isDivorcedLine = y1 === y2 && couplePairs.some(pair => {
             const p1 = nodePositionMap.get(pair.person1Id);
             const p2 = nodePositionMap.get(pair.person2Id);
             if (!p1 || !p2 || !pair.isDivorced) return false;
             if (p1.top !== p2.top) return false;
-            const nodeY = p1.top + 1;
-            if (Math.abs(y1 - nodeY) > 0.5) return false;
-            // Check X range matches: connector should span from right edge of left node
-            // to left edge of right node (nodeRight = left + NODE_SPAN, where NODE_SPAN = 2)
-            const leftNode = p1.left < p2.left ? p1 : p2;
-            const rightNode = p1.left < p2.left ? p2 : p1;
-            const expectedX1 = leftNode.left + 2; // nodeRight
-            const expectedX2 = rightNode.left;
-            const connLeft = Math.min(x1, x2);
-            const connRight = Math.max(x1, x2);
-            return Math.abs(connLeft - expectedX1) < 0.5 && Math.abs(connRight - expectedX2) < 0.5;
+            // Check if this horizontal line is at the spouse row level
+            // The connector Y should be near the node center Y
+            const nodeY = p1.top + 1; // approximate center in grid units
+            return Math.abs(y1 - nodeY) < 0.5;
           });
 
-          // Connectors are in grid units — multiply by HALF_W/HALF_H (like v1A)
           return (
             <line
               key={idx}
@@ -322,7 +316,6 @@ export default function FamilyTreeLayout({
             <PersonCard
               person={person}
               isOwner={person.id === ownerPersonId}
-              hasSubTree={!!node.hasSubTree}
               onCardClick={onCardClick}
               onAddClick={onAddClick}
               onEditClick={onEditClick}
