@@ -37,7 +37,7 @@ export default function TreeHeader({ fullTree, ownerPerson }: TreeHeaderProps) {
             )}
           </div>
           <div className="tree-header-info">
-            <div className="tree-header-title">Семейное Древо <span style={{fontSize:'13px',color:'#f97316',fontWeight:700,marginLeft:'6px'}}>v{__APP_COMMIT__}</span></div>
+            <div className="tree-header-title">Семейное Древо <span style={{fontSize:'13px',color:'#f97316',fontWeight:700,marginLeft:'6px'}}>{__APP_BUILD_TIME__}</span></div>
             <div className="tree-header-subtitle">{ownerName}</div>
           </div>
         </div>

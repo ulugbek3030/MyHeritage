@@ -1,20 +1,15 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { execSync } from 'child_process'
 
-let commitHash = process.env.RENDER_GIT_COMMIT?.slice(0, 7) || 'unknown'
-try {
-  if (commitHash === 'unknown') {
-    commitHash = execSync('git rev-parse --short HEAD').toString().trim()
-  }
-} catch {
-  // git not available in build env
-}
+const buildTime = new Date().toLocaleString('ru-RU', {
+  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+  timeZone: 'Asia/Tashkent',
+})
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   define: {
-    __APP_COMMIT__: JSON.stringify(commitHash),
+    __APP_BUILD_TIME__: JSON.stringify(buildTime),
   },
 })
