@@ -10,7 +10,7 @@
  */
 import { useMemo } from 'react';
 import type { Person, Relationship } from '../../types';
-import { customCalcTree } from '../../utils/customCalcTree';
+import { calcTreeMultiPass } from '../../utils/calcTreeMultiPass';
 import PersonCard from './PersonCard';
 
 // Node dimensions (including spacing between nodes)
@@ -56,14 +56,14 @@ export default function FamilyTreeLayout({
   onEditClick,
   onDeleteClick,
 }: FamilyTreeLayoutProps) {
-  // Transform data and compute layout using custom engine
+  // Transform data and compute layout using relatives-tree with multi-pass
   const treeData = useMemo(() => {
     if (persons.length === 0) return null;
 
     try {
-      return customCalcTree(persons, relationships, ownerPersonId || rootId);
+      return calcTreeMultiPass(persons, relationships, ownerPersonId || rootId);
     } catch (err) {
-      console.error('customCalcTree error:', err);
+      console.error('calcTreeMultiPass error:', err);
       return null;
     }
   }, [persons, relationships, ownerPersonId, rootId]);

@@ -4,12 +4,14 @@
  * Problem: relatives-tree only traverses parents/children/spouses from rootId.
  * It does NOT follow siblings or discover other children of ancestors (uncles/aunts).
  *
- * Solution: Run calcTree multiple times:
- *   1. Primary pass with ownerPersonId as root → covers most nodes
- *   2. Find missing nodes (e.g. uncles)
- *   3. For each missing cluster, pick a secondary root and run calcTree again
- *   4. Align secondary results to primary via shared anchor nodes
- *   5. Merge all nodes and connectors, resolve collisions
+ * Solution:
+ *   1. Primary pass with ownerPersonId as root → covers most nodes (e.g. 12/13)
+ *   2. Find missing nodes (uncles/aunts)
+ *   3. For each missing person, find their parents in primary result (shared anchors)
+ *   4. Place the missing person next to their sibling (who IS in primary)
+ *   5. Generate only the needed connectors (parent→child drop lines)
+ *
+ * This preserves ALL primary connectors untouched (they're perfect from relatives-tree).
  */
 import calcTree from 'relatives-tree';
 import type { Node as RTNode, ExtNode, Connector } from 'relatives-tree/lib/types';
@@ -29,6 +31,29 @@ export function calcTreeMultiPass(
 ): MultiPassResult {
   const treeNodes = transformToTreeNodes(persons, relationships) as unknown as RTNode[];
   const allIds = new Set(persons.map(p => p.id));
+  const personMap = new Map(persons.map(p => [p.id, p]));
+
+  // ── Build relationship maps ──
+  const parentsOf = new Map<string, string[]>();
+  const childrenOf = new Map<string, string[]>();
+  const spousesOf = new Map<string, string[]>();
+
+  for (const rel of relationships) {
+    if (rel.category === 'parent_child') {
+      const parentId = rel.person1Id;
+      const childId = rel.person2Id;
+      if (!parentsOf.has(childId)) parentsOf.set(childId, []);
+      parentsOf.get(childId)!.push(parentId);
+      if (!childrenOf.has(parentId)) childrenOf.set(parentId, []);
+      childrenOf.get(parentId)!.push(childId);
+    }
+    if (rel.category === 'couple') {
+      if (!spousesOf.has(rel.person1Id)) spousesOf.set(rel.person1Id, []);
+      spousesOf.get(rel.person1Id)!.push(rel.person2Id);
+      if (!spousesOf.has(rel.person2Id)) spousesOf.set(rel.person2Id, []);
+      spousesOf.get(rel.person2Id)!.push(rel.person1Id);
+    }
+  }
 
   // ── Pass 1: Primary run with owner as root ──
   const primary = calcTree(treeNodes, { rootId: ownerPersonId });
@@ -44,183 +69,181 @@ export function calcTreeMultiPass(
     };
   }
 
-  // ── Build adjacency for cluster detection ──
-  const adj = new Map<string, Set<string>>();
-  for (const id of allIds) {
-    adj.set(id, new Set());
-  }
-  for (const rel of relationships) {
-    if (allIds.has(rel.person1Id) && allIds.has(rel.person2Id)) {
-      adj.get(rel.person1Id)!.add(rel.person2Id);
-      adj.get(rel.person2Id)!.add(rel.person1Id);
-    }
+  // ── Build position map from primary ──
+  const posMap = new Map<string, { left: number; top: number }>();
+  for (const n of primary.nodes) {
+    posMap.set(n.id, { left: n.left, top: n.top });
   }
 
-  // ── Group missing nodes into connected clusters ──
-  const visited = new Set<string>();
-  const clusters: string[][] = [];
-
-  for (const id of missingIds) {
-    if (visited.has(id)) continue;
-    const cluster: string[] = [];
-    const stack = [id];
-    while (stack.length > 0) {
-      const current = stack.pop()!;
-      if (visited.has(current)) continue;
-      visited.add(current);
-      // Only add to cluster if it's a missing node
-      if (!placedIds.has(current)) cluster.push(current);
-      // Follow edges to other missing nodes
-      for (const neighbor of adj.get(current) || []) {
-        if (!visited.has(neighbor) && !placedIds.has(neighbor)) {
-          stack.push(neighbor);
-        }
-      }
-    }
-    if (cluster.length > 0) clusters.push(cluster);
-  }
-
-  // ── Pass 2+: For each cluster, find best secondary root ──
-  // Strategy: for each missing node, run calcTree with it as root.
-  // Pick the run that covers the most missing nodes AND has shared anchor nodes with primary.
   const allNodes: ExtNode[] = [...primary.nodes];
   const allConnectors: Connector[] = [...primary.connectors];
-  let currentPlaced = new Set(placedIds);
 
-  for (const cluster of clusters) {
-    // Find anchor nodes: nodes in primary that are adjacent to cluster nodes
-    const anchors = new Set<string>();
-    for (const cid of cluster) {
-      for (const neighbor of adj.get(cid) || []) {
-        if (currentPlaced.has(neighbor)) anchors.add(neighbor);
-      }
-    }
+  // ── Place missing nodes next to their siblings ──
+  for (const missingId of missingIds) {
+    const parents = parentsOf.get(missingId) || [];
 
-    // Try each cluster node as root, pick best coverage
-    let bestResult: ReturnType<typeof calcTree> | null = null;
-    let bestCoverage = 0;
-
-    for (const candidateRoot of cluster) {
-      try {
-        const result = calcTree(treeNodes, { rootId: candidateRoot });
-        // Count how many cluster nodes are covered
-        const coveredCluster = result.nodes.filter(n => cluster.includes(n.id)).length;
-        // Count how many anchors are covered (for alignment)
-        const coveredAnchors = result.nodes.filter(n => anchors.has(n.id)).length;
-        const score = coveredCluster * 10 + coveredAnchors;
-        if (score > bestCoverage) {
-          bestCoverage = score;
-          bestResult = result;
-          // bestRootId tracked for debugging
+    // Find siblings already placed (share at least one parent)
+    const placedSiblings: string[] = [];
+    for (const parentId of parents) {
+      for (const childId of (childrenOf.get(parentId) || [])) {
+        if (childId !== missingId && posMap.has(childId) && !placedSiblings.includes(childId)) {
+          placedSiblings.push(childId);
         }
-      } catch {
-        // Skip if calcTree fails for this root
       }
     }
 
-    if (!bestResult) continue;
-
-    // ── Align secondary result to primary via anchor nodes ──
-    // Find shared nodes between primary and secondary
-    const primaryPosMap = new Map<string, { left: number; top: number }>();
-    for (const n of allNodes) {
-      primaryPosMap.set(n.id, { left: n.left, top: n.top });
-    }
-
-    const secondaryPosMap = new Map<string, { left: number; top: number }>();
-    for (const n of bestResult.nodes) {
-      secondaryPosMap.set(n.id, { left: n.left, top: n.top });
-    }
-
-    // Calculate offset from anchor nodes
-    let offsetX = 0;
-    let offsetY = 0;
-    let anchorCount = 0;
-
-    for (const anchorId of anchors) {
-      const pPos = primaryPosMap.get(anchorId);
-      const sPos = secondaryPosMap.get(anchorId);
-      if (pPos && sPos) {
-        offsetX += pPos.left - sPos.left;
-        offsetY += pPos.top - sPos.top;
-        anchorCount++;
-      }
-    }
-
-    if (anchorCount > 0) {
-      offsetX = Math.round(offsetX / anchorCount);
-      offsetY = Math.round(offsetY / anchorCount);
-    } else {
-      // No anchors — place to the right of existing content
+    if (placedSiblings.length === 0 && parents.length === 0) {
+      // No connection to primary tree — place at right edge
       let maxLeft = 0;
-      for (const n of allNodes) {
-        maxLeft = Math.max(maxLeft, n.left);
-      }
-      offsetX = maxLeft + 4; // gap of 4 grid units
-      offsetY = 0;
-    }
+      for (const pos of posMap.values()) maxLeft = Math.max(maxLeft, pos.left);
+      const newLeft = maxLeft + 4;
+      const newTop = 0;
+      posMap.set(missingId, { left: newLeft, top: newTop });
 
-    // Add new (missing) nodes with offset applied
-    for (const node of bestResult.nodes) {
-      if (!currentPlaced.has(node.id)) {
-        const shifted = {
-          ...node,
-          left: node.left + offsetX,
-          top: node.top + offsetY,
-        };
-        allNodes.push(shifted);
-        currentPlaced.add(node.id);
-      }
-    }
-
-    // Add connectors with offset applied
-    // Only add connectors that involve at least one newly-placed node
-    // We need to add connectors that connect to the new nodes.
-    // Since connectors are coordinate-based (not ID-based), we offset ALL
-    // secondary connectors but filter to avoid duplicating primary connectors.
-    for (const conn of bestResult.connectors) {
-      const [x1, y1, x2, y2] = conn;
-      const shifted: Connector = [
-        x1 + offsetX,
-        y1 + offsetY,
-        x2 + offsetX,
-        y2 + offsetY,
-      ] as const;
-
-      // Check if this connector already exists in primary (approximate match)
-      const isDuplicate = allConnectors.some(existing => {
-        const [ex1, ey1, ex2, ey2] = existing;
-        return Math.abs(ex1 - shifted[0]) < 0.5 &&
-               Math.abs(ey1 - shifted[1]) < 0.5 &&
-               Math.abs(ex2 - shifted[2]) < 0.5 &&
-               Math.abs(ey2 - shifted[3]) < 0.5;
+      const person = personMap.get(missingId);
+      allNodes.push({
+        id: missingId,
+        left: newLeft,
+        top: newTop,
+        gender: (person?.gender || 'male') as any,
+        parents: [],
+        children: [],
+        siblings: [],
+        spouses: [],
+        hasSubTree: false,
       });
+      continue;
+    }
 
-      if (!isDuplicate) {
-        allConnectors.push(shifted);
+    // Determine the row (top) — same as siblings
+    let targetTop: number | null = null;
+    if (placedSiblings.length > 0) {
+      targetTop = posMap.get(placedSiblings[0])!.top;
+    } else if (parents.some(pid => posMap.has(pid))) {
+      // No placed siblings, but parents are placed — place one row below parents
+      const parentPos = parents.filter(pid => posMap.has(pid)).map(pid => posMap.get(pid)!);
+      targetTop = parentPos[0].top + 2; // standard generation gap in relatives-tree
+    }
+
+    if (targetTop === null) continue;
+
+    // Find position: to the LEFT of the leftmost sibling on this row
+    // (uncle goes to the left of father in the parents' generation)
+    const rowNodes = allNodes.filter(n => n.top === targetTop);
+    const siblingsOnRow = placedSiblings.filter(id => posMap.get(id)?.top === targetTop);
+
+    let targetLeft: number;
+
+    if (siblingsOnRow.length > 0) {
+      // Place to the left of leftmost sibling
+      const siblingLefts = siblingsOnRow.map(id => posMap.get(id)!.left);
+      const minSibLeft = Math.min(...siblingLefts);
+
+      // Check if there's room to the left (2 grid units minimum gap)
+      const leftNeighbor = rowNodes
+        .filter(n => n.left < minSibLeft)
+        .sort((a, b) => b.left - a.left)[0];
+
+      if (leftNeighbor && minSibLeft - leftNeighbor.left < 4) {
+        // Not enough room — place to the right of rightmost node on row
+        const maxRowLeft = Math.max(...rowNodes.map(n => n.left));
+        targetLeft = maxRowLeft + 2;
+      } else {
+        targetLeft = minSibLeft - 2;
+      }
+    } else {
+      // No siblings on this row, place at end
+      const maxRowLeft = rowNodes.length > 0 ? Math.max(...rowNodes.map(n => n.left)) : 0;
+      targetLeft = maxRowLeft + 2;
+    }
+
+    // Check for collision
+    while (rowNodes.some(n => Math.abs(n.left - targetLeft) < 2)) {
+      targetLeft += 2;
+    }
+
+    posMap.set(missingId, { left: targetLeft, top: targetTop });
+
+    const person = personMap.get(missingId);
+    const treeNode = treeNodes.find(n => n.id === missingId);
+
+    allNodes.push({
+      id: missingId,
+      left: targetLeft,
+      top: targetTop,
+      gender: (person?.gender || 'male') as any,
+      parents: treeNode?.parents || [],
+      children: treeNode?.children || [],
+      siblings: treeNode?.siblings || [],
+      spouses: treeNode?.spouses || [],
+      hasSubTree: false,
+    });
+
+    // ── Generate connectors for this missing node ──
+    // 1. Vertical line from parents' midpoint down to this node
+    const placedParents = parents.filter(pid => posMap.has(pid));
+    if (placedParents.length > 0) {
+      const parentPositions = placedParents.map(pid => posMap.get(pid)!);
+      const parentCenters = parentPositions.map(p => p.left + 1); // center X in grid
+      const parentMidX = (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2;
+      const parentBottomY = parentPositions[0].top + 2; // bottom of parent node
+      const childTopY = targetTop; // top of child node
+      const childCenterX = targetLeft + 1;
+      const midY = (parentBottomY + childTopY) / 2;
+
+      // Check if primary already has a horizontal bar at midY from parents
+      // (for existing siblings). If so, just add a drop from that bar.
+      const hasExistingBar = allConnectors.some(([, cy1, , cy2]) =>
+        Math.abs(cy1 - midY) < 0.1 && Math.abs(cy2 - midY) < 0.1
+      );
+
+      if (hasExistingBar) {
+        // Find the existing horizontal bar and extend it if needed
+        const barIdx = allConnectors.findIndex(([cx1, cy1, cx2, cy2]) =>
+          Math.abs(cy1 - midY) < 0.1 && Math.abs(cy2 - midY) < 0.1 && cx1 !== cx2
+        );
+
+        if (barIdx >= 0) {
+          const bar = allConnectors[barIdx];
+          const barLeft = Math.min(bar[0], bar[2]);
+          const barRight = Math.max(bar[0], bar[2]);
+
+          // Extend bar to reach new child if needed
+          if (childCenterX < barLeft || childCenterX > barRight) {
+            const newLeft = Math.min(barLeft, childCenterX);
+            const newRight = Math.max(barRight, childCenterX);
+            allConnectors[barIdx] = [newLeft, bar[1], newRight, bar[3]] as const;
+          }
+        }
+
+        // Drop line from bar to new child
+        allConnectors.push([childCenterX, midY, childCenterX, childTopY] as const);
+      } else {
+        // No existing bar — create full connector set
+        // Drop from parent midpoint to midY
+        allConnectors.push([parentMidX, parentBottomY, parentMidX, midY] as const);
+        // Horizontal to child center
+        if (Math.abs(parentMidX - childCenterX) > 0.01) {
+          allConnectors.push([
+            Math.min(parentMidX, childCenterX), midY,
+            Math.max(parentMidX, childCenterX), midY
+          ] as const);
+        }
+        // Drop to child
+        allConnectors.push([childCenterX, midY, childCenterX, childTopY] as const);
       }
     }
-  }
 
-  // ── Collision resolution ──
-  // Group by top (generation row)
-  const rowMap = new Map<number, ExtNode[]>();
-  for (const node of allNodes) {
-    if (!rowMap.has(node.top)) rowMap.set(node.top, []);
-    rowMap.get(node.top)!.push(node);
-  }
-
-  for (const [, rowNodes] of rowMap) {
-    rowNodes.sort((a, b) => a.left - b.left);
-    for (let i = 1; i < rowNodes.length; i++) {
-      const prev = rowNodes[i - 1];
-      const curr = rowNodes[i];
-      const minGap = 2; // minimum 2 grid units between left edges
-      if (curr.left - prev.left < minGap) {
-        const shift = minGap - (curr.left - prev.left);
-        // Shift current and all to the right
-        for (let j = i; j < rowNodes.length; j++) {
-          (rowNodes[j] as any).left += shift;
+    // 2. Couple connector if this person has a placed spouse
+    const spouses = spousesOf.get(missingId) || [];
+    for (const spouseId of spouses) {
+      if (posMap.has(spouseId)) {
+        const sp = posMap.get(spouseId)!;
+        if (sp.top === targetTop) {
+          const leftPos = targetLeft < sp.left ? targetLeft : sp.left;
+          const rightPos = targetLeft < sp.left ? sp.left : targetLeft;
+          const coupleY = targetTop + 1; // center Y
+          allConnectors.push([leftPos + 2, coupleY, rightPos, coupleY] as const);
         }
       }
     }
@@ -236,8 +259,8 @@ export function calcTreeMultiPass(
 
   return {
     canvas: {
-      width: maxLeft + 4, // +4 for padding (2 for node + 2 margin)
-      height: maxTop + 4,
+      width: Math.max(primary.canvas.width, maxLeft + 4),
+      height: Math.max(primary.canvas.height, maxTop + 4),
     },
     nodes: allNodes,
     connectors: allConnectors,
