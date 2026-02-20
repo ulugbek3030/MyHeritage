@@ -16,8 +16,7 @@ import type { Person, Relationship } from '../types';
 
 // ═══════════ Grid Constants ═══════════
 const NODE_SPAN = 2;       // node width/height in grid units
-const COUPLE_GAP = 0.5;    // gap between spouses
-const SIBLING_GAP = 0.5;   // gap between sibling groups
+const SIBLING_GAP = 0.5;   // gap between nodes
 const SLOT = NODE_SPAN + SIBLING_GAP; // 2.5 — minimum distance between node left edges
 const ROW_HEIGHT = 3;      // vertical distance between generation rows
 
@@ -396,8 +395,11 @@ export function calcTreeMultiPass(
   const parentsY = genToY(-1);
 
   if (ownerFatherId && ownerMotherId) {
-    // Place father and mother as a couple centered above sibling group
-    const fatherX = sibGroupCenterX - NODE_SPAN / 2 - COUPLE_GAP / 2;
+    // Place father and mother as a couple, with their midpoint of centers = sibGroupCenterX
+    // midpoint of centers = (fatherLeft+1 + motherLeft+1)/2 = sibGroupCenterX
+    // motherLeft = fatherLeft + SLOT
+    // => fatherLeft = sibGroupCenterX - 1 - SLOT/2
+    const fatherX = sibGroupCenterX - 1 - SLOT / 2;
     const motherX = fatherX + SLOT;
     setPos(ownerFatherId, fatherX, parentsY);
     setPos(ownerMotherId, motherX, parentsY);
@@ -520,7 +522,10 @@ export function calcTreeMultiPass(
     const gpY = genToY(-2);
 
     if (gpIds.length === 2) {
-      const gp1X = groupCenterX - NODE_SPAN / 2 - COUPLE_GAP / 2;
+      // midpoint of centers = groupCenterX
+      // (gp1X+1 + gp2X+1)/2 = groupCenterX, gp2X = gp1X + SLOT
+      // => gp1X = groupCenterX - 1 - SLOT/2
+      const gp1X = groupCenterX - 1 - SLOT / 2;
       if (!placed.has(gpIds[0])) setPos(gpIds[0], gp1X, gpY);
       if (!placed.has(gpIds[1])) setPos(gpIds[1], gp1X + SLOT, gpY);
     } else if (gpIds.length === 1) {
