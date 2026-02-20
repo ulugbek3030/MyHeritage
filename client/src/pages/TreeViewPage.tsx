@@ -1,7 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import type { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import * as treesApi from '../api/trees';
 import * as personsApi from '../api/persons';
 import type { FullTree, Person } from '../types';
@@ -14,8 +12,6 @@ import type { AddPersonFormData } from '../components/tree/AddPersonForm';
 import EditPersonForm from '../components/tree/EditPersonForm';
 import type { CreatePersonData } from '../api/persons';
 import ConfirmDeleteDialog from '../components/tree/ConfirmDeleteDialog';
-import ZoomControls from '../components/tree/ZoomControls';
-import { useZoom } from '../hooks/useZoom';
 import '../styles/tree-view.css';
 
 export default function TreeViewPage() {
@@ -28,9 +24,6 @@ export default function TreeViewPage() {
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
-
-  // Ref to detect drag vs click
-  const dragMoved = useRef(false);
 
   // Load tree data
   const loadTree = useCallback(() => {
@@ -46,67 +39,8 @@ export default function TreeViewPage() {
     loadTree();
   }, [loadTree]);
 
-  // Zoom hook (react-zoom-pan-pinch)
-  const { zoomIn, zoomOut, setTransformRef, transformRef } = useZoom();
-
-  // Center on owner person (used on init + reset button)
-  const centerOnOwner = useCallback((ref: ReactZoomPanPinchRef, animationTime = 0) => {
-    if (!fullTree) return;
-    const ownerId = fullTree.tree.ownerPersonId;
-    if (!ownerId) return;
-
-    const wrapper = ref.instance.wrapperComponent;
-    const content = ref.instance.contentComponent;
-    if (!wrapper || !content) return;
-
-    const ownerEl = content.querySelector(
-      `[data-person-id="${ownerId}"]`
-    ) as HTMLElement | null;
-    if (!ownerEl) return;
-
-    // Reset scale to 1 first, then calculate position
-    // Use the natural (unscaled) position of the owner element
-    const currentScale = ref.state.scale;
-    const contentRect = content.getBoundingClientRect();
-    const ownerRect = ownerEl.getBoundingClientRect();
-    const wrapperRect = wrapper.getBoundingClientRect();
-
-    // Get unscaled center of owner relative to content
-    const ownerCenterX = ((ownerRect.left + ownerRect.right) / 2 - contentRect.left) / currentScale;
-    const ownerCenterY = ((ownerRect.top + ownerRect.bottom) / 2 - contentRect.top) / currentScale;
-
-    const offsetX = wrapperRect.width / 2 - ownerCenterX;
-    const offsetY = wrapperRect.height / 2 - ownerCenterY;
-
-    ref.setTransform(offsetX, offsetY, 1, animationTime);
-  }, [fullTree]);
-
-  // Handle library init
-  const handleInit = useCallback((ref: ReactZoomPanPinchRef) => {
-    setTransformRef(ref);
-    // Center on owner after a short delay for layout to settle
-    setTimeout(() => centerOnOwner(ref, 0), 150);
-  }, [setTransformRef, centerOnOwner]);
-
-  // Reset zoom + center on owner
-  const handleZoomReset = useCallback(() => {
-    const ref = transformRef.current;
-    if (!ref) return;
-    centerOnOwner(ref, 300);
-  }, [centerOnOwner, transformRef]);
-
-  // Track panning to distinguish drag from click
-  const handlePanningStart = useCallback(() => {
-    dragMoved.current = false;
-  }, []);
-
-  const handlePanning = useCallback(() => {
-    dragMoved.current = true;
-  }, []);
-
   // Card click handler
   const handleCardClick = useCallback((person: Person) => {
-    if (dragMoved.current) return;
     setSelectedPerson(person);
   }, []);
 
@@ -293,7 +227,7 @@ export default function TreeViewPage() {
     (p) => p.id === fullTree.tree.ownerPersonId
   );
 
-  // Root for relatives-tree = owner person
+  // Root for family-chart = owner person
   const rootId = fullTree.tree.ownerPersonId || (fullTree.persons[0]?.id ?? '');
 
   return (
@@ -301,48 +235,15 @@ export default function TreeViewPage() {
       <TreeHeader fullTree={fullTree} ownerPerson={ownerPerson} />
 
       <div className="tree-viewport">
-        <TransformWrapper
-          initialScale={1}
-          minScale={0.3}
-          maxScale={2.5}
-          centerOnInit={false}
-          limitToBounds={false}
-          panning={{ velocityDisabled: false }}
-          pinch={{ step: 5 }}
-          doubleClick={{ disabled: true }}
-          onInit={handleInit}
-          onPanningStart={handlePanningStart}
-          onPanning={handlePanning}
-        >
-          <TransformComponent
-            wrapperStyle={{
-              width: '100%',
-              height: '100%',
-            }}
-            contentStyle={{
-              width: 'fit-content',
-              height: 'fit-content',
-            }}
-          >
-            <div className="tree-container">
-              <FamilyTreeLayout
-                persons={fullTree.persons}
-                relationships={fullTree.relationships}
-                rootId={rootId}
-                ownerPersonId={fullTree.tree.ownerPersonId}
-                onCardClick={handleCardClick}
-                onAddClick={handleAddClick}
-              />
-            </div>
-          </TransformComponent>
-        </TransformWrapper>
+        <FamilyTreeLayout
+          persons={fullTree.persons}
+          relationships={fullTree.relationships}
+          rootId={rootId}
+          ownerPersonId={fullTree.tree.ownerPersonId}
+          onCardClick={handleCardClick}
+          onAddClick={handleAddClick}
+        />
       </div>
-
-      <ZoomControls
-        onZoomIn={zoomIn}
-        onZoomOut={zoomOut}
-        onZoomReset={handleZoomReset}
-      />
 
       {selectedPerson && (
         <PersonInfoPopup
