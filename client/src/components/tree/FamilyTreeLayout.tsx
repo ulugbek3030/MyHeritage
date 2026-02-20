@@ -119,14 +119,14 @@ export default function FamilyTreeLayout({
     }
     if (diff < 0) {
       // Above owner (parents, grandparents...)
-      const level = Math.round(Math.abs(diff) / 2); // each generation is ~2 units apart
+      const level = Math.round(Math.abs(diff) / 3); // each generation is 3 units apart (ROW_HEIGHT=3)
       if (level >= 1 && level <= GEN_LABELS_ABOVE.length) {
         return GEN_LABELS_ABOVE[level - 1];
       }
       return `Поколение ${level + 1} (предки)`;
     }
     // Below owner (children, grandchildren...)
-    const level = Math.round(diff / 2);
+    const level = Math.round(diff / 3);
     if (level >= 1 && level <= GEN_LABELS_BELOW.length) {
       return GEN_LABELS_BELOW[level - 1];
     }
@@ -312,6 +312,7 @@ export default function FamilyTreeLayout({
             <PersonCard
               person={person}
               isOwner={person.id === ownerPersonId}
+              hasSubTree={!!node.hasSubTree}
               onCardClick={onCardClick}
               onAddClick={onAddClick}
               onEditClick={onEditClick}
