@@ -648,44 +648,32 @@ export function calcTreeMultiPass(
   const nodeCenterY = (top: number) => top + 1;
   const nodeRight = (left: number) => left + NODE_SPAN;
 
-  // Build family units (parent couple → shared children)
-  const processedChildSets = new Set<string>();
-
+  // Build family units by grouping children by their parent set.
+  // This handles both explicit couples AND implicit co-parents (no couple relationship).
   interface FamilyUnit {
     parents: string[];
     children: string[];
   }
   const familyUnits: FamilyUnit[] = [];
 
-  // From couple relationships
-  for (const rel of relationships) {
-    if (rel.category !== 'couple') continue;
-    const shared = getSharedChildren(rel.person1Id, rel.person2Id);
-    if (shared.length > 0) {
-      const key = [...shared].sort().join(',');
-      if (!processedChildSets.has(key)) {
-        processedChildSets.add(key);
-        familyUnits.push({ parents: [rel.person1Id, rel.person2Id], children: shared });
-      }
+  // Group children by their sorted parent IDs
+  const parentKeyToChildren = new Map<string, string[]>();
+  const parentKeyToParents = new Map<string, string[]>();
+
+  for (const [childId, parentIds] of parentsOf) {
+    const key = [...parentIds].sort().join('+');
+    if (!parentKeyToChildren.has(key)) {
+      parentKeyToChildren.set(key, []);
+      parentKeyToParents.set(key, [...parentIds]);
     }
+    parentKeyToChildren.get(key)!.push(childId);
   }
 
-  // Single parents with unprocessed children
-  for (const p of persons) {
-    const children = childrenOf.get(p.id) || [];
-    const unprocessed = children.filter(c =>
-      !familyUnits.some(fu => fu.children.includes(c))
-    );
-    if (unprocessed.length > 0) {
-      familyUnits.push({ parents: [p.id], children: unprocessed });
-    }
-  }
-
-  // DEBUG: log family units
-  for (const unit of familyUnits) {
-    const pNames = unit.parents.map(id => personMap.get(id)?.firstName || id.substring(0,6));
-    const cNames = unit.children.map(id => personMap.get(id)?.firstName || id.substring(0,6));
-    console.log(`FamilyUnit: parents=[${pNames}] children=[${cNames}]`);
+  for (const [key] of parentKeyToChildren) {
+    familyUnits.push({
+      parents: parentKeyToParents.get(key)!,
+      children: parentKeyToChildren.get(key)!,
+    });
   }
 
   // Parent → children connectors
@@ -725,18 +713,37 @@ export function calcTreeMultiPass(
     }
   }
 
-  // Couple connectors (horizontal line between spouses at center Y)
-  for (const rel of relationships) {
-    if (rel.category !== 'couple') continue;
-    const p1 = positions.get(rel.person1Id);
-    const p2 = positions.get(rel.person2Id);
-    if (!p1 || !p2) continue;
-    if (p1.top !== p2.top) continue;
+  // Couple connectors (horizontal line between spouses/co-parents at center Y)
+  // Track which pairs already have a couple connector to avoid duplicates
+  const coupleConnectorSet = new Set<string>();
+
+  const addCoupleConnector = (id1: string, id2: string) => {
+    const key = [id1, id2].sort().join('+');
+    if (coupleConnectorSet.has(key)) return;
+    coupleConnectorSet.add(key);
+
+    const p1 = positions.get(id1);
+    const p2 = positions.get(id2);
+    if (!p1 || !p2) return;
+    if (p1.top !== p2.top) return;
 
     const y = nodeCenterY(p1.top);
     const left = p1.left < p2.left ? p1 : p2;
     const right = p1.left < p2.left ? p2 : p1;
     connectors.push([nodeRight(left.left), y, right.left, y]);
+  };
+
+  // 1. Explicit couple relationships
+  for (const rel of relationships) {
+    if (rel.category !== 'couple') continue;
+    addCoupleConnector(rel.person1Id, rel.person2Id);
+  }
+
+  // 2. Implicit co-parents (share children but no couple relationship)
+  for (const unit of familyUnits) {
+    if (unit.parents.length === 2) {
+      addCoupleConnector(unit.parents[0], unit.parents[1]);
+    }
   }
 
   // ══════════════════════════════════════════════
