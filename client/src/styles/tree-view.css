@@ -103,7 +103,7 @@
   overflow: hidden;
   padding: 0;
   position: relative;
-  /* family-chart handles zoom/pan via D3 */
+  /* react-zoom-pan-pinch handles all touch/mouse/gesture events */
   touch-action: none;
 }
 
@@ -115,46 +115,11 @@
   overflow: hidden;
 }
 
-/* ============ FAMILY-CHART OVERRIDES ============ */
-/* Override dark background with transparent */
-.f3-custom-tree {
-  background-color: transparent !important;
-  color: var(--text, #1e293b) !important;
-}
-.f3-custom-tree .f3-cont {
-  background-color: transparent !important;
-}
-/* Override family-chart card styles with our custom card */
-.f3-custom-tree div.card {
-  color: var(--text, #1e293b);
-  cursor: default;
-  line-height: normal;
-}
-/* Hide family-chart default card background colors */
-.f3-custom-tree div.card-male .card-inner:not(.f3-custom-card),
-.f3-custom-tree div.card-female .card-inner:not(.f3-custom-card) {
-  background-color: transparent;
-}
-/* family-chart puts cards inside foreignObject which resets styling context */
-/* The .card class re-used from our original PersonCard CSS rules above */
-
-/* Connector lines color */
-.f3-custom-tree .link {
-  stroke: #cbd5e1 !important;
-  stroke-width: 2px;
-}
-
-/* Hide family-chart's nav and form containers */
-.f3-custom-tree .f3-nav-cont,
-.f3-custom-tree .f3-form-cont,
-.f3-custom-tree .f3-history-controls {
-  display: none !important;
-}
-
-/* Card main outline (selected person) */
-.f3-custom-tree div.card-main .card-inner {
-  outline: none;
-  box-shadow: none;
+.tree-container {
+  position: relative;
+  display: inline-block;
+  min-width: 100%;
+  padding: 32px 60px 80px;
 }
 
 /* ============ SVG LINES ============ */

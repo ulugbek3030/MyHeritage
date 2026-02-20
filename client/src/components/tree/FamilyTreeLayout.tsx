@@ -1,23 +1,32 @@
 /**
- * FamilyTreeLayout — renders the family tree using `family-chart` library.
+ * FamilyTreeLayout — renders the family tree using `relatives-tree` layout engine.
  *
  * Features:
- *   - Custom HTML cards matching our PersonCard design
- *   - Automatic layout and SVG connector lines
- *   - Built-in zoom/pan
- *   - Gender color coding (blue/pink border-top)
- *   - Deceased styling
- *   - Owner badge
- *   - Plus-tab for adding relatives
+ *   - Person cards at computed positions
+ *   - SVG connector lines (solid for active couples, dashed for divorced)
+ *   - Generation labels ("Дедушки и бабушки", "Родители", "Вы", "Дети", "Внуки")
+ *   - Heart icons between married couples
+ *   - "Разведены" badge for divorced couples
  */
-import { useEffect, useRef, useCallback } from 'react';
-import * as f3 from 'family-chart';
-import 'family-chart/styles/family-chart.css';
+import { useMemo } from 'react';
 import type { Person, Relationship } from '../../types';
-import type { TreeDatum } from 'family-chart';
-import { transformToFamilyChartData } from '../../utils/familyChartTransform';
+import { customCalcTree } from '../../utils/customCalcTree';
+import PersonCard from './PersonCard';
 
-const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:3001');
+// Node dimensions (including spacing between nodes)
+const NODE_WIDTH = 210;
+const NODE_HEIGHT = 270;
+
+const HALF_W = NODE_WIDTH / 2;   // 105
+const HALF_H = NODE_HEIGHT / 2;  // 135
+
+// Line styling
+const LINE_COLOR = '#cbd5e1';
+const LINE_WIDTH = 2;
+
+// Generation label names relative to owner (index 0 = owner level)
+const GEN_LABELS_ABOVE = ['Родители', 'Дедушки и бабушки', 'Прадедушки и прабабушки'];
+const GEN_LABELS_BELOW = ['Дети', 'Внуки', 'Правнуки'];
 
 interface FamilyTreeLayoutProps {
   persons: Person[];
@@ -26,109 +35,15 @@ interface FamilyTreeLayoutProps {
   ownerPersonId: string | null;
   onCardClick?: (person: Person) => void;
   onAddClick?: (person: Person) => void;
+  onEditClick?: (person: Person) => void;
+  onDeleteClick?: (person: Person) => void;
 }
 
-/** Format date for card display */
-function formatDateShort(dateStr: string | null, yearOnly: number | null, dateKnown: boolean): string {
-  if (dateKnown && dateStr) {
-    return new Date(dateStr).toLocaleDateString('ru-RU', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  }
-  if (yearOnly) return yearOnly.toString();
-  return '';
-}
-
-function formatYears(person: Person): string {
-  const birth = formatDateShort(person.birthDate, person.birthYear, person.birthDateKnown);
-  if (!birth && !person.isAlive) return '';
-  if (!birth && person.isAlive) return '';
-
-  const death = !person.isAlive
-    ? formatDateShort(person.deathDate, person.deathYear, person.deathDateKnown) || '?'
-    : '';
-
-  if (!person.isAlive) {
-    return `${birth || '?'} — ${death}`;
-  }
-  return birth;
-}
-
-/** Escape HTML for safe insertion */
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-/** Male SVG icon */
-const MALE_ICON_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v1.2c0 .7.5 1.2 1.2 1.2h16.8c.7 0 1.2-.5 1.2-1.2v-1.2c0-3.2-6.4-4.8-9.6-4.8z"/></svg>`;
-
-/** Female SVG icon */
-const FEMALE_ICON_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4c-1.5 0-2.7.5-3.6 1.3C7.9 3.5 7.4 3.4 6.8 3.4c-2.2 0-3.6 1.8-3.6 3.8 0 .8.2 1.5.5 2.1C2.7 10.5 2.4 12 2.4 12s1.2.6 2.4.6c.3 0 .6 0 .8-.1.8 1.4 2.3 3.1 4 3.9V18c-3.2.5-7.2 1.8-7.2 3.6v1.2h19.2v-1.2c0-1.8-4-3.1-7.2-3.6v-1.6c1.7-.8 3.2-2.5 4-3.9.3.1.5.1.8.1 1.2 0 2.4-.6 2.4-.6s-.3-1.5-1.3-2.7c.3-.6.5-1.3.5-2.1 0-2-1.4-3.8-3.6-3.8-.6 0-1.1.1-1.6.3-.9-.8-2.1-1.3-3.6-1.3z"/></svg>`;
-
-/** Create custom HTML for a card */
-function createCardHtml(d: TreeDatum, ownerPersonId: string | null): string {
-  const person = d.data?.data?._person as Person | undefined;
-  if (!person) {
-    // Fallback for nodes without person data
-    const firstName = d.data?.data?.['first name'] || '';
-    const lastName = d.data?.data?.['last name'] || '';
-    return `<div class="card-inner f3-custom-card">
-      <div class="card-body">
-        <div class="card-name"><span class="card-name-first">${escapeHtml(firstName)} ${escapeHtml(lastName)}</span></div>
-      </div>
-    </div>`;
-  }
-
-  const isOwner = person.id === ownerPersonId;
-  const years = formatYears(person);
-  const photoSrc = person.photoUrl
-    ? (person.photoUrl.startsWith('http') ? person.photoUrl : `${API_BASE}${person.photoUrl}`)
-    : null;
-
-  const deceasedClass = !person.isAlive ? ' deceased' : '';
-  const ownerClass = isOwner ? ' owner' : '';
-  const genderClass = person.gender;
-
-  // Avatar HTML
-  let avatarHtml: string;
-  if (photoSrc) {
-    avatarHtml = `<img src="${escapeHtml(photoSrc)}" alt="${escapeHtml(person.firstName)}" />`;
-  } else {
-    avatarHtml = person.gender === 'male' ? MALE_ICON_SVG : FEMALE_ICON_SVG;
-  }
-
-  // Name parts
-  const nameParts = [person.lastName, person.middleName].filter(Boolean).join(' ');
-  const maidenPart = person.maidenName ? ` (${escapeHtml(person.maidenName)})` : '';
-
-  // Badges
-  let badgesHtml = '';
-  if (!person.isAlive) {
-    const deceasedText = person.gender === 'male' ? 'Умер' : 'Умерла';
-    badgesHtml += `<div><span class="badge-deceased">${deceasedText}</span></div>`;
-  }
-  if (isOwner) {
-    badgesHtml += `<div><span class="badge-owner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Это вы</span></div>`;
-  }
-
-  return `<div class="f3-custom-card card ${genderClass}${deceasedClass}${ownerClass}" data-person-id="${person.id}">
-    <div class="card-body">
-      <div class="avatar">${avatarHtml}</div>
-      <div class="card-name">
-        <span class="card-name-first">${escapeHtml(person.firstName)}</span>
-        ${nameParts || person.maidenName ? `<span class="card-name-rest">${escapeHtml(nameParts)}${maidenPart}</span>` : ''}
-      </div>
-      ${years ? `<div class="card-years">${escapeHtml(years)}</div>` : ''}
-      ${badgesHtml}
-    </div>
-    <button class="plus-tab" data-action="add" data-person-id="${person.id}" aria-label="Добавить родственника">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
-        <line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
-      </svg>
-    </button>
-  </div>`;
+/** Detect couple pairs from relationships */
+interface CouplePair {
+  person1Id: string;
+  person2Id: string;
+  isDivorced: boolean;
 }
 
 export default function FamilyTreeLayout({
@@ -138,103 +53,275 @@ export default function FamilyTreeLayout({
   ownerPersonId,
   onCardClick,
   onAddClick,
+  onEditClick,
+  onDeleteClick,
 }: FamilyTreeLayoutProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<any>(null);
-
-  // Store callbacks in refs so chart doesn't need to be recreated
-  const onCardClickRef = useRef(onCardClick);
-  const onAddClickRef = useRef(onAddClick);
-  const personsMapRef = useRef<Map<string, Person>>(new Map());
-
-  onCardClickRef.current = onCardClick;
-  onAddClickRef.current = onAddClick;
-  personsMapRef.current = new Map(persons.map(p => [p.id, p]));
-
-  // Handle click on card body or plus-tab
-  const handleContainerClick = useCallback((e: MouseEvent) => {
-    const target = e.target as HTMLElement;
-
-    // Check for plus-tab click
-    const plusTab = target.closest('.plus-tab') as HTMLElement | null;
-    if (plusTab) {
-      e.stopPropagation();
-      const personId = plusTab.getAttribute('data-person-id');
-      if (personId && onAddClickRef.current) {
-        const person = personsMapRef.current.get(personId);
-        if (person) onAddClickRef.current(person);
-      }
-      return;
-    }
-
-    // Check for card body click
-    const cardBody = target.closest('.card-body') as HTMLElement | null;
-    if (cardBody) {
-      const card = cardBody.closest('.f3-custom-card') as HTMLElement | null;
-      const personId = card?.getAttribute('data-person-id');
-      if (personId && onCardClickRef.current) {
-        const person = personsMapRef.current.get(personId);
-        if (person) onCardClickRef.current(person);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container || persons.length === 0) return;
-
-    // Clear previous chart
-    container.innerHTML = '';
-
-    const data = transformToFamilyChartData(persons, relationships);
+  // Transform data and compute layout using custom engine
+  const treeData = useMemo(() => {
+    if (persons.length === 0) return null;
 
     try {
-      const chart = f3.createChart(container, data)
-        .setCardXSpacing(250)
-        .setCardYSpacing(200)
-        .setTransitionTime(800)
-        .setSingleParentEmptyCard(false);
-
-      chart.setCardHtml()
-        .setStyle('rect')
-        .setCardDim({ w: 174, h: 220, text_x: 87, text_y: 15, img_w: 60, img_h: 60, img_x: 57, img_y: 10 })
-        .setCardInnerHtmlCreator((d: TreeDatum) => createCardHtml(d, ownerPersonId))
-        .setOnCardClick(null); // Disable default card click (we handle it ourselves)
-
-      // Set main person to owner (or first person)
-      if (ownerPersonId) {
-        chart.updateMainId(ownerPersonId);
-      }
-
-      chart.updateTree({ initial: true, tree_position: 'fit' });
-
-      chartRef.current = chart;
-
-      // Add click listener for our custom buttons
-      container.addEventListener('click', handleContainerClick);
-
-      return () => {
-        container.removeEventListener('click', handleContainerClick);
-        chartRef.current = null;
-      };
+      return customCalcTree(persons, relationships, ownerPersonId || rootId);
     } catch (err) {
-      console.error('family-chart error:', err);
-      container.innerHTML = '<div style="padding:20px;text-align:center;color:#666;">Не удалось построить дерево</div>';
+      console.error('customCalcTree error:', err);
+      return null;
     }
-  }, [persons, relationships, rootId, ownerPersonId, handleContainerClick]);
+  }, [persons, relationships, ownerPersonId, rootId]);
 
-  if (persons.length === 0) {
+  const personMap = useMemo(
+    () => new Map(persons.map(p => [p.id, p])),
+    [persons]
+  );
+
+  // Build couple pairs from relationships
+  const couplePairs = useMemo((): CouplePair[] => {
+    return relationships
+      .filter(r => r.category === 'couple')
+      .map(r => ({
+        person1Id: r.person1Id,
+        person2Id: r.person2Id,
+        isDivorced: r.coupleStatus === 'divorced',
+      }));
+  }, [relationships]);
+
+  // Group nodes by Y level (generation rows)
+  const generationRows = useMemo(() => {
+    if (!treeData) return [];
+
+    // Group by top value
+    const rowMap = new Map<number, typeof treeData.nodes[number][]>();
+    for (const node of treeData.nodes) {
+      const key = node.top;
+      if (!rowMap.has(key)) rowMap.set(key, []);
+      rowMap.get(key)!.push(node);
+    }
+
+    // Sort by Y position
+    return Array.from(rowMap.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([top, nodes]) => ({ top, nodes }));
+  }, [treeData]);
+
+  // Find owner's Y level for generation labeling
+  const ownerTop = useMemo(() => {
+    if (!treeData || !ownerPersonId) return null;
+    const ownerNode = treeData.nodes.find(n => n.id === ownerPersonId);
+    return ownerNode ? ownerNode.top : null;
+  }, [treeData, ownerPersonId]);
+
+  // Generate label for a generation row
+  const getGenLabel = (rowTop: number): string | null => {
+    if (ownerTop === null) return null;
+    const diff = rowTop - ownerTop; // positive = below owner, negative = above
+
+    if (diff === 0) {
+      return 'Вы и братья/сёстры';
+    }
+    if (diff < 0) {
+      // Above owner (parents, grandparents...)
+      const level = Math.round(Math.abs(diff) / 2); // each generation is ~2 units apart
+      if (level >= 1 && level <= GEN_LABELS_ABOVE.length) {
+        return GEN_LABELS_ABOVE[level - 1];
+      }
+      return `Поколение ${level + 1} (предки)`;
+    }
+    // Below owner (children, grandchildren...)
+    const level = Math.round(diff / 2);
+    if (level >= 1 && level <= GEN_LABELS_BELOW.length) {
+      return GEN_LABELS_BELOW[level - 1];
+    }
+    return `Поколение ${level} (потомки)`;
+  };
+
+  // Build node position map for couple decoration placement
+  const nodePositionMap = useMemo(() => {
+    if (!treeData) return new Map<string, { left: number; top: number }>();
+    return new Map(
+      treeData.nodes.map(n => [n.id, { left: n.left, top: n.top }])
+    );
+  }, [treeData]);
+
+  // Find couple decorations (heart / divorce badge) positions
+  const coupleDecorations = useMemo(() => {
+    const decorations: Array<{
+      key: string;
+      cx: number;
+      cy: number;
+      isDivorced: boolean;
+    }> = [];
+
+    for (const pair of couplePairs) {
+      const pos1 = nodePositionMap.get(pair.person1Id);
+      const pos2 = nodePositionMap.get(pair.person2Id);
+      if (!pos1 || !pos2) continue;
+
+      // Only show between nodes on same row (same top)
+      if (pos1.top !== pos2.top) continue;
+
+      // Center point between two nodes (in pixel coords)
+      // Node center X = (left * HALF_W) + NODE_WIDTH/2
+      const cx1 = pos1.left * HALF_W + NODE_WIDTH / 2;
+      const cx2 = pos2.left * HALF_W + NODE_WIDTH / 2;
+      const cy = pos1.top * HALF_H + NODE_HEIGHT / 2;
+
+      decorations.push({
+        key: `${pair.person1Id}-${pair.person2Id}`,
+        cx: (cx1 + cx2) / 2,
+        cy,
+        isDivorced: pair.isDivorced,
+      });
+    }
+
+    return decorations;
+  }, [couplePairs, nodePositionMap]);
+
+  if (!treeData) {
     return <div className="tree-layout-empty">Не удалось построить дерево</div>;
   }
 
+  const canvasWidth = treeData.canvas.width * HALF_W;
+  const canvasHeight = treeData.canvas.height * HALF_H;
+
   return (
     <div
-      ref={containerRef}
-      className="f3 f3-custom-tree"
+      className="tree-layout"
       style={{
-        width: '100%',
-        height: '100%',
+        position: 'relative',
+        width: canvasWidth,
+        height: canvasHeight,
+        margin: '0 auto',
       }}
-    />
+    >
+      {/* SVG connector lines */}
+      <svg
+        className="tree-connectors"
+        width={canvasWidth}
+        height={canvasHeight}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          pointerEvents: 'none',
+          zIndex: 1,
+        }}
+      >
+        {treeData.connectors.map((connector, idx) => {
+          const [x1, y1, x2, y2] = connector;
+
+          // Check if this connector is a horizontal line between divorced spouses
+          const isDivorcedLine = y1 === y2 && couplePairs.some(pair => {
+            const p1 = nodePositionMap.get(pair.person1Id);
+            const p2 = nodePositionMap.get(pair.person2Id);
+            if (!p1 || !p2 || !pair.isDivorced) return false;
+            if (p1.top !== p2.top) return false;
+            // Connector Y should be near the node center Y in grid units (top + 1)
+            const nodeY = p1.top + 1;
+            return Math.abs(y1 - nodeY) < 0.5;
+          });
+
+          // Connectors are in grid units — multiply by HALF_W/HALF_H (like v1A)
+          return (
+            <line
+              key={idx}
+              x1={x1 * HALF_W}
+              y1={y1 * HALF_H}
+              x2={x2 * HALF_W}
+              y2={y2 * HALF_H}
+              stroke={LINE_COLOR}
+              strokeWidth={LINE_WIDTH}
+              strokeDasharray={isDivorcedLine ? '6,4' : undefined}
+            />
+          );
+        })}
+      </svg>
+
+      {/* Generation labels */}
+      {generationRows.map(({ top, nodes: rowNodes }) => {
+        const label = getGenLabel(top);
+        if (!label) return null;
+
+        // Position label at the top of the row, centered across row nodes
+        const leftMost = Math.min(...rowNodes.map(n => n.left));
+        const rightMost = Math.max(...rowNodes.map(n => n.left));
+        const centerX = ((leftMost + rightMost) / 2) * HALF_W + NODE_WIDTH / 2;
+        const labelY = top * HALF_H - 4; // slightly above the nodes
+
+        return (
+          <div
+            key={`gen-${top}`}
+            className="gen-label"
+            style={{
+              position: 'absolute',
+              left: centerX,
+              top: labelY,
+              transform: 'translateX(-50%)',
+              zIndex: 3,
+            }}
+          >
+            <span>{label}</span>
+          </div>
+        );
+      })}
+
+      {/* Couple decorations: hearts and divorce badges */}
+      {coupleDecorations.map(({ key, cx, cy, isDivorced }) => (
+        <div
+          key={`couple-${key}`}
+          style={{
+            position: 'absolute',
+            left: cx,
+            top: cy,
+            transform: 'translate(-50%, -50%)',
+            zIndex: 10,
+            pointerEvents: 'none',
+          }}
+        >
+          {isDivorced ? (
+            <div className="couple-badge-wrapper">
+              <div className="couple-badge-divorced">
+                <span>Разведены</span>
+              </div>
+            </div>
+          ) : (
+            <div className="couple-heart">
+              <span role="img" aria-label="love">💕</span>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Person nodes */}
+      {treeData.nodes.map((node) => {
+        const person = personMap.get(node.id);
+        if (!person) return null;
+
+        return (
+          <div
+            key={node.id}
+            style={{
+              position: 'absolute',
+              width: NODE_WIDTH,
+              height: NODE_HEIGHT,
+              transform: `translate(${node.left * HALF_W}px, ${node.top * HALF_H}px)`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 5,
+            }}
+          >
+            <PersonCard
+              person={person}
+              isOwner={person.id === ownerPersonId}
+              onCardClick={onCardClick}
+              onAddClick={onAddClick}
+              onEditClick={onEditClick}
+              onDeleteClick={onDeleteClick}
+            />
+          </div>
+        );
+      })}
+    </div>
   );
 }
+
+export { NODE_WIDTH, NODE_HEIGHT, HALF_W, HALF_H };
