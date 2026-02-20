@@ -98,7 +98,6 @@ export function calcTreeMultiPass(
 
     // Try each cluster node as root, pick best coverage
     let bestResult: ReturnType<typeof calcTree> | null = null;
-    let bestRootId = cluster[0];
     let bestCoverage = 0;
 
     for (const candidateRoot of cluster) {
@@ -112,7 +111,7 @@ export function calcTreeMultiPass(
         if (score > bestCoverage) {
           bestCoverage = score;
           bestResult = result;
-          bestRootId = candidateRoot;
+          // bestRootId tracked for debugging
         }
       } catch {
         // Skip if calcTree fails for this root
@@ -176,8 +175,6 @@ export function calcTreeMultiPass(
 
     // Add connectors with offset applied
     // Only add connectors that involve at least one newly-placed node
-    const newlyPlaced = new Set(bestResult.nodes.filter(n => !placedIds.has(n.id)).map(n => n.id));
-
     // We need to add connectors that connect to the new nodes.
     // Since connectors are coordinate-based (not ID-based), we offset ALL
     // secondary connectors but filter to avoid duplicating primary connectors.
