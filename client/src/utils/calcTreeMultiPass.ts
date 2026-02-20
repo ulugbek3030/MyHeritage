@@ -681,6 +681,13 @@ export function calcTreeMultiPass(
     }
   }
 
+  // DEBUG: log family units
+  for (const unit of familyUnits) {
+    const pNames = unit.parents.map(id => personMap.get(id)?.firstName || id.substring(0,6));
+    const cNames = unit.children.map(id => personMap.get(id)?.firstName || id.substring(0,6));
+    console.log(`FamilyUnit: parents=[${pNames}] children=[${cNames}]`);
+  }
+
   // Parent → children connectors
   for (const unit of familyUnits) {
     const parentPos = unit.parents
