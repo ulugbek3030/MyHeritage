@@ -209,14 +209,24 @@ export default function FamilyTreeLayout({
           const [x1, y1, x2, y2] = connector;
 
           // Check if this connector is a horizontal line between divorced spouses
+          // Must match EXACT couple position (not just Y level) to avoid marking
+          // other couple connectors on the same row as dashed
           const isDivorcedLine = y1 === y2 && couplePairs.some(pair => {
             const p1 = nodePositionMap.get(pair.person1Id);
             const p2 = nodePositionMap.get(pair.person2Id);
             if (!p1 || !p2 || !pair.isDivorced) return false;
             if (p1.top !== p2.top) return false;
-            // Connector Y should be near the node center Y in grid units (top + 1)
             const nodeY = p1.top + 1;
-            return Math.abs(y1 - nodeY) < 0.5;
+            if (Math.abs(y1 - nodeY) > 0.5) return false;
+            // Check X range matches: connector should span from right edge of left node
+            // to left edge of right node (nodeRight = left + NODE_SPAN, where NODE_SPAN = 2)
+            const leftNode = p1.left < p2.left ? p1 : p2;
+            const rightNode = p1.left < p2.left ? p2 : p1;
+            const expectedX1 = leftNode.left + 2; // nodeRight
+            const expectedX2 = rightNode.left;
+            const connLeft = Math.min(x1, x2);
+            const connRight = Math.max(x1, x2);
+            return Math.abs(connLeft - expectedX1) < 0.5 && Math.abs(connRight - expectedX2) < 0.5;
           });
 
           // Connectors are in grid units — multiply by HALF_W/HALF_H (like v1A)
