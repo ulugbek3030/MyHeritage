@@ -9,8 +9,9 @@
  *   - "Разведены" badge for divorced couples
  */
 import { useMemo } from 'react';
+import calcTree from 'relatives-tree';
 import type { Person, Relationship } from '../../types';
-import { calcTreeMultiPass } from '../../utils/calcTreeMultiPass';
+import { transformToTreeNodes } from '../../utils/treeTransform';
 import PersonCard from './PersonCard';
 
 // Node dimensions (including spacing between nodes)
@@ -56,17 +57,19 @@ export default function FamilyTreeLayout({
   onEditClick,
   onDeleteClick,
 }: FamilyTreeLayoutProps) {
-  // Transform data and compute layout using relatives-tree with multi-pass
+  // Transform data and compute layout
   const treeData = useMemo(() => {
     if (persons.length === 0) return null;
 
+    const nodes = transformToTreeNodes(persons, relationships);
+
     try {
-      return calcTreeMultiPass(persons, relationships, ownerPersonId || rootId);
+      return calcTree(nodes as any, { rootId });
     } catch (err) {
-      console.error('calcTreeMultiPass error:', err);
+      console.error('calcTree error:', err);
       return null;
     }
-  }, [persons, relationships, ownerPersonId, rootId]);
+  }, [persons, relationships, rootId]);
 
   const personMap = useMemo(
     () => new Map(persons.map(p => [p.id, p])),
@@ -209,17 +212,18 @@ export default function FamilyTreeLayout({
           const [x1, y1, x2, y2] = connector;
 
           // Check if this connector is a horizontal line between divorced spouses
+          // (same Y, connecting two nodes on the same row)
           const isDivorcedLine = y1 === y2 && couplePairs.some(pair => {
             const p1 = nodePositionMap.get(pair.person1Id);
             const p2 = nodePositionMap.get(pair.person2Id);
             if (!p1 || !p2 || !pair.isDivorced) return false;
             if (p1.top !== p2.top) return false;
-            // Connector Y should be near the node center Y in grid units (top + 1)
-            const nodeY = p1.top + 1;
+            // Check if this horizontal line is at the spouse row level
+            // The connector Y should be near the node center Y
+            const nodeY = p1.top + 1; // approximate center in grid units
             return Math.abs(y1 - nodeY) < 0.5;
           });
 
-          // Connectors are in grid units — multiply by HALF_W/HALF_H (like v1A)
           return (
             <line
               key={idx}
