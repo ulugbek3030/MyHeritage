@@ -208,15 +208,21 @@ export default function FamilyTreeLayout({
         {treeData.connectors.map((connector, idx) => {
           const [x1, y1, x2, y2] = connector;
 
-          // Check if this connector is a horizontal line between divorced spouses
+          // Check if this connector is the horizontal couple line between divorced spouses
           const isDivorcedLine = y1 === y2 && couplePairs.some(pair => {
             const p1 = nodePositionMap.get(pair.person1Id);
             const p2 = nodePositionMap.get(pair.person2Id);
             if (!p1 || !p2 || !pair.isDivorced) return false;
             if (p1.top !== p2.top) return false;
-            // Connector Y should be near the node center Y in grid units (top + 1)
-            const nodeY = p1.top + 1;
-            return Math.abs(y1 - nodeY) < 0.5;
+            // Must match Y at couple centerY (top + 1)
+            const coupleY = p1.top + 1;
+            if (Math.abs(y1 - coupleY) > 0.01) return false;
+            // Must match X span between the two nodes (right edge of left → left edge of right)
+            const leftNode = p1.left < p2.left ? p1 : p2;
+            const rightNode = p1.left < p2.left ? p2 : p1;
+            const expectedX1 = leftNode.left + 2; // nodeRight
+            const expectedX2 = rightNode.left;
+            return Math.abs(x1 - expectedX1) < 0.01 && Math.abs(x2 - expectedX2) < 0.01;
           });
 
           // Connectors are in grid units — multiply by HALF_W/HALF_H (like v1A)

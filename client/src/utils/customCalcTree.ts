@@ -424,75 +424,136 @@ export function customCalcTree(
   const nodeCenterY = (top: number) => top + 1;
   const nodeRight = (left: number) => left + NODE_SPAN;
 
-  // Build family units for connector generation
-  const processedChildSets = new Set<string>();
+  // ── Build family units from CO-PARENTS (not just couple rels) ──
+  // Key insight: two people are co-parents if they share a child.
+  // This catches pairs WITHOUT explicit couple relationship.
   const familyUnits: FamilyUnit[] = [];
+  const childAssigned = new Set<string>(); // track which children are assigned to a unit
 
-  // From couple relationships
-  for (const rel of relationships) {
-    if (rel.category !== 'couple') continue;
-    const shared = getSharedChildren(rel.person1Id, rel.person2Id);
-    if (shared.length > 0) {
-      const key = [...shared].sort().join(',');
-      if (!processedChildSets.has(key)) {
-        processedChildSets.add(key);
-        familyUnits.push({ parents: [rel.person1Id, rel.person2Id], children: shared });
+  // Step 1: Find all co-parent pairs by looking at each child's parents
+  const coParentPairs = new Map<string, { parents: string[]; children: string[] }>();
+
+  for (const [childId, parentIds] of parentsOf) {
+    if (parentIds.length === 2) {
+      // Two parents → co-parent pair
+      const key = [...parentIds].sort().join('|');
+      if (!coParentPairs.has(key)) {
+        coParentPairs.set(key, { parents: [...parentIds].sort(), children: [] });
       }
+      coParentPairs.get(key)!.children.push(childId);
+      childAssigned.add(childId);
+    } else if (parentIds.length === 1) {
+      // Single parent — will be handled in step 2
     }
   }
 
-  // Single parents with unprocessed children
+  // Add co-parent family units
+  for (const unit of coParentPairs.values()) {
+    familyUnits.push(unit);
+  }
+
+  // Step 2: Single parents — children not yet assigned to any co-parent unit
   for (const p of persons) {
     const children = childrenOf.get(p.id) || [];
-    const unprocessed = children.filter(c => {
-      return !familyUnits.some(fu => fu.children.includes(c));
-    });
-    if (unprocessed.length > 0) {
-      familyUnits.push({ parents: [p.id], children: unprocessed });
+    const unassigned = children.filter(c => !childAssigned.has(c));
+    if (unassigned.length > 0) {
+      familyUnits.push({ parents: [p.id], children: unassigned });
+      for (const c of unassigned) childAssigned.add(c);
     }
   }
 
-  // Parent → children connectors
+  // ── Parent → children connectors ──
   for (const unit of familyUnits) {
-    const parentPos = unit.parents.map(id => positions.get(id)).filter(Boolean) as Array<{ left: number; top: number }>;
-    const childPos = unit.children.map(id => positions.get(id)).filter(Boolean) as Array<{ left: number; top: number }>;
-    const childCenters = unit.children
-      .filter(id => positions.has(id))
-      .map(id => nodeCenterX(positions.get(id)!.left));
+    const parentPos = unit.parents
+      .map(id => ({ id, pos: positions.get(id) }))
+      .filter(p => p.pos != null) as Array<{ id: string; pos: { left: number; top: number } }>;
+    const childrenWithPos = unit.children
+      .filter(id => positions.has(id));
 
-    if (parentPos.length === 0 || childPos.length === 0) continue;
+    if (parentPos.length === 0 || childrenWithPos.length === 0) continue;
 
-    // Parent drop point X (midpoint between parents' centers in grid)
-    const parentCenters = parentPos.map(p => nodeCenterX(p.left));
-    const dropX = (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2;
-    const parentBotY = nodeBottom(parentPos[0].top);
-    const childTopY = nodeTop(childPos[0].top);
-    const midY = (parentBotY + childTopY) / 2;
+    const childCenters = childrenWithPos.map(id => nodeCenterX(positions.get(id)!.left));
+    const childTops = childrenWithPos.map(id => positions.get(id)!.top);
 
-    // Vertical drop from parent bottom to midpoint
-    connectors.push([dropX, parentBotY, dropX, midY] as const);
+    if (parentPos.length === 2) {
+      // ── Two parents: horizontal couple line + single vertical drop ──
+      const p1 = parentPos[0].pos;
+      const p2 = parentPos[1].pos;
+      const leftParent = p1.left < p2.left ? p1 : p2;
+      const rightParent = p1.left < p2.left ? p2 : p1;
 
-    if (childCenters.length === 1) {
-      const cx = childCenters[0];
-      if (Math.abs(dropX - cx) > 0.01) {
-        connectors.push([dropX, midY, cx, midY] as const);
-      }
-      connectors.push([cx, midY, cx, childTopY] as const);
-    } else {
-      const leftX = Math.min(...childCenters);
-      const rightX = Math.max(...childCenters);
-      // Horizontal bar
-      connectors.push([Math.min(leftX, dropX), midY, Math.max(rightX, dropX), midY] as const);
-      // Drops to each child
-      for (const cx of childCenters) {
+      // Horizontal line between parents at their centerY
+      const coupleY = nodeCenterY(leftParent.top);
+      connectors.push([nodeRight(leftParent.left), coupleY, rightParent.left, coupleY] as const);
+
+      // Drop point = midpoint between parents' centers
+      const dropX = (nodeCenterX(leftParent.left) + nodeCenterX(rightParent.left)) / 2;
+      const parentBotY = Math.max(nodeBottom(p1.top), nodeBottom(p2.top));
+      const childTopY = Math.min(...childTops.map(t => nodeTop(t)));
+      const midY = (parentBotY + childTopY) / 2;
+
+      // Vertical from couple line down to horizontal distribution bar
+      connectors.push([dropX, coupleY, dropX, midY] as const);
+
+      if (childCenters.length === 1) {
+        const cx = childCenters[0];
+        if (Math.abs(dropX - cx) > 0.01) {
+          connectors.push([dropX, midY, cx, midY] as const);
+        }
         connectors.push([cx, midY, cx, childTopY] as const);
+      } else {
+        const leftX = Math.min(...childCenters);
+        const rightX = Math.max(...childCenters);
+        // Horizontal distribution bar
+        connectors.push([Math.min(leftX, dropX), midY, Math.max(rightX, dropX), midY] as const);
+        // Drops to each child
+        for (const cx of childCenters) {
+          connectors.push([cx, midY, cx, childTopY] as const);
+        }
+      }
+    } else {
+      // ── Single parent: vertical drop from parent center ──
+      const p = parentPos[0].pos;
+      const dropX = nodeCenterX(p.left);
+      const parentBotY = nodeBottom(p.top);
+      const childTopY = Math.min(...childTops.map(t => nodeTop(t)));
+      const midY = (parentBotY + childTopY) / 2;
+
+      // Vertical from parent bottom to midpoint
+      connectors.push([dropX, parentBotY, dropX, midY] as const);
+
+      if (childCenters.length === 1) {
+        const cx = childCenters[0];
+        if (Math.abs(dropX - cx) > 0.01) {
+          connectors.push([dropX, midY, cx, midY] as const);
+        }
+        connectors.push([cx, midY, cx, childTopY] as const);
+      } else {
+        const leftX = Math.min(...childCenters);
+        const rightX = Math.max(...childCenters);
+        connectors.push([Math.min(leftX, dropX), midY, Math.max(rightX, dropX), midY] as const);
+        for (const cx of childCenters) {
+          connectors.push([cx, midY, cx, childTopY] as const);
+        }
       }
     }
   }
 
-  // Couple connectors (horizontal line between spouses at center Y)
+  // ── Couple connectors (for pairs WITHOUT shared children) ──
+  // Co-parent couples already got their horizontal line above.
+  // Only add couple line for childless couples or divorced pairs without shared children.
+  const drawnCouplePairs = new Set<string>();
+  for (const unit of familyUnits) {
+    if (unit.parents.length === 2) {
+      drawnCouplePairs.add([...unit.parents].sort().join('|'));
+    }
+  }
+
   for (const rel of relationships) {
     if (rel.category !== 'couple') continue;
+    const key = [rel.person1Id, rel.person2Id].sort().join('|');
+    if (drawnCouplePairs.has(key)) continue; // already drawn by family unit
+
     const p1 = positions.get(rel.person1Id);
     const p2 = positions.get(rel.person2Id);
     if (!p1 || !p2) continue;
