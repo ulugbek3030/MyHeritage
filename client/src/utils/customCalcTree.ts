@@ -17,7 +17,7 @@ const NODE_SPAN = 2;    // node width in grid units
 const GAP = 0.5;         // gap between nodes (tighter for couples)
 const SLOT = NODE_SPAN + GAP; // total slot width (2.5)
 const ROW_HEIGHT = 3;    // vertical distance between generation rows
-const FAMILY_GAP = 1.5;  // extra gap between different family groups on same row
+const FAMILY_GAP = 3;    // extra gap between different family groups on same row (visible separation)
 
 // Connectors are now in GRID UNITS (like relatives-tree v1A).
 // FamilyTreeLayout multiplies by HALF_W/HALF_H to convert to pixels.
@@ -454,12 +454,24 @@ export function customCalcTree(
         });
       } else {
         // ── No anchor: center children under parents ──
+        // Sort by birth year, each child with their spouse(s) as inseparable block
+        const sortedChildren = [...family.unplacedChildren]
+          .map(id => ({ id, p: personMap.get(id) }))
+          .sort((a, b) => (a.p?.birthYear || 9999) - (b.p?.birthYear || 9999))
+          .map(x => x.id);
+
         const childSlots: string[] = [];
-        for (const childId of family.unplacedChildren) {
+        for (const childId of sortedChildren) {
+          const childSpouses = spousesOf.get(childId) || [];
+          const exSp = childSpouses.find(s => s.isDivorced);
+          const mainSp = childSpouses.find(s => !s.isDivorced);
+
+          if (exSp && !family.unplacedChildren.includes(exSp.spouseId) && !placed.has(exSp.spouseId)) {
+            childSlots.push(exSp.spouseId);
+          }
           childSlots.push(childId);
-          const spouse = getMainSpouse(childId, spousesOf);
-          if (spouse && !placed.has(spouse) && !family.unplacedChildren.includes(spouse)) {
-            childSlots.push(spouse);
+          if (mainSp && !family.unplacedChildren.includes(mainSp.spouseId) && !placed.has(mainSp.spouseId)) {
+            childSlots.push(mainSp.spouseId);
           }
         }
 
@@ -484,21 +496,44 @@ export function customCalcTree(
     }
 
     // Resolve overlaps between adjacent families (add FAMILY_GAP)
-    for (let i = 1; i < familyPlacements.length; i++) {
+    // Find which family contains the anchor (owner) — it stays put, others move away
+    let anchorFamilyIdx = -1;
+    for (let i = 0; i < familyPlacements.length; i++) {
+      if (familyPlacements[i].slots.some(s => s.alreadyPlaced)) {
+        anchorFamilyIdx = i;
+        break;
+      }
+    }
+
+    // Push families to the RIGHT of anchor family rightward
+    for (let i = (anchorFamilyIdx >= 0 ? anchorFamilyIdx : 0) + 1; i < familyPlacements.length; i++) {
       const prev = familyPlacements[i - 1];
       const curr = familyPlacements[i];
       if (prev.slots.length === 0 || curr.slots.length === 0) continue;
 
       const overlap = prev.rightEdge + FAMILY_GAP - curr.leftEdge;
       if (overlap > 0) {
-        // Shift current family right (only non-anchored slots)
         for (const slot of curr.slots) {
-          if (!slot.alreadyPlaced) {
-            slot.x += overlap;
-          }
+          slot.x += overlap;
         }
         curr.leftEdge += overlap;
         curr.rightEdge += overlap;
+      }
+    }
+
+    // Push families to the LEFT of anchor family leftward
+    for (let i = (anchorFamilyIdx >= 0 ? anchorFamilyIdx : familyPlacements.length) - 1; i >= 0; i--) {
+      const next = familyPlacements[i + 1];
+      const curr = familyPlacements[i];
+      if (!next || next.slots.length === 0 || curr.slots.length === 0) continue;
+
+      const overlap = curr.rightEdge + FAMILY_GAP - next.leftEdge;
+      if (overlap > 0) {
+        for (const slot of curr.slots) {
+          slot.x -= overlap;
+        }
+        curr.leftEdge -= overlap;
+        curr.rightEdge -= overlap;
       }
     }
 
