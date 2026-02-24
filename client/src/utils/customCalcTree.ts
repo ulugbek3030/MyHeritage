@@ -418,9 +418,12 @@ export function customCalcTree(
   const connectors: Array<readonly [number, number, number, number]> = [];
 
   // Grid-unit helpers (NODE_SPAN = 2, so center offset = 1)
+  // OVERLAP: connectors extend slightly into card area to guarantee visual contact
+  // (covers border-top 5px + box-shadow visual offset)
+  const OVERLAP = 0.05; // ~6px at HALF_H=130
   const nodeCenterX = (left: number) => left + 1;
-  const nodeBottom = (top: number) => top + NODE_SPAN;
-  const nodeTop = (top: number) => top;
+  const nodeBottomConn = (top: number) => top + NODE_SPAN - OVERLAP; // connector start from parent bottom
+  const nodeTopConn = (top: number) => top + OVERLAP;                // connector end at child top
   const nodeCenterY = (top: number) => top + 1;
   const nodeRight = (left: number) => left + NODE_SPAN;
 
@@ -488,8 +491,8 @@ export function customCalcTree(
 
       // Drop point = midpoint between parents' centers
       const dropX = (nodeCenterX(leftParent.left) + nodeCenterX(rightParent.left)) / 2;
-      const parentBotY = Math.max(nodeBottom(p1.top), nodeBottom(p2.top));
-      const childTopY = Math.min(...childTops.map(t => nodeTop(t)));
+      const parentBotY = Math.max(nodeBottomConn(p1.top), nodeBottomConn(p2.top));
+      const childTopY = Math.min(...childTops.map(t => nodeTopConn(t)));
       const midY = (parentBotY + childTopY) / 2;
 
       // Vertical from couple line down to horizontal distribution bar
@@ -515,8 +518,8 @@ export function customCalcTree(
       // ── Single parent: vertical drop from parent center ──
       const p = parentPos[0].pos;
       const dropX = nodeCenterX(p.left);
-      const parentBotY = nodeBottom(p.top);
-      const childTopY = Math.min(...childTops.map(t => nodeTop(t)));
+      const parentBotY = nodeBottomConn(p.top);
+      const childTopY = Math.min(...childTops.map(t => nodeTopConn(t)));
       const midY = (parentBotY + childTopY) / 2;
 
       // Vertical from parent bottom to midpoint
