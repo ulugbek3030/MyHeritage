@@ -17,6 +17,7 @@ const NODE_SPAN = 2;    // node width in grid units
 const GAP = 0.5;         // gap between nodes (tighter for couples)
 const SLOT = NODE_SPAN + GAP; // total slot width (2.5)
 const ROW_HEIGHT = 3;    // vertical distance between generation rows
+const FAMILY_GAP = 1.5;  // extra gap between different family groups on same row
 
 // Connectors are now in GRID UNITS (like relatives-tree v1A).
 // FamilyTreeLayout multiplies by HALF_W/HALF_H to convert to pixels.
@@ -172,39 +173,24 @@ export function customCalcTree(
     parentsMidX = CENTER + NODE_SPAN / 2;
   }
 
-  // ── Place owner's siblings + owner (centered below parents) ──
-  const ownerSiblingIds: string[] = [];
-  if (ownerFatherId && ownerMotherId) {
-    const shared = getSharedChildren(ownerFatherId, ownerMotherId);
-    for (const id of shared) {
-      if (!ownerSiblingIds.includes(id)) ownerSiblingIds.push(id);
+  // ── Place ONLY owner (centered below parents) ──
+  // Siblings will be placed by the universal children placement loop (Phase 4b)
+  // so that each family's children stay grouped under their parents.
+  {
+    const ownerY = genToY(0);
+    setPos(ownerPersonId, parentsMidX - NODE_SPAN / 2, ownerY);
+
+    // Place owner's spouse(s) adjacent
+    const ownerSpouses = spousesOf.get(ownerPersonId) || [];
+    const mainSpouse = ownerSpouses.find(s => !s.isDivorced);
+    const exSpouse = ownerSpouses.find(s => s.isDivorced);
+    if (exSpouse && !placed.has(exSpouse.spouseId)) {
+      setPos(exSpouse.spouseId, parentsMidX - NODE_SPAN / 2 - SLOT, ownerY);
     }
-  } else if (ownerFatherId) {
-    for (const id of (childrenOf.get(ownerFatherId) || [])) {
-      if (!ownerSiblingIds.includes(id)) ownerSiblingIds.push(id);
-    }
-  } else if (ownerMotherId) {
-    for (const id of (childrenOf.get(ownerMotherId) || [])) {
-      if (!ownerSiblingIds.includes(id)) ownerSiblingIds.push(id);
+    if (mainSpouse && !placed.has(mainSpouse.spouseId)) {
+      setPos(mainSpouse.spouseId, parentsMidX - NODE_SPAN / 2 + SLOT, ownerY);
     }
   }
-
-  // If owner not in siblings list (e.g. no parents), add them
-  if (!ownerSiblingIds.includes(ownerPersonId)) {
-    ownerSiblingIds.push(ownerPersonId);
-  }
-
-  // Sort: owner in center
-  const ownerIdx = ownerSiblingIds.indexOf(ownerPersonId);
-  if (ownerIdx > -1) {
-    ownerSiblingIds.splice(ownerIdx, 1);
-  }
-  // Put owner in center position
-  const mid = Math.floor(ownerSiblingIds.length / 2);
-  ownerSiblingIds.splice(mid, 0, ownerPersonId);
-
-  // Place siblings row with their spouses
-  placeRowWithSpouses(ownerSiblingIds, ownerPersonId, parentsMidX, genToY(0), positions, placed, genMap, spousesOf, personMap);
 
   // ── Place paternal side (LEFT of center) ──
   if (paternalGPIds.length > 0) {
@@ -315,27 +301,28 @@ export function customCalcTree(
     }
   }
 
-  // ── Place children below ALL placed parents ──
+  // ── Phase 4b: Place children below ALL placed parents ──
   // Group parents into families (co-parent pairs), sort left-to-right,
-  // place each family's children strictly below them without mixing.
+  // place each family's children strictly below them with FAMILY_GAP between groups.
+  //
+  // KEY: Owner is already placed at gen 0. Their siblings will be placed around them.
+  // Cousins from other families get placed as separate groups.
   const maxGen = Math.max(...Array.from(genMap.values()));
   for (let gen = minGen; gen <= maxGen; gen++) {
     // Build unique family units in this generation
-    // A family = set of co-parents who share children
     const familiesInGen: Array<{
       parentIds: string[];
       centerX: number;
-      unplacedChildren: string[];
+      allChildren: string[];       // all children (including already-placed ones like owner)
+      unplacedChildren: string[];   // children to place
     }> = [];
-    const processedParents = new Set<string>();
+    const processedFamilies = new Set<string>();
 
     const personsInGen = persons
       .filter(p => genMap.get(p.id) === gen && placed.has(p.id))
       .sort((a, b) => positions.get(a.id)!.left - positions.get(b.id)!.left);
 
     for (const person of personsInGen) {
-      if (processedParents.has(person.id)) continue;
-
       const allChildren = childrenOf.get(person.id) || [];
       if (allChildren.length === 0) continue;
 
@@ -347,59 +334,199 @@ export function customCalcTree(
         }
       }
 
-      // Skip if already processed this family
       const familyKey = [...coParentIds].sort().join('|');
-      if (processedParents.has(familyKey)) continue;
+      if (processedFamilies.has(familyKey)) continue;
+      processedFamilies.add(familyKey);
 
-      // Mark all parents as processed
-      for (const pid of coParentIds) processedParents.add(pid);
-      processedParents.add(familyKey);
-
-      // Collect ALL shared children of this family (union of all co-parents' children)
+      // Collect ALL children of this family (union)
       const familyChildrenSet = new Set<string>();
       for (const pid of coParentIds) {
         for (const cid of (childrenOf.get(pid) || [])) {
           familyChildrenSet.add(cid);
         }
       }
-      const unplacedChildren = [...familyChildrenSet].filter(c => !placed.has(c));
+
+      const familyAllChildren = [...familyChildrenSet];
+      const unplacedChildren = familyAllChildren.filter(c => !placed.has(c));
       if (unplacedChildren.length === 0) continue;
 
-      // Family center X
+      // Family center X (center of parents)
       const familyPositions = [...coParentIds].filter(id => positions.has(id));
       const familyMinX = Math.min(...familyPositions.map(id => positions.get(id)!.left));
       const familyMaxX = Math.max(...familyPositions.map(id => positions.get(id)!.left));
       const centerX = (familyMinX + familyMaxX + NODE_SPAN) / 2;
 
-      familiesInGen.push({ parentIds: [...coParentIds], centerX, unplacedChildren });
+      familiesInGen.push({
+        parentIds: [...coParentIds],
+        centerX,
+        allChildren: familyAllChildren,
+        unplacedChildren,
+      });
     }
 
     // Sort families left-to-right by their center X
     familiesInGen.sort((a, b) => a.centerX - b.centerX);
 
-    // Place each family's children below parents, respecting left-to-right order
-    for (const family of familiesInGen) {
-      const childGen = gen + 1;
-      const childY = genToY(childGen);
+    const childGen = gen + 1;
+    const childY = genToY(childGen);
 
-      // Count total slots needed (children + their spouses)
-      const childSlots: string[] = [];
-      for (const childId of family.unplacedChildren) {
-        childSlots.push(childId);
-        // Check if child has a spouse to place
-        const spouse = getMainSpouse(childId, spousesOf);
-        if (spouse && !placed.has(spouse) && !family.unplacedChildren.includes(spouse)) {
-          childSlots.push(spouse);
+    // Build slot lists and compute positions for each family
+    const familyPlacements: Array<{
+      slots: Array<{ id: string; x: number; alreadyPlaced: boolean }>;
+      leftEdge: number;
+      rightEdge: number;
+    }> = [];
+
+    for (const family of familiesInGen) {
+      // Check if any children are already placed (e.g., owner)
+      const alreadyPlacedChildren = family.allChildren.filter(c => placed.has(c));
+      const hasAnchor = alreadyPlacedChildren.length > 0;
+
+      if (hasAnchor) {
+        // ── Place siblings around an already-placed anchor (e.g., owner) ──
+        // The anchor's position is fixed; siblings go around it.
+        // Build complete slot list: [siblings-left... anchor+spouse... siblings-right...]
+
+        // Find the anchor and its position (use owner or first placed child)
+        const anchorId = alreadyPlacedChildren.includes(ownerPersonId)
+          ? ownerPersonId
+          : alreadyPlacedChildren[0];
+        const anchorPos = positions.get(anchorId)!;
+
+        // Siblings to place (unplaced children, excluding the anchor)
+        const siblingsToPlace = family.unplacedChildren.filter(c => c !== anchorId);
+
+        // Build slots around anchor: left siblings, then anchor(+spouse already placed), then right siblings
+        // Split siblings: half left of anchor, half right
+        const leftSiblings: string[] = [];
+        const rightSiblings: string[] = [];
+
+        for (let i = 0; i < siblingsToPlace.length; i++) {
+          if (i < Math.floor(siblingsToPlace.length / 2)) {
+            leftSiblings.push(siblingsToPlace[i]);
+          } else {
+            rightSiblings.push(siblingsToPlace[i]);
+          }
+        }
+
+        const slots: Array<{ id: string; x: number; alreadyPlaced: boolean }> = [];
+
+        // Place left siblings going left from anchor
+        // First, find leftmost already-placed slot in this family (anchor or its spouse)
+        const anchorLeftEdge = anchorPos.left;
+        // Check for already-placed spouse to the left of anchor
+        const allPlacedSlots = alreadyPlacedChildren
+          .filter(id => positions.has(id))
+          .map(id => ({ id, x: positions.get(id)!.left }));
+        // Also add already-placed spouses
+        for (const childId of alreadyPlacedChildren) {
+          const sp = spousesOf.get(childId) || [];
+          for (const { spouseId } of sp) {
+            if (placed.has(spouseId)) {
+              allPlacedSlots.push({ id: spouseId, x: positions.get(spouseId)!.left });
+            }
+          }
+        }
+        allPlacedSlots.sort((a, b) => a.x - b.x);
+
+        const leftmostPlaced = allPlacedSlots.length > 0 ? allPlacedSlots[0].x : anchorLeftEdge;
+        const rightmostPlaced = allPlacedSlots.length > 0 ? allPlacedSlots[allPlacedSlots.length - 1].x : anchorLeftEdge;
+
+        // Place left siblings + their spouses going left
+        let leftX = leftmostPlaced;
+        for (let i = leftSiblings.length - 1; i >= 0; i--) {
+          const sibId = leftSiblings[i];
+          // Sibling's spouse goes to the left of sibling
+          const spouse = getMainSpouse(sibId, spousesOf);
+          leftX -= SLOT;
+          slots.push({ id: sibId, x: leftX, alreadyPlaced: false });
+          if (spouse && !placed.has(spouse) && !family.allChildren.includes(spouse)) {
+            leftX -= SLOT;
+            slots.push({ id: spouse, x: leftX, alreadyPlaced: false });
+          }
+        }
+
+        // Add already-placed slots as anchors (for edge tracking)
+        for (const s of allPlacedSlots) {
+          slots.push({ id: s.id, x: s.x, alreadyPlaced: true });
+        }
+
+        // Place right siblings + their spouses going right
+        let rightX = rightmostPlaced + NODE_SPAN + GAP;
+        for (let i = 0; i < rightSiblings.length; i++) {
+          const sibId = rightSiblings[i];
+          slots.push({ id: sibId, x: rightX, alreadyPlaced: false });
+          rightX += SLOT;
+          // Sibling's spouse goes to the right
+          const spouse = getMainSpouse(sibId, spousesOf);
+          if (spouse && !placed.has(spouse) && !family.allChildren.includes(spouse)) {
+            slots.push({ id: spouse, x: rightX, alreadyPlaced: false });
+            rightX += SLOT;
+          }
+        }
+
+        // Compute edges
+        const allXs = slots.map(s => s.x);
+        familyPlacements.push({
+          slots,
+          leftEdge: Math.min(...allXs),
+          rightEdge: Math.max(...allXs) + NODE_SPAN,
+        });
+      } else {
+        // ── No anchor: center children under parents ──
+        const childSlots: string[] = [];
+        for (const childId of family.unplacedChildren) {
+          childSlots.push(childId);
+          const spouse = getMainSpouse(childId, spousesOf);
+          if (spouse && !placed.has(spouse) && !family.unplacedChildren.includes(spouse)) {
+            childSlots.push(spouse);
+          }
+        }
+
+        const totalWidth = childSlots.length * NODE_SPAN + (childSlots.length - 1) * GAP;
+        const startX = family.centerX - totalWidth / 2;
+
+        const slots: Array<{ id: string; x: number; alreadyPlaced: boolean }> = [];
+        for (let i = 0; i < childSlots.length; i++) {
+          slots.push({ id: childSlots[i], x: startX + i * SLOT, alreadyPlaced: false });
+        }
+
+        if (slots.length > 0) {
+          familyPlacements.push({
+            slots,
+            leftEdge: slots[0].x,
+            rightEdge: slots[slots.length - 1].x + NODE_SPAN,
+          });
+        } else {
+          familyPlacements.push({ slots: [], leftEdge: 0, rightEdge: 0 });
         }
       }
+    }
 
-      const totalWidth = childSlots.length * NODE_SPAN + (childSlots.length - 1) * GAP;
-      let startX = family.centerX - totalWidth / 2;
+    // Resolve overlaps between adjacent families (add FAMILY_GAP)
+    for (let i = 1; i < familyPlacements.length; i++) {
+      const prev = familyPlacements[i - 1];
+      const curr = familyPlacements[i];
+      if (prev.slots.length === 0 || curr.slots.length === 0) continue;
 
-      for (const slotId of childSlots) {
-        if (!placed.has(slotId)) {
-          setPos(slotId, startX, childY);
-          startX += SLOT;
+      const overlap = prev.rightEdge + FAMILY_GAP - curr.leftEdge;
+      if (overlap > 0) {
+        // Shift current family right (only non-anchored slots)
+        for (const slot of curr.slots) {
+          if (!slot.alreadyPlaced) {
+            slot.x += overlap;
+          }
+        }
+        curr.leftEdge += overlap;
+        curr.rightEdge += overlap;
+      }
+    }
+
+    // Commit placements
+    for (const fp of familyPlacements) {
+      for (const slot of fp.slots) {
+        if (!slot.alreadyPlaced && !placed.has(slot.id)) {
+          setPos(slot.id, slot.x, childY);
         }
       }
     }
@@ -680,50 +807,5 @@ function placeSpouseAdjacent(
     const x = side === 'right' ? personX + SLOT : personX - SLOT;
     positions.set(spouseId, { left: x, top: personY });
     placed.add(spouseId);
-  }
-}
-
-function placeRowWithSpouses(
-  orderedIds: string[],
-  ownerId: string,
-  centerX: number,
-  y: number,
-  positions: Map<string, { left: number; top: number }>,
-  placed: Set<string>,
-  _genMap: Map<string, number>,
-  spousesOf: Map<string, SpouseInfo[]>,
-  _personMap: Map<string, Person>
-) {
-  // Build list of slots: [person, spouse?, person, spouse?, ...]
-  const slots: string[] = [];
-  for (const id of orderedIds) {
-    // Place spouse to the LEFT of person (for non-owner), or both sides for owner
-    const spouses = spousesOf.get(id) || [];
-    const mainSpouse = spouses.find(s => !s.isDivorced);
-    const exSpouse = spouses.find(s => s.isDivorced);
-
-    if (id === ownerId) {
-      // Ex-spouse LEFT, owner CENTER, current spouse RIGHT
-      if (exSpouse && !placed.has(exSpouse.spouseId)) slots.push(exSpouse.spouseId);
-      slots.push(id);
-      if (mainSpouse && !placed.has(mainSpouse.spouseId)) slots.push(mainSpouse.spouseId);
-    } else {
-      slots.push(id);
-      // Spouse adjacent to the right
-      if (mainSpouse && !placed.has(mainSpouse.spouseId)) slots.push(mainSpouse.spouseId);
-      if (exSpouse && !placed.has(exSpouse.spouseId)) slots.push(exSpouse.spouseId);
-    }
-  }
-
-  // Find owner's index in slots for centering
-  const ownerSlotIdx = slots.indexOf(ownerId);
-  const startX = centerX - (ownerSlotIdx * SLOT + NODE_SPAN / 2);
-
-  for (let i = 0; i < slots.length; i++) {
-    const id = slots[i];
-    if (!placed.has(id)) {
-      positions.set(id, { left: startX + i * SLOT, top: y });
-      placed.add(id);
-    }
   }
 }
