@@ -496,6 +496,7 @@ export function customCalcTree(
     }
 
     // Resolve overlaps between adjacent families (add FAMILY_GAP)
+    // KEY: When children shift, their PARENTS shift too — whole family moves as a cluster.
     // Find which family contains the anchor (owner) — it stays put, others move away
     let anchorFamilyIdx = -1;
     for (let i = 0; i < familyPlacements.length; i++) {
@@ -505,6 +506,42 @@ export function customCalcTree(
       }
     }
 
+    // Helper: shift a family cluster (children + their parents + parent spouses) by dx
+    const shiftFamilyCluster = (familyIdx: number, dx: number) => {
+      const fp = familyPlacements[familyIdx];
+      // Shift children slots
+      for (const slot of fp.slots) {
+        slot.x += dx;
+      }
+      fp.leftEdge += dx;
+      fp.rightEdge += dx;
+
+      // Shift the PARENTS of this family (already placed in Phase 4)
+      const family = familiesInGen[familyIdx];
+      if (family) {
+        for (const pid of family.parentIds) {
+          const pos = positions.get(pid);
+          if (pos) {
+            pos.left += dx;
+            // Also shift parent's spouse(s) that are on the same row
+            for (const { spouseId } of (spousesOf.get(pid) || [])) {
+              const spPos = positions.get(spouseId);
+              if (spPos && spPos.top === pos.top) {
+                // Don't shift if this spouse is a parent in another family
+                // (e.g., owner's father is parent in both owner's family and uncle's family)
+                const isSharedParent = familiesInGen.some((f, idx) =>
+                  idx !== familyIdx && f.parentIds.includes(spouseId)
+                );
+                if (!isSharedParent) {
+                  spPos.left += dx;
+                }
+              }
+            }
+          }
+        }
+      }
+    };
+
     // Push families to the RIGHT of anchor family rightward
     for (let i = (anchorFamilyIdx >= 0 ? anchorFamilyIdx : 0) + 1; i < familyPlacements.length; i++) {
       const prev = familyPlacements[i - 1];
@@ -513,11 +550,7 @@ export function customCalcTree(
 
       const overlap = prev.rightEdge + FAMILY_GAP - curr.leftEdge;
       if (overlap > 0) {
-        for (const slot of curr.slots) {
-          slot.x += overlap;
-        }
-        curr.leftEdge += overlap;
-        curr.rightEdge += overlap;
+        shiftFamilyCluster(i, overlap);
       }
     }
 
@@ -529,11 +562,7 @@ export function customCalcTree(
 
       const overlap = curr.rightEdge + FAMILY_GAP - next.leftEdge;
       if (overlap > 0) {
-        for (const slot of curr.slots) {
-          slot.x -= overlap;
-        }
-        curr.leftEdge -= overlap;
-        curr.rightEdge -= overlap;
+        shiftFamilyCluster(i, -overlap);
       }
     }
 
@@ -546,6 +575,56 @@ export function customCalcTree(
       }
     }
   }
+
+  // ── Phase 4c: Re-center grandparents above their (shifted) children ──
+  // After Phase 4b, parents may have shifted. Grandparents were placed centered
+  // over their children in Phase 4, but children positions changed.
+  // Re-center each grandparent couple over their now-shifted children.
+  const recenterGrandparents = (gpIds: string[]) => {
+    if (gpIds.length === 0) return;
+    // Find all children of these grandparents
+    const gpChildrenIds = new Set<string>();
+    for (const gpId of gpIds) {
+      for (const cid of (childrenOf.get(gpId) || [])) {
+        gpChildrenIds.add(cid);
+      }
+    }
+    const placedChildren = [...gpChildrenIds].filter(id => positions.has(id));
+    if (placedChildren.length === 0) return;
+
+    // Find actual center of placed children (including their spouses)
+    const allXs: number[] = [];
+    for (const cid of placedChildren) {
+      allXs.push(positions.get(cid)!.left);
+      // Include spouse positions
+      for (const { spouseId } of (spousesOf.get(cid) || [])) {
+        if (positions.has(spouseId)) {
+          allXs.push(positions.get(spouseId)!.left);
+        }
+      }
+    }
+    const childMinX = Math.min(...allXs);
+    const childMaxX = Math.max(...allXs);
+    const childCenterX = (childMinX + childMaxX + NODE_SPAN) / 2;
+
+    if (gpIds.length === 2) {
+      const gp0Pos = positions.get(gpIds[0]);
+      const gp1Pos = positions.get(gpIds[1]);
+      if (gp0Pos && gp1Pos) {
+        const gp1X = childCenterX - (SLOT + NODE_SPAN) / 2;
+        gp0Pos.left = gp1X;
+        gp1Pos.left = gp1X + SLOT;
+      }
+    } else if (gpIds.length === 1) {
+      const gp0Pos = positions.get(gpIds[0]);
+      if (gp0Pos) {
+        gp0Pos.left = childCenterX - NODE_SPAN / 2;
+      }
+    }
+  };
+
+  recenterGrandparents(paternalGPIds);
+  recenterGrandparents(maternalGPIds);
 
   // ── Place any remaining unplaced persons ──
   let rightEdge = 0;
