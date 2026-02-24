@@ -106,6 +106,7 @@ export default function TreeViewPage() {
 
       // Regular scroll (two-finger swipe) → pan the canvas
       e.preventDefault();
+      e.stopPropagation(); // prevent page scroll
       const ref = transformRef.current;
       if (!ref) return;
 

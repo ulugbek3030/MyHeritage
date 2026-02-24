@@ -105,6 +105,7 @@
   position: relative;
   /* react-zoom-pan-pinch handles all touch/mouse/gesture events */
   touch-action: none;
+  overscroll-behavior: none; /* contain scroll inside viewport */
 }
 
 .tree-page {
@@ -113,6 +114,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  overscroll-behavior: none; /* prevent page bounce/scroll on trackpad */
 }
 
 .tree-container {
