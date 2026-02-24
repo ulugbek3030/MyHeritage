@@ -308,11 +308,7 @@ export default function FamilyTreeLayout({
             style={{
               position: 'absolute',
               width: NODE_WIDTH,
-              height: NODE_HEIGHT,
               transform: `translate(${node.left * HALF_W}px, ${node.top * HALF_H}px)`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
               zIndex: 5,
             }}
           >
