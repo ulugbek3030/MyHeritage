@@ -110,6 +110,8 @@ export default function FamilyTreeLayout({
   }, [treeData, ownerPersonId]);
 
   // Generate label for a generation row
+  // ROW_HEIGHT=3 grid units per generation in customCalcTree
+  const ROW_HEIGHT_GRID = 3;
   const getGenLabel = (rowTop: number): string | null => {
     if (ownerTop === null) return null;
     const diff = rowTop - ownerTop; // positive = below owner, negative = above
@@ -118,15 +120,13 @@ export default function FamilyTreeLayout({
       return 'Вы и братья/сёстры';
     }
     if (diff < 0) {
-      // Above owner (parents, grandparents...)
-      const level = Math.round(Math.abs(diff) / 2); // each generation is ~2 units apart
+      const level = Math.round(Math.abs(diff) / ROW_HEIGHT_GRID);
       if (level >= 1 && level <= GEN_LABELS_ABOVE.length) {
         return GEN_LABELS_ABOVE[level - 1];
       }
       return `Поколение ${level + 1} (предки)`;
     }
-    // Below owner (children, grandchildren...)
-    const level = Math.round(diff / 2);
+    const level = Math.round(diff / ROW_HEIGHT_GRID);
     if (level >= 1 && level <= GEN_LABELS_BELOW.length) {
       return GEN_LABELS_BELOW[level - 1];
     }
@@ -241,16 +241,30 @@ export default function FamilyTreeLayout({
         })}
       </svg>
 
-      {/* Generation labels */}
-      {generationRows.map(({ top, nodes: rowNodes }) => {
+      {/* Generation labels — centered on owner X, vertically between rows */}
+      {generationRows.map(({ top }, rowIdx) => {
         const label = getGenLabel(top);
         if (!label) return null;
 
-        // Position label above the row, centered across row nodes
-        const leftMost = Math.min(...rowNodes.map(n => n.left));
-        const rightMost = Math.max(...rowNodes.map(n => n.left));
-        const centerX = ((leftMost + rightMost) / 2) * HALF_W + NODE_WIDTH / 2;
-        const labelY = top * HALF_H - 24; // above the nodes, not overlapping connector lines
+        // Horizontal: align with owner card center
+        const ownerNode = treeData.nodes.find(n => n.id === ownerPersonId);
+        const ownerCenterX = ownerNode
+          ? ownerNode.left * HALF_W + NODE_WIDTH / 2
+          : canvasWidth / 2;
+
+        // Vertical: midpoint between bottom of previous row cards and top of this row cards
+        // Card visible height ≈ 210px (min-height from CSS)
+        const CARD_VISIBLE_H = 210;
+        let labelY: number;
+        if (rowIdx > 0) {
+          const prevTop = generationRows[rowIdx - 1].top;
+          const prevBottom = prevTop * HALF_H + CARD_VISIBLE_H; // bottom of prev row cards
+          const thisTop = top * HALF_H;                          // top of this row cards
+          labelY = (prevBottom + thisTop) / 2;
+        } else {
+          // First row — place label 24px above cards
+          labelY = top * HALF_H - 24;
+        }
 
         return (
           <div
@@ -258,10 +272,10 @@ export default function FamilyTreeLayout({
             className="gen-label"
             style={{
               position: 'absolute',
-              left: centerX,
+              left: ownerCenterX,
               top: labelY,
-              transform: 'translateX(-50%)',
-              zIndex: 20, // above cards (z-index 5) so labels are always visible
+              transform: 'translate(-50%, -50%)',
+              zIndex: 20,
               pointerEvents: 'none',
             }}
           >
