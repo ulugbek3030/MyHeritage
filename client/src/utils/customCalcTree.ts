@@ -373,75 +373,76 @@ export function customCalcTree(
       const hasAnchor = alreadyPlacedChildren.length > 0;
 
       if (hasAnchor) {
-        // ── Place siblings + spouses around an already-placed anchor (e.g., owner) ──
-        // Build a linear row where each person + their spouse stay together:
-        //   [leftSib (+spouse)] ... [exSpouse] [ANCHOR] [mainSpouse] ... [rightSib (+spouse)]
-        // Anchor = only the owner (1 slot). Owner's spouses are placed as part of this row.
+        // ── Place ALL children (including anchor) as a birth-order row ──
+        // Each child + their spouse(s) form an inseparable unit.
+        // Anchor (owner) has a fixed position; the whole row shifts to match.
+        //
+        // MyHeritage convention:
+        //   - Children sorted by birth year (oldest left, youngest right)
+        //   - Each person's spouse is immediately adjacent
+        //   - For owner: [exSpouse] [OWNER] [mainSpouse] as a unit
+        //   - For siblings: [sibling] [spouse] as a unit
 
         const anchorId = alreadyPlacedChildren.includes(ownerPersonId)
           ? ownerPersonId
           : alreadyPlacedChildren[0];
         const anchorPos = positions.get(anchorId)!;
 
-        // Split unplaced siblings: half left, half right
-        const siblingsToPlace = family.unplacedChildren.filter(c => c !== anchorId);
-        const leftSiblings = siblingsToPlace.slice(0, Math.floor(siblingsToPlace.length / 2));
-        const rightSiblings = siblingsToPlace.slice(Math.floor(siblingsToPlace.length / 2));
+        // Get ALL children of this family (placed + unplaced), sorted by birth year
+        const allChildrenSorted = [...family.allChildren]
+          .map(id => ({ id, p: personMap.get(id) }))
+          .sort((a, b) => {
+            const ya = a.p?.birthYear || 9999;
+            const yb = b.p?.birthYear || 9999;
+            return ya - yb; // oldest first (smallest year = leftmost)
+          })
+          .map(x => x.id);
 
-        // Build linear slot list: [...left pairs...] [ex] [ANCHOR] [main] [...right pairs...]
-        const leftSlots: string[] = [];
-        const rightSlots: string[] = [];
+        // Build linear slot sequence: for each child in birth order,
+        // add [exSpouse?] [child] [mainSpouse?] as an inseparable block
+        const linearSlots: string[] = [];
+        let anchorSlotIndex = -1; // index of anchor in linearSlots
 
-        // Left siblings: each sibling + their spouse as a pair
-        for (const sibId of leftSiblings) {
-          leftSlots.push(sibId);
-          const spouse = getMainSpouse(sibId, spousesOf);
-          if (spouse && !placed.has(spouse) && !family.allChildren.includes(spouse)) {
-            leftSlots.push(spouse);
+        for (const childId of allChildrenSorted) {
+          const childSpouses = spousesOf.get(childId) || [];
+          const exSp = childSpouses.find(s => s.isDivorced);
+          const mainSp = childSpouses.find(s => !s.isDivorced);
+
+          // Ex-spouse goes to the left of the person
+          if (exSp && !family.allChildren.includes(exSp.spouseId)) {
+            linearSlots.push(exSp.spouseId);
+          }
+
+          // Track anchor position in the slot list
+          if (childId === anchorId) {
+            anchorSlotIndex = linearSlots.length;
+          }
+          linearSlots.push(childId);
+
+          // Main spouse goes to the right of the person
+          if (mainSp && !family.allChildren.includes(mainSp.spouseId)) {
+            linearSlots.push(mainSp.spouseId);
           }
         }
 
-        // Anchor's ex-spouse goes to the left of anchor (between left sibs and anchor)
-        const anchorSpouses = spousesOf.get(anchorId) || [];
-        const anchorExSpouse = anchorSpouses.find(s => s.isDivorced);
-        const anchorMainSpouse = anchorSpouses.find(s => !s.isDivorced);
+        // Assign ideal X positions (0-indexed from left)
+        const idealPositions = linearSlots.map((id, i) => ({
+          id,
+          x: i * SLOT,
+        }));
 
-        if (anchorExSpouse && !placed.has(anchorExSpouse.spouseId)) {
-          leftSlots.push(anchorExSpouse.spouseId);
-        }
+        // Shift entire row so that anchor lands on its fixed position
+        const anchorIdealX = idealPositions[anchorSlotIndex].x;
+        const shift = anchorPos.left - anchorIdealX;
 
-        // Anchor's main spouse goes to the right of anchor
-        if (anchorMainSpouse && !placed.has(anchorMainSpouse.spouseId)) {
-          rightSlots.push(anchorMainSpouse.spouseId);
-        }
-
-        // Right siblings: each sibling + their spouse as a pair
-        for (const sibId of rightSiblings) {
-          rightSlots.push(sibId);
-          const spouse = getMainSpouse(sibId, spousesOf);
-          if (spouse && !placed.has(spouse) && !family.allChildren.includes(spouse)) {
-            rightSlots.push(spouse);
-          }
-        }
-
-        // Assign X positions: anchor is fixed, build outward
         const slots: Array<{ id: string; x: number; alreadyPlaced: boolean }> = [];
-
-        // Anchor (fixed)
-        slots.push({ id: anchorId, x: anchorPos.left, alreadyPlaced: true });
-
-        // Left slots: go leftward from anchor
-        let leftX = anchorPos.left;
-        for (let i = leftSlots.length - 1; i >= 0; i--) {
-          leftX -= SLOT;
-          slots.push({ id: leftSlots[i], x: leftX, alreadyPlaced: false });
-        }
-
-        // Right slots: go rightward from anchor
-        let rightX = anchorPos.left + NODE_SPAN + GAP;
-        for (const slotId of rightSlots) {
-          slots.push({ id: slotId, x: rightX, alreadyPlaced: false });
-          rightX += SLOT;
+        for (const ip of idealPositions) {
+          const isAnchor = ip.id === anchorId;
+          slots.push({
+            id: ip.id,
+            x: ip.x + shift,
+            alreadyPlaced: isAnchor || placed.has(ip.id),
+          });
         }
 
         // Compute edges
