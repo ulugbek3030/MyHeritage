@@ -246,11 +246,11 @@ export default function FamilyTreeLayout({
         const label = getGenLabel(top);
         if (!label) return null;
 
-        // Position label at the top of the row, centered across row nodes
+        // Position label above the row, centered across row nodes
         const leftMost = Math.min(...rowNodes.map(n => n.left));
         const rightMost = Math.max(...rowNodes.map(n => n.left));
         const centerX = ((leftMost + rightMost) / 2) * HALF_W + NODE_WIDTH / 2;
-        const labelY = top * HALF_H - 4; // slightly above the nodes
+        const labelY = top * HALF_H - 24; // above the nodes, not overlapping connector lines
 
         return (
           <div
@@ -261,7 +261,8 @@ export default function FamilyTreeLayout({
               left: centerX,
               top: labelY,
               transform: 'translateX(-50%)',
-              zIndex: 3,
+              zIndex: 20, // above cards (z-index 5) so labels are always visible
+              pointerEvents: 'none',
             }}
           >
             <span>{label}</span>
