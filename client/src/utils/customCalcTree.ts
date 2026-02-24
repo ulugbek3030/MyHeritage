@@ -219,11 +219,12 @@ export function customCalcTree(
       }
     }
 
-    // Place paternal grandparents centered above OWNER'S FATHER only.
-    // Grandparents stay above the owner's lineage — uncles shift away with their families.
-    if (ownerFatherId && positions.has(ownerFatherId)) {
-      const fatherX = positions.get(ownerFatherId)!.left;
-      const gpCenterX = fatherX + NODE_SPAN / 2; // center above father
+    // Place paternal grandparents centered above all their children
+    const allPatChildren = paternalChildren.filter(id => placed.has(id));
+    if (allPatChildren.length > 0) {
+      const minX = Math.min(...allPatChildren.map(id => positions.get(id)!.left));
+      const maxX = Math.max(...allPatChildren.map(id => positions.get(id)!.left));
+      const gpCenterX = (minX + maxX + NODE_SPAN) / 2;
 
       if (paternalGPIds.length === 2) {
         const gpY = genToY(genMap.get(paternalGPIds[0])!);
@@ -271,10 +272,12 @@ export function customCalcTree(
       }
     }
 
-    // Place maternal grandparents centered above OWNER'S MOTHER only.
-    if (ownerMotherId && positions.has(ownerMotherId)) {
-      const motherX = positions.get(ownerMotherId)!.left;
-      const gpCenterX = motherX + NODE_SPAN / 2; // center above mother
+    // Place maternal grandparents centered above all their children
+    const allMatChildren = maternalChildren.filter(id => placed.has(id));
+    if (allMatChildren.length > 0) {
+      const minX = Math.min(...allMatChildren.map(id => positions.get(id)!.left));
+      const maxX = Math.max(...allMatChildren.map(id => positions.get(id)!.left));
+      const gpCenterX = (minX + maxX + NODE_SPAN) / 2;
 
       if (maternalGPIds.length === 2) {
         const gpY = genToY(genMap.get(maternalGPIds[0])!);
@@ -493,7 +496,6 @@ export function customCalcTree(
     }
 
     // Resolve overlaps between adjacent families (add FAMILY_GAP)
-    // KEY: When children shift, their PARENTS shift too — whole family moves as a cluster.
     // Find which family contains the anchor (owner) — it stays put, others move away
     let anchorFamilyIdx = -1;
     for (let i = 0; i < familyPlacements.length; i++) {
@@ -503,42 +505,6 @@ export function customCalcTree(
       }
     }
 
-    // Helper: shift a family cluster (children + their parents + parent spouses) by dx
-    const shiftFamilyCluster = (familyIdx: number, dx: number) => {
-      const fp = familyPlacements[familyIdx];
-      // Shift children slots
-      for (const slot of fp.slots) {
-        slot.x += dx;
-      }
-      fp.leftEdge += dx;
-      fp.rightEdge += dx;
-
-      // Shift the PARENTS of this family (already placed in Phase 4)
-      const family = familiesInGen[familyIdx];
-      if (family) {
-        for (const pid of family.parentIds) {
-          const pos = positions.get(pid);
-          if (pos) {
-            pos.left += dx;
-            // Also shift parent's spouse(s) that are on the same row
-            for (const { spouseId } of (spousesOf.get(pid) || [])) {
-              const spPos = positions.get(spouseId);
-              if (spPos && spPos.top === pos.top) {
-                // Don't shift if this spouse is a parent in another family
-                // (e.g., owner's father is parent in both owner's family and uncle's family)
-                const isSharedParent = familiesInGen.some((f, idx) =>
-                  idx !== familyIdx && f.parentIds.includes(spouseId)
-                );
-                if (!isSharedParent) {
-                  spPos.left += dx;
-                }
-              }
-            }
-          }
-        }
-      }
-    };
-
     // Push families to the RIGHT of anchor family rightward
     for (let i = (anchorFamilyIdx >= 0 ? anchorFamilyIdx : 0) + 1; i < familyPlacements.length; i++) {
       const prev = familyPlacements[i - 1];
@@ -547,7 +513,11 @@ export function customCalcTree(
 
       const overlap = prev.rightEdge + FAMILY_GAP - curr.leftEdge;
       if (overlap > 0) {
-        shiftFamilyCluster(i, overlap);
+        for (const slot of curr.slots) {
+          slot.x += overlap;
+        }
+        curr.leftEdge += overlap;
+        curr.rightEdge += overlap;
       }
     }
 
@@ -559,7 +529,11 @@ export function customCalcTree(
 
       const overlap = curr.rightEdge + FAMILY_GAP - next.leftEdge;
       if (overlap > 0) {
-        shiftFamilyCluster(i, -overlap);
+        for (const slot of curr.slots) {
+          slot.x -= overlap;
+        }
+        curr.leftEdge -= overlap;
+        curr.rightEdge -= overlap;
       }
     }
 
@@ -572,9 +546,6 @@ export function customCalcTree(
       }
     }
   }
-
-  // Grandparents stay centered above the OWNER (not re-centered over shifted uncles/aunts).
-  // They were already placed in Phase 4 centered over owner's parents. No changes needed.
 
   // ── Place any remaining unplaced persons ──
   let rightEdge = 0;
