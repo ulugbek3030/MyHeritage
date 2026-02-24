@@ -315,27 +315,56 @@ export function customCalcTree(
     }
   }
 
-  // ── Place owner's children below owner ──
-  const ownerPos = positions.get(ownerPersonId);
-  if (ownerPos) {
-    const ownerChildrenIds = childrenOf.get(ownerPersonId) || [];
-    if (ownerChildrenIds.length > 0) {
-      // Find owner's center (including spouse)
-      const ownerSpouseIds = (spousesOf.get(ownerPersonId) || [])
+  // ── Place children below ALL placed persons (not just owner) ──
+  // For each placed person, find their unplaced children and center them below the parent couple.
+  // Process by generation: first gen -1 children (owner + siblings + cousins),
+  // then gen 0 children, etc.
+  const maxGen = Math.max(...Array.from(genMap.values()));
+  for (let gen = minGen; gen <= maxGen; gen++) {
+    // Find all placed persons in this generation
+    const personsInGen = persons.filter(p => genMap.get(p.id) === gen && placed.has(p.id));
+
+    // Track which children have been placed by a co-parent pair to avoid duplicates
+    const placedByFamily = new Set<string>();
+
+    for (const person of personsInGen) {
+      const allChildren = childrenOf.get(person.id) || [];
+      const unplacedChildren = allChildren.filter(c => !placed.has(c) && !placedByFamily.has(c));
+      if (unplacedChildren.length === 0) continue;
+
+      // Find family center: person + placed spouse
+      const spouseIds = (spousesOf.get(person.id) || [])
         .filter(s => placed.has(s.spouseId))
         .map(s => s.spouseId);
-      const allOwnerFamily = [ownerPersonId, ...ownerSpouseIds];
-      const ownerMinX = Math.min(...allOwnerFamily.map(id => positions.get(id)!.left));
-      const ownerMaxX = Math.max(...allOwnerFamily.map(id => positions.get(id)!.left));
-      const ownerCenterX = (ownerMinX + ownerMaxX + NODE_SPAN) / 2;
 
-      const childY = genToY(1);
-      const totalWidth = ownerChildrenIds.length * NODE_SPAN + (ownerChildrenIds.length - 1) * GAP;
-      let startX = ownerCenterX - totalWidth / 2;
+      // Also check co-parents (may not have couple rel but share children)
+      for (const childId of unplacedChildren) {
+        const childParents = parentsOf.get(childId) || [];
+        for (const pid of childParents) {
+          if (pid !== person.id && placed.has(pid) && !spouseIds.includes(pid)) {
+            spouseIds.push(pid);
+          }
+        }
+      }
 
-      for (const childId of ownerChildrenIds) {
+      const familyIds = [person.id, ...spouseIds];
+      const familyMinX = Math.min(...familyIds.map(id => positions.get(id)!.left));
+      const familyMaxX = Math.max(...familyIds.map(id => positions.get(id)!.left));
+      const familyCenterX = (familyMinX + familyMaxX + NODE_SPAN) / 2;
+
+      const childGen = gen + 1;
+      const childY = genToY(childGen);
+      const totalWidth = unplacedChildren.length * NODE_SPAN + (unplacedChildren.length - 1) * GAP;
+      let startX = familyCenterX - totalWidth / 2;
+
+      for (const childId of unplacedChildren) {
         if (!placed.has(childId)) {
           setPos(childId, startX, childY);
+          placedByFamily.add(childId);
+
+          // Place child's spouse adjacent
+          placeSpouseAdjacent(childId, startX, childY, 'right', positions, placed, genMap, spousesOf, personMap);
+
           startX += SLOT;
         }
       }
