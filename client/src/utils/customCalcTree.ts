@@ -219,12 +219,11 @@ export function customCalcTree(
       }
     }
 
-    // Place paternal grandparents centered above all their children
-    const allPatChildren = paternalChildren.filter(id => placed.has(id));
-    if (allPatChildren.length > 0) {
-      const minX = Math.min(...allPatChildren.map(id => positions.get(id)!.left));
-      const maxX = Math.max(...allPatChildren.map(id => positions.get(id)!.left));
-      const gpCenterX = (minX + maxX + NODE_SPAN) / 2;
+    // Place paternal grandparents centered above OWNER'S FATHER only.
+    // Grandparents stay above the owner's lineage — uncles shift away with their families.
+    if (ownerFatherId && positions.has(ownerFatherId)) {
+      const fatherX = positions.get(ownerFatherId)!.left;
+      const gpCenterX = fatherX + NODE_SPAN / 2; // center above father
 
       if (paternalGPIds.length === 2) {
         const gpY = genToY(genMap.get(paternalGPIds[0])!);
@@ -272,12 +271,10 @@ export function customCalcTree(
       }
     }
 
-    // Place maternal grandparents centered above all their children
-    const allMatChildren = maternalChildren.filter(id => placed.has(id));
-    if (allMatChildren.length > 0) {
-      const minX = Math.min(...allMatChildren.map(id => positions.get(id)!.left));
-      const maxX = Math.max(...allMatChildren.map(id => positions.get(id)!.left));
-      const gpCenterX = (minX + maxX + NODE_SPAN) / 2;
+    // Place maternal grandparents centered above OWNER'S MOTHER only.
+    if (ownerMotherId && positions.has(ownerMotherId)) {
+      const motherX = positions.get(ownerMotherId)!.left;
+      const gpCenterX = motherX + NODE_SPAN / 2; // center above mother
 
       if (maternalGPIds.length === 2) {
         const gpY = genToY(genMap.get(maternalGPIds[0])!);
@@ -576,55 +573,8 @@ export function customCalcTree(
     }
   }
 
-  // ── Phase 4c: Re-center grandparents above their (shifted) children ──
-  // After Phase 4b, parents may have shifted. Grandparents were placed centered
-  // over their children in Phase 4, but children positions changed.
-  // Re-center each grandparent couple over their now-shifted children.
-  const recenterGrandparents = (gpIds: string[]) => {
-    if (gpIds.length === 0) return;
-    // Find all children of these grandparents
-    const gpChildrenIds = new Set<string>();
-    for (const gpId of gpIds) {
-      for (const cid of (childrenOf.get(gpId) || [])) {
-        gpChildrenIds.add(cid);
-      }
-    }
-    const placedChildren = [...gpChildrenIds].filter(id => positions.has(id));
-    if (placedChildren.length === 0) return;
-
-    // Find actual center of placed children (including their spouses)
-    const allXs: number[] = [];
-    for (const cid of placedChildren) {
-      allXs.push(positions.get(cid)!.left);
-      // Include spouse positions
-      for (const { spouseId } of (spousesOf.get(cid) || [])) {
-        if (positions.has(spouseId)) {
-          allXs.push(positions.get(spouseId)!.left);
-        }
-      }
-    }
-    const childMinX = Math.min(...allXs);
-    const childMaxX = Math.max(...allXs);
-    const childCenterX = (childMinX + childMaxX + NODE_SPAN) / 2;
-
-    if (gpIds.length === 2) {
-      const gp0Pos = positions.get(gpIds[0]);
-      const gp1Pos = positions.get(gpIds[1]);
-      if (gp0Pos && gp1Pos) {
-        const gp1X = childCenterX - (SLOT + NODE_SPAN) / 2;
-        gp0Pos.left = gp1X;
-        gp1Pos.left = gp1X + SLOT;
-      }
-    } else if (gpIds.length === 1) {
-      const gp0Pos = positions.get(gpIds[0]);
-      if (gp0Pos) {
-        gp0Pos.left = childCenterX - NODE_SPAN / 2;
-      }
-    }
-  };
-
-  recenterGrandparents(paternalGPIds);
-  recenterGrandparents(maternalGPIds);
+  // Grandparents stay centered above the OWNER (not re-centered over shifted uncles/aunts).
+  // They were already placed in Phase 4 centered over owner's parents. No changes needed.
 
   // ── Place any remaining unplaced persons ──
   let rightEdge = 0;
