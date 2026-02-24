@@ -13,12 +13,12 @@ import type { Person, Relationship } from '../../types';
 import { customCalcTree } from '../../utils/customCalcTree';
 import PersonCard from './PersonCard';
 
-// Node dimensions (including spacing between nodes)
-const NODE_WIDTH = 210;
-const NODE_HEIGHT = 270;
+// Grid cell matches card width so connectors align with card edges
+const NODE_WIDTH = 174;  // same as .card CSS width
+const NODE_HEIGHT = 260;
 
-const HALF_W = NODE_WIDTH / 2;   // 105
-const HALF_H = NODE_HEIGHT / 2;  // 135
+const HALF_W = NODE_WIDTH / 2;   // 87
+const HALF_H = NODE_HEIGHT / 2;  // 130
 
 // Line styling
 const LINE_COLOR = '#cbd5e1';
