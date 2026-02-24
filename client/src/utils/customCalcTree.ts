@@ -384,85 +384,95 @@ export function customCalcTree(
 
       if (hasAnchor) {
         // ── Place siblings around an already-placed anchor (e.g., owner) ──
-        // The anchor's position is fixed; siblings go around it.
-        // Build complete slot list: [siblings-left... anchor+spouse... siblings-right...]
+        // Build a linear row: [leftSibs+spouses...] [anchor+anchorSpouses] [rightSibs+spouses...]
+        // Each sibling is kept together with their spouse as a unit.
 
-        // Find the anchor and its position (use owner or first placed child)
         const anchorId = alreadyPlacedChildren.includes(ownerPersonId)
           ? ownerPersonId
           : alreadyPlacedChildren[0];
-        const anchorPos = positions.get(anchorId)!;
 
-        // Siblings to place (unplaced children, excluding the anchor)
+        // Build ordered list of all children (anchor in middle, siblings around)
         const siblingsToPlace = family.unplacedChildren.filter(c => c !== anchorId);
+        const leftSiblings = siblingsToPlace.slice(0, Math.floor(siblingsToPlace.length / 2));
+        const rightSiblings = siblingsToPlace.slice(Math.floor(siblingsToPlace.length / 2));
 
-        // Build slots around anchor: left siblings, then anchor(+spouse already placed), then right siblings
-        // Split siblings: half left of anchor, half right
-        const leftSiblings: string[] = [];
-        const rightSiblings: string[] = [];
+        // Build the full linear slot sequence: each person + their spouse kept together
+        // Format: [...leftSib pairs...] [anchor block] [...rightSib pairs...]
+        const linearSlots: Array<{ id: string; isAnchor: boolean }> = [];
 
-        for (let i = 0; i < siblingsToPlace.length; i++) {
-          if (i < Math.floor(siblingsToPlace.length / 2)) {
-            leftSiblings.push(siblingsToPlace[i]);
-          } else {
-            rightSiblings.push(siblingsToPlace[i]);
+        // Left siblings (each with their spouse as a pair: [sib, spouse])
+        for (const sibId of leftSiblings) {
+          linearSlots.push({ id: sibId, isAnchor: false });
+          const spouse = getMainSpouse(sibId, spousesOf);
+          if (spouse && !placed.has(spouse) && !family.allChildren.includes(spouse)) {
+            linearSlots.push({ id: spouse, isAnchor: false });
           }
         }
 
-        const slots: Array<{ id: string; x: number; alreadyPlaced: boolean }> = [];
-
-        // Place left siblings going left from anchor
-        // First, find leftmost already-placed slot in this family (anchor or its spouse)
-        const anchorLeftEdge = anchorPos.left;
-        // Check for already-placed spouse to the left of anchor
-        const allPlacedSlots = alreadyPlacedChildren
-          .filter(id => positions.has(id))
-          .map(id => ({ id, x: positions.get(id)!.left }));
-        // Also add already-placed spouses
+        // Anchor block: exSpouse, anchor, mainSpouse (all already placed)
+        // Collect all already-placed slots in this anchor block, sorted by X
+        const anchorBlockIds: Array<{ id: string; x: number }> = [];
         for (const childId of alreadyPlacedChildren) {
-          const sp = spousesOf.get(childId) || [];
-          for (const { spouseId } of sp) {
-            if (placed.has(spouseId)) {
-              allPlacedSlots.push({ id: spouseId, x: positions.get(spouseId)!.left });
+          if (positions.has(childId)) {
+            anchorBlockIds.push({ id: childId, x: positions.get(childId)!.left });
+          }
+          for (const { spouseId } of (spousesOf.get(childId) || [])) {
+            if (placed.has(spouseId) && positions.has(spouseId)) {
+              anchorBlockIds.push({ id: spouseId, x: positions.get(spouseId)!.left });
             }
           }
         }
-        allPlacedSlots.sort((a, b) => a.x - b.x);
+        // Deduplicate
+        const seenAnchorIds = new Set<string>();
+        const uniqueAnchorBlock = anchorBlockIds.filter(s => {
+          if (seenAnchorIds.has(s.id)) return false;
+          seenAnchorIds.add(s.id);
+          return true;
+        });
+        uniqueAnchorBlock.sort((a, b) => a.x - b.x);
 
-        const leftmostPlaced = allPlacedSlots.length > 0 ? allPlacedSlots[0].x : anchorLeftEdge;
-        const rightmostPlaced = allPlacedSlots.length > 0 ? allPlacedSlots[allPlacedSlots.length - 1].x : anchorLeftEdge;
+        // Mark anchor block positions
+        const anchorSlotStart = linearSlots.length;
+        for (const ab of uniqueAnchorBlock) {
+          linearSlots.push({ id: ab.id, isAnchor: true });
+        }
+        const anchorSlotEnd = linearSlots.length; // exclusive
 
-        // Place left siblings + their spouses going left
-        let leftX = leftmostPlaced;
-        for (let i = leftSiblings.length - 1; i >= 0; i--) {
-          const sibId = leftSiblings[i];
-          // Sibling's spouse goes to the left of sibling
+        // Right siblings (each with their spouse as a pair: [sib, spouse])
+        for (const sibId of rightSiblings) {
+          linearSlots.push({ id: sibId, isAnchor: false });
           const spouse = getMainSpouse(sibId, spousesOf);
+          if (spouse && !placed.has(spouse) && !family.allChildren.includes(spouse)) {
+            linearSlots.push({ id: spouse, isAnchor: false });
+          }
+        }
+
+        // Now assign X positions:
+        // Anchor block has fixed positions. Build outward from anchor edges.
+        const anchorLeftX = uniqueAnchorBlock.length > 0 ? uniqueAnchorBlock[0].x : 0;
+        const anchorRightX = uniqueAnchorBlock.length > 0
+          ? uniqueAnchorBlock[uniqueAnchorBlock.length - 1].x + NODE_SPAN + GAP
+          : 0;
+
+        const slots: Array<{ id: string; x: number; alreadyPlaced: boolean }> = [];
+
+        // Assign anchor block positions (fixed)
+        for (const ab of uniqueAnchorBlock) {
+          slots.push({ id: ab.id, x: ab.x, alreadyPlaced: true });
+        }
+
+        // Place left slots going leftward from anchor left edge
+        let leftX = anchorLeftX;
+        for (let i = anchorSlotStart - 1; i >= 0; i--) {
           leftX -= SLOT;
-          slots.push({ id: sibId, x: leftX, alreadyPlaced: false });
-          if (spouse && !placed.has(spouse) && !family.allChildren.includes(spouse)) {
-            leftX -= SLOT;
-            slots.push({ id: spouse, x: leftX, alreadyPlaced: false });
-          }
+          slots.push({ id: linearSlots[i].id, x: leftX, alreadyPlaced: false });
         }
 
-        // Add already-placed slots as anchors (for edge tracking)
-        for (const s of allPlacedSlots) {
-          slots.push({ id: s.id, x: s.x, alreadyPlaced: true });
-        }
-
-        // Place right siblings + their spouses going right
-        let rightX = rightmostPlaced + NODE_SPAN + GAP;
-        for (let i = 0; i < rightSiblings.length; i++) {
-          const sibId = rightSiblings[i];
-          slots.push({ id: sibId, x: rightX, alreadyPlaced: false });
+        // Place right slots going rightward from anchor right edge
+        let rightX = anchorRightX;
+        for (let i = anchorSlotEnd; i < linearSlots.length; i++) {
+          slots.push({ id: linearSlots[i].id, x: rightX, alreadyPlaced: false });
           rightX += SLOT;
-          // Sibling's spouse goes to the right
-          const spouse = getMainSpouse(sibId, spousesOf);
-          if (spouse && !placed.has(spouse) && !family.allChildren.includes(spouse)) {
-            slots.push({ id: spouse, x: rightX, alreadyPlaced: false });
-            rightX += SLOT;
-          }
         }
 
         // Compute edges
