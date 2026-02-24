@@ -95,6 +95,33 @@ export default function TreeViewPage() {
     centerOnOwner(ref, 300);
   }, [centerOnOwner, transformRef]);
 
+  // Scroll-to-pan: trackpad two-finger scroll should PAN, not zoom
+  useEffect(() => {
+    const viewport = document.querySelector('.tree-viewport') as HTMLElement;
+    if (!viewport) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // ctrlKey = trackpad pinch → let react-zoom-pan-pinch handle zoom
+      if (e.ctrlKey || e.metaKey) return;
+
+      // Regular scroll (two-finger swipe) → pan the canvas
+      e.preventDefault();
+      const ref = transformRef.current;
+      if (!ref) return;
+
+      const { positionX, positionY, scale } = ref.state;
+      ref.setTransform(
+        positionX - e.deltaX,
+        positionY - e.deltaY,
+        scale,
+        0, // no animation — instant response
+      );
+    };
+
+    viewport.addEventListener('wheel', handleWheel, { passive: false });
+    return () => viewport.removeEventListener('wheel', handleWheel);
+  }, [transformRef]);
+
   // Track panning to distinguish drag from click
   const handlePanningStart = useCallback(() => {
     dragMoved.current = false;
@@ -309,6 +336,10 @@ export default function TreeViewPage() {
           limitToBounds={false}
           panning={{ velocityDisabled: false }}
           pinch={{ step: 5 }}
+          wheel={{
+            wheelDisabled: true,     // Disable regular scroll → zoom
+            touchPadDisabled: false,  // Keep trackpad pinch → zoom
+          }}
           doubleClick={{ disabled: true }}
           onInit={handleInit}
           onPanningStart={handlePanningStart}
