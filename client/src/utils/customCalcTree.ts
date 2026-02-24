@@ -315,56 +315,90 @@ export function customCalcTree(
     }
   }
 
-  // ── Place children below ALL placed persons (not just owner) ──
-  // For each placed person, find their unplaced children and center them below the parent couple.
-  // Process by generation: first gen -1 children (owner + siblings + cousins),
-  // then gen 0 children, etc.
+  // ── Place children below ALL placed parents ──
+  // Group parents into families (co-parent pairs), sort left-to-right,
+  // place each family's children strictly below them without mixing.
   const maxGen = Math.max(...Array.from(genMap.values()));
   for (let gen = minGen; gen <= maxGen; gen++) {
-    // Find all placed persons in this generation
-    const personsInGen = persons.filter(p => genMap.get(p.id) === gen && placed.has(p.id));
+    // Build unique family units in this generation
+    // A family = set of co-parents who share children
+    const familiesInGen: Array<{
+      parentIds: string[];
+      centerX: number;
+      unplacedChildren: string[];
+    }> = [];
+    const processedParents = new Set<string>();
 
-    // Track which children have been placed by a co-parent pair to avoid duplicates
-    const placedByFamily = new Set<string>();
+    const personsInGen = persons
+      .filter(p => genMap.get(p.id) === gen && placed.has(p.id))
+      .sort((a, b) => positions.get(a.id)!.left - positions.get(b.id)!.left);
 
     for (const person of personsInGen) {
+      if (processedParents.has(person.id)) continue;
+
       const allChildren = childrenOf.get(person.id) || [];
-      const unplacedChildren = allChildren.filter(c => !placed.has(c) && !placedByFamily.has(c));
-      if (unplacedChildren.length === 0) continue;
+      if (allChildren.length === 0) continue;
 
-      // Find family center: person + placed spouse
-      const spouseIds = (spousesOf.get(person.id) || [])
-        .filter(s => placed.has(s.spouseId))
-        .map(s => s.spouseId);
-
-      // Also check co-parents (may not have couple rel but share children)
-      for (const childId of unplacedChildren) {
-        const childParents = parentsOf.get(childId) || [];
-        for (const pid of childParents) {
-          if (pid !== person.id && placed.has(pid) && !spouseIds.includes(pid)) {
-            spouseIds.push(pid);
-          }
+      // Find co-parent(s) for these children
+      const coParentIds = new Set<string>([person.id]);
+      for (const childId of allChildren) {
+        for (const pid of (parentsOf.get(childId) || [])) {
+          if (placed.has(pid)) coParentIds.add(pid);
         }
       }
 
-      const familyIds = [person.id, ...spouseIds];
-      const familyMinX = Math.min(...familyIds.map(id => positions.get(id)!.left));
-      const familyMaxX = Math.max(...familyIds.map(id => positions.get(id)!.left));
-      const familyCenterX = (familyMinX + familyMaxX + NODE_SPAN) / 2;
+      // Skip if already processed this family
+      const familyKey = [...coParentIds].sort().join('|');
+      if (processedParents.has(familyKey)) continue;
 
+      // Mark all parents as processed
+      for (const pid of coParentIds) processedParents.add(pid);
+      processedParents.add(familyKey);
+
+      // Collect ALL shared children of this family (union of all co-parents' children)
+      const familyChildrenSet = new Set<string>();
+      for (const pid of coParentIds) {
+        for (const cid of (childrenOf.get(pid) || [])) {
+          familyChildrenSet.add(cid);
+        }
+      }
+      const unplacedChildren = [...familyChildrenSet].filter(c => !placed.has(c));
+      if (unplacedChildren.length === 0) continue;
+
+      // Family center X
+      const familyPositions = [...coParentIds].filter(id => positions.has(id));
+      const familyMinX = Math.min(...familyPositions.map(id => positions.get(id)!.left));
+      const familyMaxX = Math.max(...familyPositions.map(id => positions.get(id)!.left));
+      const centerX = (familyMinX + familyMaxX + NODE_SPAN) / 2;
+
+      familiesInGen.push({ parentIds: [...coParentIds], centerX, unplacedChildren });
+    }
+
+    // Sort families left-to-right by their center X
+    familiesInGen.sort((a, b) => a.centerX - b.centerX);
+
+    // Place each family's children below parents, respecting left-to-right order
+    for (const family of familiesInGen) {
       const childGen = gen + 1;
       const childY = genToY(childGen);
-      const totalWidth = unplacedChildren.length * NODE_SPAN + (unplacedChildren.length - 1) * GAP;
-      let startX = familyCenterX - totalWidth / 2;
 
-      for (const childId of unplacedChildren) {
-        if (!placed.has(childId)) {
-          setPos(childId, startX, childY);
-          placedByFamily.add(childId);
+      // Count total slots needed (children + their spouses)
+      const childSlots: string[] = [];
+      for (const childId of family.unplacedChildren) {
+        childSlots.push(childId);
+        // Check if child has a spouse to place
+        const spouse = getMainSpouse(childId, spousesOf);
+        if (spouse && !placed.has(spouse) && !family.unplacedChildren.includes(spouse)) {
+          childSlots.push(spouse);
+        }
+      }
 
-          // Place child's spouse adjacent
-          placeSpouseAdjacent(childId, startX, childY, 'right', positions, placed, genMap, spousesOf, personMap);
+      const totalWidth = childSlots.length * NODE_SPAN + (childSlots.length - 1) * GAP;
+      let startX = family.centerX - totalWidth / 2;
 
+      for (const slotId of childSlots) {
+        if (!placed.has(slotId)) {
+          setPos(slotId, startX, childY);
           startX += SLOT;
         }
       }
