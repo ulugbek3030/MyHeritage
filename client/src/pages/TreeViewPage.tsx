@@ -4,14 +4,18 @@ import { getFullTree } from '../api/trees';
 import type { FullTree, Person } from '../types';
 import { FamilyTreeLayout } from '../components/tree/FamilyTreeLayout';
 import { PersonSheet } from '../components/tree/PersonSheet';
+import { AddPersonForm } from '../components/tree/AddPersonForm';
 
 export const TreeViewPage = () => {
   const { treeId } = useParams<{ treeId: string }>();
   const nav = useNavigate();
   const [data, setData] = useState<FullTree | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
+  const [addOpen, setAddOpen] = useState<Person | null>(null);
 
   useEffect(() => { if (treeId) getFullTree(treeId).then(setData); }, [treeId]);
+
+  const reload = () => { if (treeId) getFullTree(treeId).then(setData); };
 
   if (!data) return <div style={{padding:24}}>Загрузка дерева…</div>;
 
@@ -28,7 +32,7 @@ export const TreeViewPage = () => {
           relationships={data.relationships}
           ownerId={data.tree.ownerPersonId}
           onPersonClick={(id) => setSelectedPerson(data.persons.find((p) => p.id === id) ?? null)}
-          onPlusClick={(id) => console.log('plus on', id)}
+          onPlusClick={(id) => { const p = data.persons.find((p) => p.id === id); if (p) setAddOpen(p); }}
         />
       </div>
       <PersonSheet
@@ -36,9 +40,20 @@ export const TreeViewPage = () => {
         onClose={() => setSelectedPerson(null)}
         person={selectedPerson}
         onEdit={() => {}}
-        onAdd={() => {}}
+        onAdd={() => { if (selectedPerson) { setAddOpen(selectedPerson); setSelectedPerson(null); } }}
         onDelete={() => {}}
       />
+      {addOpen && (
+        <AddPersonForm
+          open
+          onClose={() => setAddOpen(null)}
+          treeId={treeId!}
+          targetPerson={addOpen}
+          persons={data.persons}
+          relationships={data.relationships}
+          onCreated={reload}
+        />
+      )}
     </div>
   );
 };

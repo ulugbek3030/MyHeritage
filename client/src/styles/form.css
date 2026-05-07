@@ -1,0 +1,4 @@
+.auth-input { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; font-size: 16px; color: var(--text); font-family: inherit; margin-bottom: 14px; }
+.auth-input:focus { outline: none; border-color: var(--accent); }
+.auth-btn { width: 100%; background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #0a0a0d; font-weight: 800; padding: 14px; border: none; border-radius: 14px; font-size: 16px; box-shadow: 0 8px 24px rgba(251,191,36,0.3); }
+.auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
