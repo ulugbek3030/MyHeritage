@@ -59,7 +59,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
           const person = personById.get(n.id);
           if (!person) return null;
           return (
-            <div key={n.id} style={{ position: 'absolute', transform: `translate(${n.left * (NODE_W / 2)}px, ${n.top * (NODE_H / 2)}px)`, width: NODE_W, height: NODE_H, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div key={n.id} data-person-id={n.id} style={{ position: 'absolute', transform: `translate(${n.left * (NODE_W / 2)}px, ${n.top * (NODE_H / 2)}px)`, width: NODE_W, height: NODE_H, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <PersonCard
                 person={person}
                 isOwner={person.id === ownerId}

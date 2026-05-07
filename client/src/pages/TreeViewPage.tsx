@@ -13,6 +13,7 @@ import { QuickActions } from '../components/home/QuickActions';
 import { FAB } from '../components/home/FAB';
 import { Skeleton } from '../components/ui/Skeleton';
 import { LongPressMenu } from '../components/tree/LongPressMenu';
+import { TreeSearch } from '../components/tree/TreeSearch';
 
 export const TreeViewPage = () => {
   const { treeId } = useParams<{ treeId: string }>();
@@ -23,6 +24,7 @@ export const TreeViewPage = () => {
   const [shareOpen, setShareOpen] = useState(false);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
   const [lpMenu, setLpMenu] = useState<{ person: Person; pos: { x: number; y: number } } | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => { if (treeId) getFullTree(treeId).then(setData); }, [treeId]);
 
@@ -52,6 +54,7 @@ export const TreeViewPage = () => {
         <button onClick={() => nav('/')} style={{width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)'}}>←</button>
         <div style={{flex:1,fontSize:17,fontWeight:800}}>{data.tree.name}</div>
         <button onClick={() => nav(`/trees/${treeId}/full`)} style={{fontSize:12,color:'var(--accent)',background:'transparent',border:'none'}}>Полное →</button>
+        <button onClick={() => setSearchOpen(true)} style={{width:32,height:32,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)',fontSize:14,marginLeft:6}}>⌕</button>
         <button onClick={() => setShareOpen(true)} style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',border:'none',color:'#0a0a0d',fontWeight:800,fontSize:14,marginLeft:6}}>⤴</button>
       </header>
       <Hero
@@ -112,6 +115,7 @@ export const TreeViewPage = () => {
           onDelete={() => alert('TODO')}
         />
       )}
+      {searchOpen && <TreeSearch persons={data.persons} onSelect={(id) => { document.querySelector(`[data-person-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onClose={() => setSearchOpen(false)} />}
     </div>
   );
 };
