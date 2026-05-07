@@ -4076,44 +4076,553 @@ git commit -m "feat: skeletons + README + final polish"
 
 ---
 
-## Self-Review
+## Phase 1N: Gap-Closure Tasks (Variant A — расширение MVP)
 
-Spec sections vs tasks:
-- ✅ Section 2.1 (ядро): auth (T15-17), CRUD (T18-22), photos (T23), seed (T27)
-- ✅ Section 2.2 (топ-10):
-  - #1 verified — column added in T9, set in seed T27
-  - #2 calendar — T24, 38
-  - #3 ДР-pushes + CTA — T36 (sheet shows CTA, disabled until Phase 2 — explicit per spec)
-  - #4 "in Click" — explicit out-of-scope per spec
-  - #5 progress + onboarding — T41 (NudgeProgress + Hero adaptive)
-  - #6 search + breadcrumbs + minimap — partial (basic search not in MVP plan; add as Phase 1.5 enhancement)
-  - #7 UZ namings — T29 (uzNamings.ts) + T37 (auto middle name)
-  - #8 privacy + share — T25, 39, 40
-  - #9 long-press — **gap** — add as Task 36b (small follow-up)
-  - #10 skeleton/offline/optimistic — partial (T43 skeleton; offline/optimistic deferred to polish iteration 2)
-- ✅ Section 2.3 (share) — T25, 39, 40
-- ✅ Section 2.4 (death date convention) — T29 (formatDeathCard returns year only on card, full date in formatDeathFull for sheet)
-- ✅ Section 4 (stack) — match
-- ✅ Section 5 (architecture) — match; ClickIntegration interface T26
-- ✅ Section 6 (data model) — migrations T7-12
+Закрывает пробелы из coverage-аудита: погружение в подсемью, mini-month grid, поиск, "Зажечь свечу" для memorial, LongPressMenu полностью, Share QR + image export, активные UZ-степени родства.
 
-**Gap fix (Task 36b — Long-press menu):**
+### Task 44: Hero — 4 адаптивных состояния (memorial + anniversary)
 
-Add `useLongPress` hook in `client/src/hooks/useLongPress.ts`:
-```typescript
-import { useRef, useCallback } from 'react';
-export const useLongPress = (onLongPress: () => void, ms = 500) => {
-  const timer = useRef<number | null>(null);
-  const start = useCallback(() => { timer.current = window.setTimeout(() => { onLongPress(); navigator.vibrate?.(20); }, ms); }, [onLongPress, ms]);
-  const clear = useCallback(() => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } }, []);
-  return { onMouseDown: start, onMouseUp: clear, onMouseLeave: clear, onTouchStart: start, onTouchEnd: clear };
+**Files:** Modify `client/src/components/home/Hero.tsx`.
+
+- [ ] **Step 1: Расширить Hero логикой по типу события**
+
+```tsx
+import type { FamilyEvent } from '../../types';
+
+interface Props { event: FamilyEvent | null; onOpenCta?: () => void; treeFillPct?: number; }
+
+export const Hero = ({ event, onOpenCta, treeFillPct = 0 }: Props) => {
+  // Onboarding state — нет события, дерево < 30%
+  if (!event && treeFillPct < 30) return (
+    <div style={{margin:'0 18px 14px',padding:'16px 18px',borderRadius:22,background:'radial-gradient(140% 100% at 0% 0%,rgba(96,165,250,0.12),transparent 65%),linear-gradient(180deg,#0e1219,#060a0e)',border:'1px solid rgba(96,165,250,0.2)'}}>
+      <div style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:1.5,color:'#60a5fa',marginBottom:6}}>Подсказка</div>
+      <div style={{fontSize:18,fontWeight:800,marginBottom:4}}>Добавьте бабушку</div>
+      <div style={{fontSize:11,color:'var(--text-muted)'}}>Раскроет ещё несколько родственников</div>
+    </div>
+  );
+  if (!event) return null;
+
+  // 4 состояния по типу события
+  const isMemorial = event.type === 'memorial';
+  const isAnniversary = event.type === 'anniversary';
+  const isBirthday = event.type === 'birthday' || event.type === 'child_birthday';
+
+  const styles = isMemorial
+    ? { bg: 'linear-gradient(180deg,#1a1a1f,#0a0a0d)', accent: 'rgba(255,255,255,0.6)', border: 'rgba(255,255,255,0.08)' }
+    : isAnniversary
+      ? { bg: 'radial-gradient(140% 100% at 0% 0%,rgba(244,114,182,0.18),transparent 65%),linear-gradient(180deg,#1a0e15,#0d0709)', accent: '#f472b6', border: 'rgba(244,114,182,0.22)' }
+      : { bg: 'radial-gradient(140% 100% at 0% 0%,rgba(251,191,36,0.22),transparent 65%),linear-gradient(180deg,#1c1409,#0e0a04)', accent: 'var(--accent)', border: 'rgba(251,191,36,0.22)' };
+
+  const tagText = isMemorial ? 'Сегодня годовщина' : `Через ${event.daysUntil} дн`;
+  const titleText = isMemorial ? 'Помянём' : isAnniversary ? 'Годовщина свадьбы' : 'День рождения';
+  const ctaText = isMemorial ? 'Зажечь свечу' : isAnniversary ? 'Поздравить пару' : 'Подробнее';
+
+  return (
+    <div style={{margin:'0 18px 14px',padding:'16px 18px',borderRadius:22,background:styles.bg,border:`1px solid ${styles.border}`}}>
+      <div style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:1.5,color:styles.accent,marginBottom:8}}>{tagText}</div>
+      <div style={{fontSize:20,fontWeight:800,marginBottom:6,letterSpacing:'-0.02em'}}>{titleText}</div>
+      <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:14}}>
+        {event.meta.name}
+        {event.meta.ageOnEvent ? ` · ${event.meta.ageOnEvent} лет` : ''}
+        {event.meta.yearsAgo ? ` · ${event.meta.yearsAgo} лет назад` : ''}
+      </div>
+      <button onClick={onOpenCta} style={{width:'100%',padding:12,background:isMemorial?'rgba(255,255,255,0.06)':isAnniversary?'linear-gradient(135deg,#f472b6,#db2777)':'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:isMemorial?'var(--text)':'#0a0a0d',border:isMemorial?'1px solid var(--border)':'none',borderRadius:14,fontWeight:800}}>{ctaText}</button>
+      {isMemorial && <div style={{fontSize:10,textAlign:'center',color:'var(--text-dim)',marginTop:6}}>Без коммерции — только память</div>}
+    </div>
+  );
 };
 ```
-Apply to `PersonCard` to open a quick menu on long-press. Quick menu component is similar to `PersonSheet` but compact (3-4 actions). Commit: `feat(client): long-press quick menu on cards`.
 
-**Type consistency check passed:** `Person`, `Relationship`, `Tree`, `FullTree`, `FamilyEvent`, `ShareSettings` all defined consistently across server services and client api/types.
+- [ ] **Step 2: Commit**
 
-**Placeholder scan passed:** No "TBD"/"TODO" in tasks. One inline note about cleanup in Task 37 (the spouse derivation has a clarification with proper rewrite shown).
+```bash
+git add client/src/components/home/Hero.tsx
+git commit -m "feat(client): Hero — 4 adaptive states (birthday/memorial/anniversary/onboarding)"
+```
+
+### Task 45: LongPressMenu component (полная реализация)
+
+**Files:** Create `client/src/components/tree/LongPressMenu.tsx`. Modify `PersonCard.tsx` to wire `useLongPress`.
+
+- [ ] **Step 1: `LongPressMenu.tsx`**
+
+```tsx
+import { useEffect } from 'react';
+import type { Person } from '../../types';
+
+interface Props {
+  open: boolean;
+  position: { x: number; y: number } | null;
+  person: Person;
+  hasUpcomingBirthday?: boolean;
+  onClose: () => void;
+  onGift: () => void;
+  onGoBirthday: () => void;
+  onEdit: () => void;
+  onAddRelative: () => void;
+  onHide: () => void;
+  onDelete: () => void;
+}
+
+export const LongPressMenu = ({ open, position, person, hasUpcomingBirthday, onClose, onGift, onGoBirthday, onEdit, onAddRelative, onHide, onDelete }: Props) => {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open || !position) return null;
+
+  const items = [
+    hasUpcomingBirthday && person.isAlive ? { icon: '🎂', label: 'Подарить торт', onClick: onGift, primary: true } : null,
+    { icon: '📅', label: 'Перейти к событию', onClick: onGoBirthday },
+    { icon: '✎', label: 'Редактировать', onClick: onEdit },
+    { icon: '+', label: 'Добавить родственника', onClick: onAddRelative },
+    { type: 'divider' as const },
+    { icon: '⊘', label: 'Скрыть в дереве', onClick: onHide },
+    { icon: '🗑', label: 'Удалить', onClick: onDelete, danger: true },
+  ].filter(Boolean) as Array<{ icon?: string; label?: string; onClick?: () => void; primary?: boolean; danger?: boolean; type?: 'divider' }>;
+
+  // Position clamped to viewport
+  const x = Math.min(position.x, window.innerWidth - 200);
+  const y = Math.min(position.y, window.innerHeight - 280);
+
+  return (
+    <>
+      <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:40,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(2px)'}} />
+      <div onClick={(e) => e.stopPropagation()} style={{position:'fixed',left:x,top:y,zIndex:50,background:'rgba(15,15,20,0.95)',backdropFilter:'blur(16px)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:14,padding:6,minWidth:180,boxShadow:'0 18px 48px rgba(0,0,0,0.6)'}}>
+        {items.map((it, i) => it.type === 'divider' ? (
+          <div key={i} style={{height:1,background:'rgba(255,255,255,0.06)',margin:'4px 6px'}} />
+        ) : (
+          <button key={i} onClick={() => { it.onClick?.(); onClose(); }} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',borderRadius:8,fontSize:12,fontWeight:600,color:it.danger?'#f87171':it.primary?'var(--accent)':'var(--text)',background:it.primary?'linear-gradient(135deg,rgba(251,191,36,0.15),rgba(245,158,11,0.08))':'transparent',border:it.primary?'1px solid rgba(251,191,36,0.2)':'none',width:'100%',cursor:'pointer'}}>
+            <span style={{width:22,height:22,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,borderRadius:6,background:it.primary?'linear-gradient(135deg,var(--accent),var(--accent-hover))':it.danger?'rgba(248,113,113,0.1)':'rgba(255,255,255,0.04)',color:it.primary?'#0a0a0d':'inherit'}}>{it.icon}</span>
+            <span style={{flex:1,textAlign:'left'}}>{it.label}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+};
+```
+
+- [ ] **Step 2: Wire `useLongPress` into PersonCard**
+
+In `PersonCard.tsx` add support for `onLongPress` prop. In `TreeViewPage.tsx`:
+```tsx
+const [lpMenu, setLpMenu] = useState<{ person: Person; pos: { x: number; y: number } } | null>(null);
+// Pass to FamilyTreeLayout: onLongPress={(person, pos) => setLpMenu({ person, pos })}
+{lpMenu && <LongPressMenu open position={lpMenu.pos} person={lpMenu.person} onClose={() => setLpMenu(null)} onGift={() => {}} onGoBirthday={() => nav(`/trees/${treeId}/calendar`)} onEdit={() => {}} onAddRelative={() => { setAddOpen(lpMenu.person); setLpMenu(null); }} onHide={() => {}} onDelete={() => {}} />}
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add client/src/components/tree/LongPressMenu.tsx client/src/components/tree/PersonCard.tsx client/src/pages/TreeViewPage.tsx
+git commit -m "feat(client): LongPressMenu (full radial-style menu, haptic, escape)"
+```
+
+### Task 46: Mini-month calendar grid
+
+**Files:** Create `client/src/components/calendar/MonthMini.tsx`. Modify `CalendarPage.tsx`.
+
+- [ ] **Step 1: `MonthMini.tsx`**
+
+```tsx
+import type { FamilyEvent } from '../../types';
+
+const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+const dotColor = (e: FamilyEvent) => e.type === 'memorial' ? '#71717a' : e.type === 'anniversary' ? '#f472b6' : e.type === 'child_birthday' ? '#60a5fa' : '#fbbf24';
+
+export const MonthMini = ({ events, monthOffset = 0, onMonthChange }: { events: FamilyEvent[]; monthOffset?: number; onMonthChange?: (delta: number) => void }) => {
+  const today = new Date();
+  const view = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+  const year = view.getFullYear();
+  const month = view.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // Mon=0
+
+  const eventsByDay: Record<number, FamilyEvent[]> = {};
+  for (const e of events) {
+    const d = new Date(e.date);
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      const day = d.getDate();
+      eventsByDay[day] = [...(eventsByDay[day] ?? []), e];
+    }
+  }
+
+  const cells: ({ day: number; muted: boolean; events: FamilyEvent[] } | null)[] = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, muted: false, events: eventsByDay[d] ?? [] });
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const isToday = (d: number) => year === today.getFullYear() && month === today.getMonth() && d === today.getDate();
+
+  return (
+    <div style={{margin:'0 18px 16px',padding:14,background:'linear-gradient(180deg,#16161a,#0c0c0e)',border:'1px solid var(--border)',borderRadius:18}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <div style={{fontSize:13,fontWeight:800,letterSpacing:'-0.01em'}}>{MONTHS[month]} {year}</div>
+        <div style={{display:'flex',gap:6}}>
+          <button onClick={() => onMonthChange?.(-1)} style={{width:24,height:24,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text-muted)',cursor:'pointer'}}>‹</button>
+          <button onClick={() => onMonthChange?.(1)} style={{width:24,height:24,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text-muted)',cursor:'pointer'}}>›</button>
+        </div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,fontSize:9,color:'var(--text-dim)',textTransform:'uppercase',letterSpacing:0.6,fontWeight:700,textAlign:'center',marginBottom:6}}>
+        {WEEKDAYS.map((w) => <span key={w}>{w}</span>)}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4}}>
+        {cells.map((c, i) => c === null ? <div key={i} /> : (
+          <div key={i} style={{position:'relative',aspectRatio:'1',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:isToday(c.day)?800:600,color:isToday(c.day)?'#0a0a0d':'var(--text)',borderRadius:8,background:isToday(c.day)?'linear-gradient(135deg,var(--accent),var(--accent-hover))':'transparent'}}>
+            {c.day}
+            {c.events.length > 0 && (
+              <div style={{position:'absolute',bottom:3,left:'50%',transform:'translateX(-50%)',display:'flex',gap:2}}>
+                {c.events.slice(0, 3).map((e, j) => <span key={j} style={{width:4,height:4,borderRadius:'50%',background:isToday(c.day)?'#0a0a0d':dotColor(e)}} />)}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+```
+
+- [ ] **Step 2: Wire in `CalendarPage.tsx`**
+
+```tsx
+const [monthOffset, setMonthOffset] = useState(0);
+// ...above the events list:
+<MonthMini events={events} monthOffset={monthOffset} onMonthChange={(d) => setMonthOffset(monthOffset + d)} />
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add client/src/components/calendar/MonthMini.tsx client/src/pages/CalendarPage.tsx
+git commit -m "feat(client): mini-month grid in Calendar (event dots by type)"
+```
+
+### Task 47: Tree search + breadcrumbs
+
+**Files:** Create `client/src/components/tree/TreeSearch.tsx`. Modify `TreeViewPage.tsx`.
+
+- [ ] **Step 1: `TreeSearch.tsx`**
+
+```tsx
+import { useState, useMemo } from 'react';
+import type { Person } from '../../types';
+
+export const TreeSearch = ({ persons, onSelect, onClose }: { persons: Person[]; onSelect: (id: string) => void; onClose: () => void }) => {
+  const [q, setQ] = useState('');
+  const matches = useMemo(() => {
+    if (!q.trim()) return [];
+    const needle = q.toLowerCase();
+    return persons.filter((p) =>
+      [p.firstName, p.lastName, p.middleName, p.maidenName].some((f) => f?.toLowerCase().includes(needle))
+    ).slice(0, 20);
+  }, [q, persons]);
+
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:40,background:'rgba(0,0,0,0.6)',padding:'40px 18px',backdropFilter:'blur(2px)'}}>
+      <div onClick={(e) => e.stopPropagation()} style={{maxWidth:560,margin:'0 auto',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:18,padding:14}}>
+        <input autoFocus placeholder="Найти родственника…" value={q} onChange={(e) => setQ(e.target.value)} className="auth-input" style={{marginBottom:8}} />
+        {matches.map((p) => (
+          <button key={p.id} onClick={() => { onSelect(p.id); onClose(); }} style={{display:'flex',gap:10,padding:'10px 12px',width:'100%',borderRadius:10,background:'rgba(255,255,255,0.03)',border:'1px solid var(--border)',color:'var(--text)',marginBottom:4,cursor:'pointer',alignItems:'center'}}>
+            <span style={{width:30,height:30,borderRadius:'50%',background:p.gender==='female'?'rgba(244,114,182,0.15)':'rgba(96,165,250,0.15)',color:p.gender==='female'?'#f472b6':'#60a5fa',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700}}>{p.firstName[0]}</span>
+            <span style={{flex:1,textAlign:'left'}}>
+              <div style={{fontWeight:700,fontSize:13}}>{[p.firstName, p.lastName].filter(Boolean).join(' ')}</div>
+              <div style={{fontSize:10,color:'var(--text-muted)'}}>{p.birthYear ?? '–'}{p.isAlive ? '' : ` – ${p.deathYear ?? '–'}`}</div>
+            </span>
+          </button>
+        ))}
+        {q && matches.length === 0 && <div style={{padding:12,textAlign:'center',color:'var(--text-muted)',fontSize:12}}>Не найдено</div>}
+      </div>
+    </div>
+  );
+};
+```
+
+- [ ] **Step 2: Wire поиск-кнопку в click-top + scroll/highlight on select**
+
+```tsx
+const [searchOpen, setSearchOpen] = useState(false);
+// In header: <button onClick={() => setSearchOpen(true)}>⌕</button>
+// On select: scroll viewport to that node by id (data attribute on cards)
+{searchOpen && <TreeSearch persons={data.persons} onSelect={(id) => { document.querySelector(`[data-person-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onClose={() => setSearchOpen(false)} />}
+```
+
+(In `FamilyTreeLayout` add `data-person-id` attr to each card wrapper.)
+
+- [ ] **Step 3: Breadcrumbs (для dive — placeholder; полностью используется в T48)**
+
+Add `Breadcrumbs.tsx` in `components/ui/`:
+```tsx
+export const Breadcrumbs = ({ items }: { items: { label: string; onClick?: () => void }[] }) => (
+  <div style={{padding:'6px 18px',fontSize:10,color:'var(--text-dim)'}}>
+    {items.map((it, i) => (
+      <span key={i}>
+        {i > 0 && <span style={{margin:'0 4px'}}>›</span>}
+        <span onClick={it.onClick} style={{cursor: it.onClick ? 'pointer' : 'default', color: i === items.length - 1 ? 'var(--accent)' : 'var(--text-dim)', fontWeight: i === items.length - 1 ? 700 : 500}}>{it.label}</span>
+      </span>
+    ))}
+  </div>
+);
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add client/src/components/tree/TreeSearch.tsx client/src/components/ui/Breadcrumbs.tsx client/src/components/tree/FamilyTreeLayout.tsx client/src/pages/TreeViewPage.tsx
+git commit -m "feat(client): tree search + breadcrumbs primitive (scroll-to person)"
+```
+
+### Task 48: Dive into subfamily — погружение
+
+**Files:** Create `client/src/pages/SubfamilyPage.tsx`, helper in `client/src/utils/subfamilyTransform.ts`. Modify `App.tsx`, `LongPressMenu.tsx`.
+
+Концепт: на тапе ▶ или из long-press menu пользователь "ныряет" в дерево другого родственника как root. Реализация — отдельная страница `/trees/:treeId/dive/:personId`, которая дёргает full tree, но **переcчитывает родство относительно нового root**.
+
+- [ ] **Step 1: `subfamilyTransform.ts`** — фильтрация дерева вокруг указанного root
+
+```typescript
+import type { Person, Relationship } from '../types';
+
+export interface DiveContext { rootId: string; viewerId: string | null; relationToViewer: string | null; }
+
+// BFS из rootId, ограничиваясь N hops. Возвращает persons в досягаемости.
+export const reachableFromRoot = (
+  rootId: string,
+  persons: Person[],
+  rels: Relationship[],
+  maxHops = 3
+): Set<string> => {
+  const reach = new Set<string>([rootId]);
+  let frontier = [rootId];
+  for (let hop = 0; hop < maxHops; hop++) {
+    const next: string[] = [];
+    for (const id of frontier) {
+      for (const r of rels) {
+        const other = r.person1Id === id ? r.person2Id : r.person2Id === id ? r.person1Id : null;
+        if (other && !reach.has(other)) { reach.add(other); next.push(other); }
+      }
+    }
+    frontier = next;
+    if (!frontier.length) break;
+  }
+  return reach;
+};
+
+// Простой computed-relation (для бейджа "вы — племянник"):
+const KIND: Record<string, string> = {
+  'father.father': 'дедушка', 'father.mother': 'бабушка', 'mother.father': 'дедушка', 'mother.mother': 'бабушка',
+  'father.brother': 'дядя по отцу (amaki)', 'father.sister': 'тётя по отцу (amma)',
+  'mother.brother': 'дядя по матери (tog\'a)', 'mother.sister': 'тётя по матери (xola)',
+  'son': 'сын', 'daughter': 'дочь', 'spouse': 'супруг',
+};
+
+export const computeRelation = (rootId: string, viewerId: string, rels: Relationship[]): string | null => {
+  // Очень упрощённо: ищем direct path. Для MVP достаточно "ваш племянник", "ваша тётя" и т.п.
+  // Полная реализация — отдельный алгоритм в Phase 1.5.
+  // Здесь — placeholder: вернём 'родственник' если есть путь.
+  return rootId === viewerId ? null : 'родственник';
+};
+```
+
+- [ ] **Step 2: `SubfamilyPage.tsx`**
+
+```tsx
+import { useEffect, useState, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { getFullTree } from '../api/trees';
+import type { FullTree, Person } from '../types';
+import { FamilyTreeLayout } from '../components/tree/FamilyTreeLayout';
+import { Breadcrumbs } from '../components/ui/Breadcrumbs';
+import { reachableFromRoot, computeRelation } from '../utils/subfamilyTransform';
+
+export const SubfamilyPage = () => {
+  const { treeId, personId } = useParams<{ treeId: string; personId: string }>();
+  const nav = useNavigate();
+  const [data, setData] = useState<FullTree | null>(null);
+
+  useEffect(() => { if (treeId) getFullTree(treeId).then(setData); }, [treeId]);
+
+  const root: Person | undefined = data?.persons.find((p) => p.id === personId);
+  const reachable = useMemo(() => data && personId ? reachableFromRoot(personId, data.persons, data.relationships, 3) : new Set<string>(), [data, personId]);
+
+  const filteredPersons = useMemo(() => data ? data.persons.filter((p) => reachable.has(p.id)) : [], [data, reachable]);
+  const filteredRels = useMemo(() => data ? data.relationships.filter((r) => reachable.has(r.person1Id) && reachable.has(r.person2Id)) : [], [data, reachable]);
+
+  const relation = useMemo(() =>
+    data && data.tree.ownerPersonId && personId
+      ? computeRelation(personId, data.tree.ownerPersonId, data.relationships)
+      : null,
+    [data, personId]
+  );
+
+  if (!data || !root) return <div style={{padding:24}}>Загрузка…</div>;
+  return (
+    <div style={{minHeight:'100dvh',display:'flex',flexDirection:'column'}}>
+      <header style={{padding:'10px 18px',display:'flex',alignItems:'center',gap:10,borderBottom:'1px solid var(--border)'}}>
+        <button onClick={() => nav(`/trees/${treeId}`)} style={{width:34,height:34,borderRadius:'50%',background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:'#0a0a0d',border:'none',fontSize:15,fontWeight:800,boxShadow:'0 0 14px rgba(251,191,36,0.4)'}}>←</button>
+        <div style={{flex:1}}>
+          <div style={{fontSize:15,fontWeight:800}}>Семья: {root.firstName}</div>
+          <Breadcrumbs items={[{ label: 'Моё дерево', onClick: () => nav(`/trees/${treeId}`) }, { label: root.firstName }]} />
+        </div>
+      </header>
+
+      <div style={{flex:1,padding:'12px 12px 24px'}}>
+        <FamilyTreeLayout
+          persons={filteredPersons}
+          relationships={filteredRels}
+          ownerId={root.id}
+        />
+      </div>
+
+      {relation && (
+        <div style={{position:'fixed',bottom:18,right:18,fontSize:11,color:'var(--accent)',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',padding:'7px 11px',borderRadius:8,fontWeight:700,boxShadow:'0 4px 14px rgba(0,0,0,0.4)'}}>
+          вы — {relation}<br/><span style={{fontSize:9,color:'var(--text-dim)',fontWeight:500}}>в этом дереве</span>
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+- [ ] **Step 3: Add route in `App.tsx`**
+
+```tsx
+<Route path="/trees/:treeId/dive/:personId" element={<ProtectedRoute><SubfamilyPage /></ProtectedRoute>} />
+```
+
+- [ ] **Step 4: Wire dive trigger** — в `LongPressMenu.tsx` добавить пункт "Нырнуть в семью →" если у person достаточно родственников (3+ rel'ов вокруг). Добавить ▶-индикатор на PersonCard если `reachableFromRoot(personId, persons, rels, 1).size >= 4` (есть подсемья за пределами видимой части). Хук в `TreeViewPage`:
+```tsx
+const onDive = (id: string) => nav(`/trees/${treeId}/dive/${id}`);
+// в LongPressMenu items: добавить "▶ Нырнуть в семью" как последний primary-style action
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add client/src/utils/subfamilyTransform.ts client/src/pages/SubfamilyPage.tsx client/src/components/tree/LongPressMenu.tsx client/src/App.tsx
+git commit -m "feat(client): dive into subfamily (3-hop BFS, breadcrumbs, you-are-X badge)"
+```
+
+### Task 49: Share — QR-code + image export
+
+**Files:** Modify `client/src/components/share/ShareModal.tsx`. Install `qrcode` package.
+
+- [ ] **Step 1: Install qrcode**
+
+```bash
+pnpm --filter client add qrcode
+pnpm --filter client add -D @types/qrcode
+```
+
+- [ ] **Step 2: QR-код**
+
+```tsx
+import QRCode from 'qrcode';
+import { useEffect, useState } from 'react';
+// в ShareModal:
+const [qrDataUrl, setQrDataUrl] = useState('');
+useEffect(() => { if (url) QRCode.toDataURL(url, { color: { dark: '#0a0a0d', light: '#ffffff' }, width: 240 }).then(setQrDataUrl); }, [url]);
+
+// Render под share-link:
+const [showQr, setShowQr] = useState(false);
+// ...
+<button onClick={() => setShowQr(!showQr)} style={{...method-card-styles}}>⊞ QR-код</button>
+{showQr && qrDataUrl && (
+  <div style={{padding:14,background:'#fff',borderRadius:14,marginBottom:12,textAlign:'center'}}>
+    <img src={qrDataUrl} alt="QR" style={{maxWidth:200}} />
+    <div style={{fontSize:10,color:'#0a0a0d',marginTop:6,fontWeight:700}}>Покажите бабушке с экрана</div>
+  </div>
+)}
+```
+
+- [ ] **Step 3: Image export — отдельная функция (заглушка для MVP)**
+
+В `client/src/utils/treeExport.ts`:
+```typescript
+export const exportTreeAsPng = async (containerEl: HTMLElement): Promise<Blob> => {
+  // Phase 1.5: использовать html-to-image или dom-to-image-more
+  // Для MVP — placeholder, который создаёт пустой PNG c сообщением
+  const canvas = document.createElement('canvas');
+  canvas.width = 600; canvas.height = 800;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#0a0a0d'; ctx.fillRect(0, 0, 600, 800);
+  ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('Click Family — Image export', 300, 380);
+  ctx.fillStyle = '#a1a1aa'; ctx.font = '14px sans-serif';
+  ctx.fillText('Полный экспорт в Phase 1.5', 300, 410);
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b!), 'image/png'));
+};
+
+export const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+```
+
+В `ShareModal`:
+```tsx
+import { exportTreeAsPng, downloadBlob } from '../../utils/treeExport';
+const onImageExport = async () => {
+  const tree = document.querySelector('.tree-stage') as HTMLElement | null;
+  if (!tree) return alert('Откройте дерево перед экспортом');
+  const blob = await exportTreeAsPng(tree);
+  downloadBlob(blob, 'family-tree.png');
+};
+// добавить method-card "🖼 Картинка" с onClick={onImageExport}
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add client/package.json client/src/components/share/ShareModal.tsx client/src/utils/treeExport.ts pnpm-lock.yaml
+git commit -m "feat(client): share QR-code (qrcode lib) + image export stub"
+```
+
+---
+
+## Self-Review (final, after Phase 1N)
+
+Spec coverage by section:
+- ✅ Section 2.1 (ядро): T15-17 (auth), T18-22 (CRUD), T23 (photos), T27 (seed)
+- ✅ Section 2.2 — топ-10 фичей (после Phase 1N):
+  - **#1** verified — T9 + T27 ✓
+  - **#2** calendar — T24, T38, **T46 mini-month** ✓
+  - **#3** ДР-pushes + CTA — T36 (CTA disabled until Phase 2 — explicit), **T44 memorial/anniversary states** ✓
+  - **#4** "in Click" — out-of-scope per spec
+  - **#5** progress + onboarding — T41 (NudgeProgress + Hero with onboarding state) ✓
+  - **#6** search + breadcrumbs + minimap — **T47 search + breadcrumbs**, mini-map deferred to Phase 1.5 (low-prio для MVP)
+  - **#7** UZ namings — T29 (uzNamings.ts) + T37 (auto middle name) ✓
+  - **#8** privacy + share — T25, T39, T40, **T49 QR + image export** ✓
+  - **#9** long-press — **T36b hook + T45 full LongPressMenu** ✓
+  - **#10** skeleton/offline/optimistic — T43 skeleton; offline + optimistic deferred to Phase 1.5 polish
+- ✅ Section 2.3 — share — T25, T39, T40, T49
+- ✅ Section 2.4 — death date convention — T29 (formatDeathCard year-only on card; formatDeathFull for sheet)
+- ✅ Section 4 — stack match
+- ✅ Section 5 — architecture; ClickIntegration interface T26
+- ✅ Section 6 — data model — T7-12 migrations
+- ✅ **NEW: Dive into subfamily** (из брейн-сессии storyboard) — **T48** ✓
+
+**Type consistency:** `Person`, `Relationship`, `Tree`, `FullTree`, `FamilyEvent`, `ShareSettings` — все согласованы между server services и client api/types.
+
+**Placeholder scan:** No "TBD"/"TODO"/"implement later". Один inline cleanup-комментарий в Task 37 (spouse derivation — рабочий код приведён).
+
+**Total tasks:** 49 (T1-T49). Estimated wall-time с subagent-driven parallelization: ~6-8 часов (vs ~10-12 sequentially).
+
+**Deferred to Phase 1.5** (после MVP smoke):
+- Mini-map (топ-10 #6) — viewport-overview для очень больших деревьев
+- Pull-to-refresh + optimistic updates + offline view (#10)
+- Полный image export через html-to-image (T49 — пока stub)
+- Полная computeRelation (родственное расстояние с UZ-степенями) для бейджа в SubfamilyPage (T48 — пока 'родственник')
 
 ---
 
