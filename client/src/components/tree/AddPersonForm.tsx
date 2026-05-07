@@ -25,6 +25,49 @@ interface RoleOption {
   visible: boolean;
 }
 
+/**
+ * SVG silhouettes — adult/child × male/female.
+ * Filled with currentColor so the parent button can tint them via gender.
+ */
+const Silhouette = ({ kind }: { kind: 'adult-male' | 'adult-female' | 'child-male' | 'child-female' }) => {
+  switch (kind) {
+    case 'adult-male':
+      return (
+        <svg viewBox="0 0 64 64" width="42" height="42" fill="currentColor" aria-hidden="true">
+          <circle cx="32" cy="22" r="11" />
+          <path d="M 12 60 C 12 46, 22 40, 32 40 C 42 40, 52 46, 52 60 Z" />
+        </svg>
+      );
+    case 'adult-female':
+      return (
+        <svg viewBox="0 0 64 64" width="42" height="42" fill="currentColor" aria-hidden="true">
+          {/* hair frame around head + neck */}
+          <path d="M 20 18 C 20 10, 26 6, 32 6 C 38 6, 44 10, 44 18 L 44 30 C 44 32, 42 32, 42 32 L 22 32 C 22 32, 20 32, 20 30 Z" />
+          <circle cx="32" cy="22" r="9" />
+          {/* shoulders + soft hair flowing onto them */}
+          <path d="M 12 60 C 12 46, 22 40, 32 40 C 42 40, 52 46, 52 60 Z" />
+          <path d="M 18 38 Q 14 42, 16 50 L 22 47 Z M 46 38 Q 50 42, 48 50 L 42 47 Z" />
+        </svg>
+      );
+    case 'child-male':
+      return (
+        <svg viewBox="0 0 64 64" width="42" height="42" fill="currentColor" aria-hidden="true">
+          <circle cx="32" cy="24" r="13" />
+          <path d="M 18 60 C 18 50, 24 46, 32 46 C 40 46, 46 50, 46 60 Z" />
+        </svg>
+      );
+    case 'child-female':
+      return (
+        <svg viewBox="0 0 64 64" width="42" height="42" fill="currentColor" aria-hidden="true">
+          {/* slightly fuller hair frame */}
+          <path d="M 17 22 C 17 12, 24 7, 32 7 C 40 7, 47 12, 47 22 L 47 30 C 47 32, 45 32, 45 32 L 19 32 C 19 32, 17 32, 17 30 Z" />
+          <circle cx="32" cy="25" r="10" />
+          <path d="M 18 60 C 18 50, 24 46, 32 46 C 40 46, 46 50, 46 60 Z" />
+        </svg>
+      );
+  }
+};
+
 export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, relationships, onCreated }: Props) => {
   const [step, setStep] = useState<'select' | 'form'>('select');
   const [mode, setMode] = useState<Mode>('parent');
@@ -201,11 +244,11 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 28,
-                    color: o.gender === 'female' ? '#f472b6' : '#60a5fa',
+                    overflow: 'hidden',
+                    color: o.gender === 'female' ? 'rgba(244,114,182,0.65)' : 'rgba(96,165,250,0.65)',
                   }}
                 >
-                  {o.gender === 'female' ? '♀' : '♂'}
+                  <Silhouette kind={`${o.mode === 'child' ? 'child' : 'adult'}-${o.gender}` as 'adult-male' | 'adult-female' | 'child-male' | 'child-female'} />
                   <span
                     aria-hidden="true"
                     style={{
