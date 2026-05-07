@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { BottomSheet } from '../ui/BottomSheet';
 import { enableShare, updateShareSettings, type ShareSettings } from '../../api/share';
+import QRCode from 'qrcode';
+import { exportTreeAsPng, downloadBlob } from '../../utils/treeExport';
 
 interface Props { open: boolean; onClose: () => void; treeId: string; existingToken?: string | null; existingSettings?: Partial<ShareSettings>; }
 
@@ -8,6 +10,8 @@ export const ShareModal = ({ open, onClose, treeId, existingToken, existingSetti
   const [token, setToken] = useState<string | null>(existingToken ?? null);
   const [settings, setSettings] = useState<ShareSettings>({ showBirthDates: existingSettings?.showBirthDates ?? true, showPhotos: existingSettings?.showPhotos ?? true, allowSuggestions: existingSettings?.allowSuggestions ?? false });
   const [busy, setBusy] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [showQr, setShowQr] = useState(false);
 
   useEffect(() => {
     if (open && !token) { setBusy(true); enableShare(treeId, settings).then((r) => setToken(r.token)).finally(() => setBusy(false)); }
@@ -15,6 +19,15 @@ export const ShareModal = ({ open, onClose, treeId, existingToken, existingSetti
 
   const url = token ? `${window.location.origin}/share/${token}` : '';
   const copy = () => { navigator.clipboard?.writeText(url); };
+
+  useEffect(() => { if (url) QRCode.toDataURL(url, { color: { dark: '#0a0a0d', light: '#ffffff' }, width: 240 }).then(setQrDataUrl); }, [url]);
+
+  const onImageExport = async () => {
+    const tree = document.querySelector('.tree-stage') as HTMLElement | null;
+    if (!tree) { alert('Откройте дерево перед экспортом'); return; }
+    const blob = await exportTreeAsPng(tree);
+    downloadBlob(blob, 'family-tree.png');
+  };
 
   const toggleSetting = (k: keyof ShareSettings) => {
     const next = { ...settings, [k]: !settings[k] };
@@ -32,6 +45,21 @@ export const ShareModal = ({ open, onClose, treeId, existingToken, existingSetti
         <div style={{flex:1,minWidth:0,fontFamily:'monospace',fontSize:11,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{busy ? 'Генерация…' : url}</div>
         <button onClick={copy} disabled={busy} style={{background:'rgba(255,255,255,0.08)',color:'var(--text)',border:'1px solid var(--border)',fontSize:10,fontWeight:700,padding:'6px 10px',borderRadius:8}}>Копировать</button>
       </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
+        <button onClick={() => setShowQr(!showQr)} style={{padding:10,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:12,color:'var(--text)',fontSize:11,fontWeight:700,textAlign:'left'}}>
+          <div style={{fontSize:18,marginBottom:4}}>⊞</div>QR-код
+        </button>
+        <button onClick={onImageExport} style={{padding:10,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:12,color:'var(--text)',fontSize:11,fontWeight:700,textAlign:'left'}}>
+          <div style={{fontSize:18,marginBottom:4}}>🖼</div>Картинка
+        </button>
+      </div>
+      {showQr && qrDataUrl && (
+        <div style={{padding:14,background:'#fff',borderRadius:14,marginBottom:12,textAlign:'center'}}>
+          <img src={qrDataUrl} alt="QR" style={{maxWidth:200}} />
+          <div style={{fontSize:10,color:'#0a0a0d',marginTop:6,fontWeight:700}}>Покажите бабушке с экрана</div>
+        </div>
+      )}
 
       <div style={{fontSize:9,textTransform:'uppercase',fontWeight:800,letterSpacing:1.2,color:'var(--text-dim)',margin:'14px 0 8px'}}>Приватность</div>
 
