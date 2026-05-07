@@ -1,5 +1,7 @@
 import { query } from '../db/pool.js';
 import { NotFoundError } from '../utils/errors.js';
+import { listPersons } from './persons.service.js';
+import { listRels } from './relationships.service.js';
 
 export interface Tree { id: string; userId: string; name: string; description: string | null; ownerPersonId: string | null; visibility: string; shareToken: string | null; }
 
@@ -45,33 +47,41 @@ export const deleteTree = async (id: string): Promise<void> => {
 };
 
 // BFS generations from owner (gen=0): parents = -1, children = +1, spouses = same
+// Uses listPersons / listRels which return camelCase columns to match client expectations.
 export const getFullTree = async (treeId: string) => {
   const tree = await getTree(treeId);
-  const persons = (await query(`SELECT * FROM persons WHERE tree_id = $1 ORDER BY birth_year NULLS LAST, birth_date NULLS LAST`, [treeId])).rows;
-  const rels = (await query(`SELECT * FROM relationships WHERE tree_id = $1`, [treeId])).rows;
+  const persons = await listPersons(treeId);
+  const rels = await listRels(treeId);
 
   const generations: { number: number; label: string; personIds: string[] }[] = [];
   if (tree.ownerPersonId && persons.length) {
     const gen = new Map<string, number>();
     gen.set(tree.ownerPersonId, 0);
-    const queue = [tree.ownerPersonId];
+    const queue: string[] = [tree.ownerPersonId];
     while (queue.length) {
       const cur = queue.shift()!;
       const g = gen.get(cur)!;
       for (const r of rels as any[]) {
-        let other: string | null = null, dg = 0;
+        let other: string | null = null;
+        let dg = 0;
         if (r.category === 'parent_child') {
-          if (r.person1_id === cur) { other = r.person2_id; dg = 1; }
-          else if (r.person2_id === cur) { other = r.person1_id; dg = -1; }
+          if (r.person1Id === cur) { other = r.person2Id; dg = 1; }
+          else if (r.person2Id === cur) { other = r.person1Id; dg = -1; }
         } else if (r.category === 'couple') {
-          if (r.person1_id === cur) other = r.person2_id;
-          else if (r.person2_id === cur) other = r.person1_id;
+          if (r.person1Id === cur) other = r.person2Id;
+          else if (r.person2Id === cur) other = r.person1Id;
         }
-        if (other && !gen.has(other)) { gen.set(other, g + dg); queue.push(other); }
+        if (other && !gen.has(other)) {
+          gen.set(other, g + dg);
+          queue.push(other);
+        }
       }
     }
     for (const p of persons as any[]) if (!gen.has(p.id)) gen.set(p.id, 0);
-    const labels: Record<number, string> = { '-4': 'Прапрадеды', '-3': 'Прадеды', '-2': 'Деды и Бабушки', '-1': 'Родители', '0': 'Я и сиблинги', '1': 'Дети', '2': 'Внуки', '3': 'Правнуки' };
+    const labels: Record<number, string> = {
+      [-4]: 'Прапрадеды', [-3]: 'Прадеды', [-2]: 'Деды и Бабушки', [-1]: 'Родители',
+      [0]: 'Я и сиблинги', [1]: 'Дети', [2]: 'Внуки', [3]: 'Правнуки',
+    };
     const buckets = new Map<number, string[]>();
     for (const [pid, g] of gen) buckets.set(g, [...(buckets.get(g) ?? []), pid]);
     for (const [g, ids] of [...buckets].sort((a, b) => a[0] - b[0])) {
