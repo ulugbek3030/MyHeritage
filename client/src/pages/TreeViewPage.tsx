@@ -1,1 +1,34 @@
-export const TreeViewPage = () => <div>TreeViewPage</div>;
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { getFullTree } from '../api/trees';
+import type { FullTree } from '../types';
+import { FamilyTreeLayout } from '../components/tree/FamilyTreeLayout';
+
+export const TreeViewPage = () => {
+  const { treeId } = useParams<{ treeId: string }>();
+  const nav = useNavigate();
+  const [data, setData] = useState<FullTree | null>(null);
+
+  useEffect(() => { if (treeId) getFullTree(treeId).then(setData); }, [treeId]);
+
+  if (!data) return <div style={{padding:24}}>Загрузка дерева…</div>;
+
+  return (
+    <div style={{minHeight:'100dvh',display:'flex',flexDirection:'column'}}>
+      <header style={{padding:'16px 18px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid var(--border)'}}>
+        <button onClick={() => nav('/')} style={{width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)'}}>←</button>
+        <div style={{flex:1,fontSize:17,fontWeight:800}}>{data.tree.name}</div>
+        <button onClick={() => nav(`/trees/${treeId}/full`)} style={{fontSize:12,color:'var(--accent)',background:'transparent',border:'none'}}>Полное →</button>
+      </header>
+      <div style={{padding:'12px 12px 24px',flex:1}}>
+        <FamilyTreeLayout
+          persons={data.persons}
+          relationships={data.relationships}
+          ownerId={data.tree.ownerPersonId}
+          onPersonClick={(id) => console.log('tap', id)}
+          onPlusClick={(id) => console.log('plus on', id)}
+        />
+      </div>
+    </div>
+  );
+};
