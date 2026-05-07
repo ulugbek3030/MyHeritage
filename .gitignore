@@ -39,3 +39,4 @@ postgres-data/
 
 # brainstorm session artifacts (если попадут в проект)
 .superpowers/
+.worktrees/
