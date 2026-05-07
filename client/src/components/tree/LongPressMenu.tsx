@@ -13,9 +13,10 @@ interface Props {
   onAddRelative: () => void;
   onHide: () => void;
   onDelete: () => void;
+  onDive?: () => void;
 }
 
-export const LongPressMenu = ({ open, position, person, hasUpcomingBirthday, onClose, onGift, onGoBirthday, onEdit, onAddRelative, onHide, onDelete }: Props) => {
+export const LongPressMenu = ({ open, position, person, hasUpcomingBirthday, onClose, onGift, onGoBirthday, onEdit, onAddRelative, onHide, onDelete, onDive }: Props) => {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -26,6 +27,7 @@ export const LongPressMenu = ({ open, position, person, hasUpcomingBirthday, onC
   if (!open || !position) return null;
 
   const items: Array<{ icon?: string; label?: string; onClick?: () => void; primary?: boolean; danger?: boolean; type?: 'divider' }> = [
+    ...(onDive ? [{ icon: '▶', label: 'Нырнуть в семью', onClick: onDive, primary: true }] : []),
     ...(hasUpcomingBirthday && person.isAlive ? [{ icon: '🎂', label: 'Подарить торт', onClick: onGift, primary: true }] : []),
     { icon: '📅', label: 'Перейти к событию', onClick: onGoBirthday },
     { icon: '✎', label: 'Редактировать', onClick: onEdit },

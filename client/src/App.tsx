@@ -6,6 +6,7 @@ import { TreeViewPage } from './pages/TreeViewPage';
 import { FullTreePage } from './pages/FullTreePage';
 import { CalendarPage } from './pages/CalendarPage';
 import { SharedTreePage } from './pages/SharedTreePage';
+import { SubfamilyPage } from './pages/SubfamilyPage';
 
 export const App = () => (
   <BrowserRouter>
@@ -16,6 +17,7 @@ export const App = () => (
         <Route path="/trees/:treeId" element={<ProtectedRoute><TreeViewPage /></ProtectedRoute>} />
         <Route path="/trees/:treeId/full" element={<ProtectedRoute><FullTreePage /></ProtectedRoute>} />
         <Route path="/trees/:treeId/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
+        <Route path="/trees/:treeId/dive/:personId" element={<ProtectedRoute><SubfamilyPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>

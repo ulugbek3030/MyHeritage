@@ -113,6 +113,7 @@ export const TreeViewPage = () => {
           onAddRelative={() => { setAddOpen(lpMenu.person); setLpMenu(null); }}
           onHide={() => alert('TODO')}
           onDelete={() => alert('TODO')}
+          onDive={() => { nav(`/trees/${treeId}/dive/${lpMenu.person.id}`); setLpMenu(null); }}
         />
       )}
       {searchOpen && <TreeSearch persons={data.persons} onSelect={(id) => { document.querySelector(`[data-person-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onClose={() => setSearchOpen(false)} />}
