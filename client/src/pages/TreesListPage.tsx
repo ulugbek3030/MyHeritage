@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listTrees, createTree } from '../api/trees';
 import type { Tree } from '../types';
+import { Skeleton } from '../components/ui/Skeleton';
 
 export const TreesListPage = () => {
   const nav = useNavigate();
@@ -15,7 +16,13 @@ export const TreesListPage = () => {
     nav(`/trees/${t.id}`);
   };
 
-  if (loading) return <div style={{padding:24}}>Загрузка…</div>;
+  if (loading) return (
+    <div style={{padding:24,display:'flex',flexDirection:'column',gap:8}}>
+      <Skeleton height={48} radius={14} />
+      <Skeleton height={120} radius={14} />
+      <Skeleton height={300} radius={14} />
+    </div>
+  );
   if (trees.length === 0) return (
     <div style={{padding:24,maxWidth:420,margin:'40px auto',textAlign:'center'}}>
       <h1 style={{fontSize:28,fontWeight:800,marginBottom:12}}>Создайте дерево</h1>

@@ -11,6 +11,7 @@ import { Hero } from '../components/home/Hero';
 import { NudgeProgress } from '../components/home/NudgeProgress';
 import { QuickActions } from '../components/home/QuickActions';
 import { FAB } from '../components/home/FAB';
+import { Skeleton } from '../components/ui/Skeleton';
 
 export const TreeViewPage = () => {
   const { treeId } = useParams<{ treeId: string }>();
@@ -32,7 +33,13 @@ export const TreeViewPage = () => {
 
   const reload = () => { if (treeId) getFullTree(treeId).then(setData); };
 
-  if (!data) return <div style={{padding:24}}>Загрузка дерева…</div>;
+  if (!data) return (
+    <div style={{padding:24,display:'flex',flexDirection:'column',gap:8}}>
+      <Skeleton height={48} radius={14} />
+      <Skeleton height={120} radius={14} />
+      <Skeleton height={300} radius={14} />
+    </div>
+  );
 
   const upcoming = events.filter((e) => e.daysUntil >= 0).sort((a, b) => a.daysUntil - b.daysUntil)[0] ?? null;
   const pct = Math.min(100, Math.round((data.persons.length / 45) * 100));
