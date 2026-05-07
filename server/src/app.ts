@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { env } from './config/env.js';
 import { authRoutes } from './routes/auth.routes.js';
+import { devAuthRoutes } from './routes/dev-auth.routes.js';
 import { photoPublicRoutes } from './routes/photo-public.routes.js';
 import { treesRoutes } from './routes/trees.routes.js';
 import { personsRoutes } from './routes/persons.routes.js';
@@ -17,6 +18,7 @@ export const createApp = () => {
   app.use(express.json({ limit: '10mb' }));
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
   app.use('/api/auth', authRoutes);
+  if (env.NODE_ENV !== 'production') app.use('/api/auth', devAuthRoutes);
   app.use('/api', photoPublicRoutes);
   app.use('/api', sharePublicRoutes);
   app.use('/api/trees', treesRoutes);
