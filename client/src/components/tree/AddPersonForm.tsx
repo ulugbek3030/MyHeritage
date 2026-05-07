@@ -26,43 +26,55 @@ interface RoleOption {
 }
 
 /**
- * SVG silhouettes — adult/child × male/female. Classic "person placeholder"
- * shape (defined head + broad rounded shoulders) tuned for the dark theme.
- * Filled with currentColor so the parent button tints them via gender.
+ * Human-figure silhouettes — adult/child × male/female.
+ * Single solid shape per kind (no outlines), filled via currentColor so the
+ * parent button tints by gender. Each variant has:
+ *   • head with subtle jawline (not a perfect circle)
+ *   • visible neck taper between head and shoulders
+ *   • shoulders that slope organically into the torso
+ *   • female variants add a hair frame that extends down past the shoulders
+ *   • child variants have a larger head:body ratio (~1:1.4) for cuter proportions
  */
 const Silhouette = ({ kind }: { kind: 'adult-male' | 'adult-female' | 'child-male' | 'child-female' }) => {
   switch (kind) {
     case 'adult-male':
-      // Slim oval head, broad sloping shoulders, narrow waist taper.
       return (
         <svg viewBox="0 0 64 64" width="44" height="44" fill="currentColor" aria-hidden="true">
-          <ellipse cx="32" cy="21" rx="10" ry="11" />
-          <path d="M 8 64 L 8 52 C 8 42, 18 35, 32 35 C 46 35, 56 42, 56 52 L 56 64 Z" />
+          {/* head: subtle jaw narrowing toward chin */}
+          <path d="M 32 5 C 25 5, 22 10, 22 18 L 22 23 C 22 30, 26 33, 32 33 C 38 33, 42 30, 42 23 L 42 18 C 42 10, 39 5, 32 5 Z" />
+          {/* visible neck + sloping shoulders + torso */}
+          <path d="M 28 35 C 28 37, 26 37, 24 38 C 14 40, 6 46, 6 54 L 6 64 L 58 64 L 58 54 C 58 46, 50 40, 40 38 C 38 37, 36 37, 36 35 Z" />
         </svg>
       );
     case 'adult-female':
-      // Wider hair frame (extends below ears), narrower shoulders, longer hair on shoulders.
       return (
         <svg viewBox="0 0 64 64" width="44" height="44" fill="currentColor" aria-hidden="true">
-          <path d="M 18 22 C 18 10, 24 5, 32 5 C 40 5, 46 10, 46 22 L 46 33 C 46 35, 44 35, 44 35 L 20 35 C 20 35, 18 35, 18 33 Z" />
-          <path d="M 11 64 L 11 53 C 11 44, 20 37, 32 37 C 44 37, 53 44, 53 53 L 53 64 Z" />
-          <path d="M 16 39 C 13 46, 13 54, 16 60 L 22 56 L 22 39 Z M 48 39 L 48 56 L 54 60 C 51 54, 51 46, 48 39 Z" />
+          {/* hair: long, drops past shoulders to chest level on both sides */}
+          <path d="M 32 3 C 21 3, 15 11, 15 21 L 15 36 C 15 41, 16 45, 18 48 L 18 64 L 24 64 L 24 50 C 24 47, 25 45, 27 44 L 37 44 C 39 45, 40 47, 40 50 L 40 64 L 46 64 L 46 48 C 48 45, 49 41, 49 36 L 49 21 C 49 11, 43 3, 32 3 Z" />
+          {/* head with subtle jaw, sits inside the hair frame */}
+          <path d="M 32 7 C 25 7, 22 12, 22 19 L 22 25 C 22 31, 26 34, 32 34 C 38 34, 42 31, 42 25 L 42 19 C 42 12, 39 7, 32 7 Z" />
+          {/* neck + narrower shoulders + torso */}
+          <path d="M 28 36 C 28 38, 26 38, 24 39 C 16 41, 10 47, 10 54 L 10 64 L 54 64 L 54 54 C 54 47, 48 41, 40 39 C 38 38, 36 38, 36 36 Z" />
         </svg>
       );
     case 'child-male':
-      // Larger head proportional to body, smaller compact shoulders.
       return (
         <svg viewBox="0 0 64 64" width="44" height="44" fill="currentColor" aria-hidden="true">
-          <circle cx="32" cy="24" r="13" />
-          <path d="M 14 64 L 14 56 C 14 48, 22 43, 32 43 C 42 43, 50 48, 50 56 L 50 64 Z" />
+          {/* larger round head, soft chin */}
+          <path d="M 32 5 C 23 5, 19 11, 19 21 L 19 27 C 19 35, 24 39, 32 39 C 40 39, 45 35, 45 27 L 45 21 C 45 11, 41 5, 32 5 Z" />
+          {/* short neck + compact shoulders */}
+          <path d="M 28 41 C 28 42, 27 42, 26 43 C 18 45, 14 50, 14 56 L 14 64 L 50 64 L 50 56 C 50 50, 46 45, 38 43 C 37 42, 36 42, 36 41 Z" />
         </svg>
       );
     case 'child-female':
-      // Bigger rounded hair frame, smaller shoulders.
       return (
         <svg viewBox="0 0 64 64" width="44" height="44" fill="currentColor" aria-hidden="true">
-          <path d="M 17 25 C 17 13, 24 7, 32 7 C 40 7, 47 13, 47 25 L 47 36 C 47 38, 45 38, 45 38 L 19 38 C 19 38, 17 38, 17 36 Z" />
-          <path d="M 14 64 L 14 56 C 14 48, 22 43, 32 43 C 42 43, 50 48, 50 56 L 50 64 Z" />
+          {/* fuller hair frame around bigger child head, hair drops to shoulders */}
+          <path d="M 32 4 C 21 4, 16 11, 16 22 L 16 36 C 16 41, 18 45, 20 48 L 20 64 L 25 64 L 25 52 C 25 50, 26 48, 28 47 L 36 47 C 38 48, 39 50, 39 52 L 39 64 L 44 64 L 44 48 C 46 45, 48 41, 48 36 L 48 22 C 48 11, 43 4, 32 4 Z" />
+          {/* head sits inside hair frame */}
+          <path d="M 32 9 C 24 9, 21 14, 21 22 L 21 28 C 21 35, 25 39, 32 39 C 39 39, 43 35, 43 28 L 43 22 C 43 14, 40 9, 32 9 Z" />
+          {/* short neck + compact shoulders */}
+          <path d="M 28 41 C 28 43, 26 43, 25 43 C 18 45, 14 50, 14 56 L 14 64 L 50 64 L 50 56 C 50 50, 46 45, 39 43 C 38 43, 36 43, 36 41 Z" />
         </svg>
       );
   }
