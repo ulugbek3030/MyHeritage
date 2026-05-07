@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { listEvents } from '../api/events';
 import type { FamilyEvent } from '../types';
 import { EventCard } from '../components/calendar/EventCard';
+import { MonthMini } from '../components/calendar/MonthMini';
 
 export const CalendarPage = () => {
   const { treeId } = useParams<{ treeId: string }>();
@@ -10,6 +11,7 @@ export const CalendarPage = () => {
   const [events, setEvents] = useState<FamilyEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'birthday' | 'memorial' | 'anniversary'>('all');
+  const [monthOffset, setMonthOffset] = useState(0);
 
   useEffect(() => {
     if (!treeId) return;
@@ -42,6 +44,7 @@ export const CalendarPage = () => {
           <button key={k} onClick={() => setFilter(k)} style={{padding:'7px 12px',borderRadius:18,fontSize:11,fontWeight:filter===k?800:600,whiteSpace:'nowrap',background:filter===k?'linear-gradient(135deg,var(--accent),var(--accent-hover))':'rgba(255,255,255,0.04)',color:filter===k?'#0a0a0d':'var(--text)',border:`1px solid ${filter===k?'transparent':'var(--border)'}`}}>{label}</button>
         ))}
       </div>
+      <MonthMini events={events} monthOffset={monthOffset} onMonthChange={(d) => setMonthOffset(monthOffset + d)} />
       {loading ? <div style={{padding:24}}>Загрузка…</div> : (
         <div style={{padding:'0 18px 24px',flex:1}}>
           {([['Сегодня', groups.today], ['На этой неделе', groups.week], ['В этом месяце', groups.month], ['Дальше', groups.later]] as const).map(([title, list]) => list.length > 0 && (
