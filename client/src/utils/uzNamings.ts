@@ -4,6 +4,27 @@ export const generateMiddleName = (fatherFirstName: string | null, gender: 'male
   return `${fatherFirstName} ${suffix}`;
 };
 
+/**
+ * Adjust a Slavic-style surname (-ов/-ев/-ин/-ский …) to match the target gender.
+ *   • female: append "а" if missing  (Рустамов → Рустамова, Иванский → Иванская)
+ *   • male:   strip trailing "а"      (Рустамова → Рустамов, Иванская → Иванский)
+ * No-op for surnames already in the target form (e.g. "Khan" stays unchanged).
+ */
+export const adjustSurnameForGender = (surname: string, targetGender: 'male' | 'female'): string => {
+  const trimmed = (surname ?? '').trim();
+  if (!trimmed) return '';
+  const endsInA = /[ая]$/i.test(trimmed);
+  if (targetGender === 'female' && !endsInA) {
+    if (/(ский|цкий)$/i.test(trimmed)) return trimmed.replace(/ий$/i, 'ая');
+    return trimmed + 'а';
+  }
+  if (targetGender === 'male' && endsInA) {
+    if (/(ская|цкая)$/i.test(trimmed)) return trimmed.replace(/ая$/i, 'ий');
+    return trimmed.replace(/а$/i, '');
+  }
+  return trimmed;
+};
+
 export type RelationKey = 'father' | 'mother' | 'son' | 'daughter' | 'brother' | 'sister' | 'husband' | 'wife' | 'amaki' | 'amma' | 'togha' | 'kelin' | 'kuyov';
 
 export const RELATIONS_RU: Record<RelationKey, string> = {

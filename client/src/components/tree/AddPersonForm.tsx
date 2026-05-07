@@ -2,10 +2,13 @@ import { useState, useMemo } from 'react';
 import type { Person, Relationship } from '../../types';
 import { createPerson, type CreatePersonInput } from '../../api/persons';
 import { generateMiddleName } from '../../utils/uzNamings';
+import { adjustSurnameForGender } from '../../utils/uzNamings';
 import { BottomSheet } from '../ui/BottomSheet';
+import { Silhouette, type SilhouetteKind } from '../ui/Silhouette';
+import { DateWheelPicker } from '../ui/DateWheelPicker';
 import '../../styles/form.css';
 
-type Mode = 'parent' | 'sibling' | 'child';
+type Mode = 'parent' | 'sibling' | 'child' | 'spouse';
 
 interface Props {
   open: boolean;
@@ -25,60 +28,6 @@ interface RoleOption {
   visible: boolean;
 }
 
-/**
- * Human-figure silhouettes — adult/child × male/female.
- * Single solid shape per kind (no outlines), filled via currentColor so the
- * parent button tints by gender. Each variant has:
- *   • head with subtle jawline (not a perfect circle)
- *   • visible neck taper between head and shoulders
- *   • shoulders that slope organically into the torso
- *   • female variants add a hair frame that extends down past the shoulders
- *   • child variants have a larger head:body ratio (~1:1.4) for cuter proportions
- */
-const Silhouette = ({ kind }: { kind: 'adult-male' | 'adult-female' | 'child-male' | 'child-female' }) => {
-  switch (kind) {
-    case 'adult-male':
-      return (
-        <svg viewBox="0 0 64 64" width="44" height="44" fill="currentColor" aria-hidden="true">
-          {/* head: subtle jaw narrowing toward chin */}
-          <path d="M 32 5 C 25 5, 22 10, 22 18 L 22 23 C 22 30, 26 33, 32 33 C 38 33, 42 30, 42 23 L 42 18 C 42 10, 39 5, 32 5 Z" />
-          {/* visible neck + sloping shoulders + torso */}
-          <path d="M 28 35 C 28 37, 26 37, 24 38 C 14 40, 6 46, 6 54 L 6 64 L 58 64 L 58 54 C 58 46, 50 40, 40 38 C 38 37, 36 37, 36 35 Z" />
-        </svg>
-      );
-    case 'adult-female':
-      return (
-        <svg viewBox="0 0 64 64" width="44" height="44" fill="currentColor" aria-hidden="true">
-          {/* hair: long, drops past shoulders to chest level on both sides */}
-          <path d="M 32 3 C 21 3, 15 11, 15 21 L 15 36 C 15 41, 16 45, 18 48 L 18 64 L 24 64 L 24 50 C 24 47, 25 45, 27 44 L 37 44 C 39 45, 40 47, 40 50 L 40 64 L 46 64 L 46 48 C 48 45, 49 41, 49 36 L 49 21 C 49 11, 43 3, 32 3 Z" />
-          {/* head with subtle jaw, sits inside the hair frame */}
-          <path d="M 32 7 C 25 7, 22 12, 22 19 L 22 25 C 22 31, 26 34, 32 34 C 38 34, 42 31, 42 25 L 42 19 C 42 12, 39 7, 32 7 Z" />
-          {/* neck + narrower shoulders + torso */}
-          <path d="M 28 36 C 28 38, 26 38, 24 39 C 16 41, 10 47, 10 54 L 10 64 L 54 64 L 54 54 C 54 47, 48 41, 40 39 C 38 38, 36 38, 36 36 Z" />
-        </svg>
-      );
-    case 'child-male':
-      return (
-        <svg viewBox="0 0 64 64" width="44" height="44" fill="currentColor" aria-hidden="true">
-          {/* larger round head, soft chin */}
-          <path d="M 32 5 C 23 5, 19 11, 19 21 L 19 27 C 19 35, 24 39, 32 39 C 40 39, 45 35, 45 27 L 45 21 C 45 11, 41 5, 32 5 Z" />
-          {/* short neck + compact shoulders */}
-          <path d="M 28 41 C 28 42, 27 42, 26 43 C 18 45, 14 50, 14 56 L 14 64 L 50 64 L 50 56 C 50 50, 46 45, 38 43 C 37 42, 36 42, 36 41 Z" />
-        </svg>
-      );
-    case 'child-female':
-      return (
-        <svg viewBox="0 0 64 64" width="44" height="44" fill="currentColor" aria-hidden="true">
-          {/* fuller hair frame around bigger child head, hair drops to shoulders */}
-          <path d="M 32 4 C 21 4, 16 11, 16 22 L 16 36 C 16 41, 18 45, 20 48 L 20 64 L 25 64 L 25 52 C 25 50, 26 48, 28 47 L 36 47 C 38 48, 39 50, 39 52 L 39 64 L 44 64 L 44 48 C 46 45, 48 41, 48 36 L 48 22 C 48 11, 43 4, 32 4 Z" />
-          {/* head sits inside hair frame */}
-          <path d="M 32 9 C 24 9, 21 14, 21 22 L 21 28 C 21 35, 25 39, 32 39 C 39 39, 43 35, 43 28 L 43 22 C 43 14, 40 9, 32 9 Z" />
-          {/* short neck + compact shoulders */}
-          <path d="M 28 41 C 28 43, 26 43, 25 43 C 18 45, 14 50, 14 56 L 14 64 L 50 64 L 50 56 C 50 50, 46 45, 39 43 C 38 43, 36 43, 36 41 Z" />
-        </svg>
-      );
-  }
-};
 
 export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, relationships, onCreated }: Props) => {
   const [step, setStep] = useState<'select' | 'form'>('select');
@@ -87,7 +36,11 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState(targetPerson.lastName ?? '');
   const [maidenName, setMaidenName] = useState('');
-  const [year, setYear] = useState<string>('');
+  const [birthDate, setBirthDate] = useState<string>(''); // YYYY-MM-DD via <input type="date">
+  const [year, setYear] = useState<string>('');           // year-only fallback
+  const [isAlive, setIsAlive] = useState(true);
+  const [deathDate, setDeathDate] = useState<string>('');
+  const [deathYear, setDeathYear] = useState<string>('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -126,19 +79,24 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
     .join(' ');
 
   const options: RoleOption[] = [
-    { key: 'father', label: 'Добавить отца', mode: 'parent', gender: 'male', visible: !father },
-    { key: 'mother', label: 'Добавить мать', mode: 'parent', gender: 'female', visible: !mother },
-    { key: 'brother', label: 'Добавить брата', mode: 'sibling', gender: 'male', visible: hasParents },
-    { key: 'sister', label: 'Добавить сестру', mode: 'sibling', gender: 'female', visible: hasParents },
-    { key: 'son', label: 'Добавить сына', mode: 'child', gender: 'male', visible: true },
-    { key: 'daughter', label: 'Добавить дочь', mode: 'child', gender: 'female', visible: true },
+    { key: 'partner', label: 'Добавить\nпартнёра', mode: 'spouse', gender: targetPerson.gender === 'male' ? 'female' : 'male', visible: true },
+    { key: 'father', label: 'Добавить\nотца', mode: 'parent', gender: 'male', visible: !father },
+    { key: 'mother', label: 'Добавить\nмать', mode: 'parent', gender: 'female', visible: !mother },
+    { key: 'brother', label: 'Добавить\nбрата', mode: 'sibling', gender: 'male', visible: hasParents },
+    { key: 'sister', label: 'Добавить\nсестру', mode: 'sibling', gender: 'female', visible: hasParents },
+    { key: 'son', label: 'Добавить\nсына', mode: 'child', gender: 'male', visible: true },
+    { key: 'daughter', label: 'Добавить\nдочь', mode: 'child', gender: 'female', visible: true },
   ];
 
   const reset = () => {
     setFirstName('');
     setLastName(targetPerson.lastName ?? '');
     setMaidenName('');
+    setBirthDate('');
     setYear('');
+    setIsAlive(true);
+    setDeathDate('');
+    setDeathYear('');
     setPhoto(null);
     setStep('select');
   };
@@ -146,6 +104,24 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
   const pick = (m: Mode, g: 'male' | 'female') => {
     setMode(m);
     setGender(g);
+    // Smart surname defaults per role:
+    //   • male sibling/child/father → inherits target's lastName
+    //   • female sibling/daughter   → maidenName = target's lastName (born into family),
+    //                                  lastName empty (filled if married)
+    //   • female parent (mother)    → maidenName empty (unknown), lastName empty
+    const tLast = targetPerson.lastName ?? '';
+    if (g === 'male') {
+      // Strip trailing "а" — Рустамова (target female) → Рустамов (new son).
+      setLastName(adjustSurnameForGender(tLast, 'male'));
+      setMaidenName('');
+    } else if (m === 'parent') {
+      setLastName('');
+      setMaidenName('');
+    } else {
+      // Append "а" — Рустамов (target male) → Рустамова (new daughter's maiden).
+      setMaidenName(adjustSurnameForGender(tLast, 'female'));
+      setLastName('');
+    }
     setStep('form');
   };
 
@@ -170,15 +146,38 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
       } else if (mode === 'child') {
         rels.push({ category: 'parent_child', otherPersonId: targetPerson.id, role: 'child', childRelation: 'biological' });
         if (spouse) rels.push({ category: 'parent_child', otherPersonId: spouse.id, role: 'child', childRelation: 'biological' });
+      } else if (mode === 'spouse') {
+        rels.push({ category: 'couple', otherPersonId: targetPerson.id, role: 'spouse', coupleStatus: 'married' });
       }
+
+      // birthDate / deathDate are already ISO strings (YYYY-MM-DD) from
+      // <input type="date">. If only year is provided, store as birthYear.
+      const fullBirthDate = !!birthDate;
+      const fullDeathDate = !!deathDate;
+      const effectiveBirthYear = fullBirthDate
+        ? Number(birthDate.split('-')[0])
+        : (year ? Number(year) : undefined);
+      const effectiveDeathYear = fullDeathDate
+        ? Number(deathDate.split('-')[0])
+        : (deathYear ? Number(deathYear) : undefined);
+
+      // For unmarried women, lastName falls back to maidenName so display logic
+      // (which prefers lastName) shows the right surname.
+      const effectiveLastName = lastName.trim() || (gender === 'female' ? maidenName.trim() : '');
 
       const newPerson = await createPerson(treeId, {
         firstName: firstName.trim(),
-        lastName: lastName.trim() || undefined,
+        lastName: effectiveLastName || undefined,
         middleName: middleName || undefined,
         maidenName: gender === 'female' ? maidenName.trim() || undefined : undefined,
         gender,
-        birthYear: year ? Number(year) : undefined,
+        birthYear: effectiveBirthYear,
+        birthDate: fullBirthDate ? birthDate : undefined,
+        birthDateKnown: fullBirthDate,
+        isAlive,
+        deathYear: !isAlive ? effectiveDeathYear : undefined,
+        deathDate: !isAlive && fullDeathDate ? deathDate : undefined,
+        deathDateKnown: !isAlive && fullDeathDate,
         relationships: rels,
       });
       if (photo) {
@@ -208,88 +207,99 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
             >
               ←
             </button>
-            <div style={{ flex: 1, fontSize: 14, fontWeight: 800, lineHeight: 1.3 }}>
-              Добавьте родственника
-              {targetFullName && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>{targetFullName}</div>}
+            <div style={{ flex: 1, fontSize: 17, fontWeight: 800, lineHeight: 1.3, letterSpacing: '-0.01em' }}>
+              Добавьте родственника {targetFullName && <span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>{targetFullName}</span>}
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, padding: '14px 4px 4px' }}>
-            {options.filter((o) => o.visible).map((o) => (
-              <button
-                key={o.key}
-                type="button"
-                onClick={() => pick(o.mode, o.gender)}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 4px',
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 14,
-                  color: 'var(--text)',
-                  cursor: 'pointer',
-                  transition: 'background 0.15s ease, border-color 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(251,191,36,0.08)';
-                  e.currentTarget.style.borderColor = 'rgba(251,191,36,0.35)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
-                  e.currentTarget.style.borderColor = 'var(--border)';
-                }}
-              >
-                <div style={{ position: 'relative', width: 64, height: 64 }}>
-                  <div
-                    style={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: '50%',
-                      background:
-                        o.gender === 'female'
-                          ? 'linear-gradient(135deg, rgba(244,114,182,0.18), rgba(244,114,182,0.04))'
-                          : 'linear-gradient(135deg, rgba(96,165,250,0.18), rgba(96,165,250,0.04))',
-                      border: `1px solid ${o.gender === 'female' ? 'rgba(244,114,182,0.35)' : 'rgba(96,165,250,0.35)'}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden',
-                      color: o.gender === 'female' ? 'rgba(244,114,182,0.65)' : 'rgba(96,165,250,0.65)',
-                    }}
-                  >
-                    <Silhouette kind={`${o.mode === 'child' ? 'child' : 'adult'}-${o.gender}` as 'adult-male' | 'adult-female' | 'child-male' | 'child-female'} />
+          {(() => {
+            // Two centred rows:
+            //   • Row 1: partner + EITHER parents (if not yet added) OR siblings
+            //     (if target already has parents). Siblings hidden when there are
+            //     no parents to link to; parent options hidden once both exist.
+            //   • Row 2: children.
+            const visible = options.filter((o) => o.visible);
+            const partner = visible.filter((o) => o.mode === 'spouse');
+            const upperFamily = visible.filter((o) => o.mode === 'parent' || o.mode === 'sibling');
+            const lower = visible.filter((o) => o.mode === 'child');
+            const rows = [[...partner, ...upperFamily], lower].filter((r) => r.length > 0);
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 40, padding: '28px 4px 16px' }}>
+                {rows.map((row, ri) => (
+                  <div key={ri} style={{ display: 'flex', justifyContent: 'center', gap: 32, flexWrap: 'wrap' }}>
+                    {row.map((o) => {
+              const accent = o.gender === 'female' ? 'rgba(244,114,182,0.65)' : 'rgba(96,165,250,0.65)';
+              const ring = o.gender === 'female' ? 'rgba(244,114,182,0.3)' : 'rgba(96,165,250,0.3)';
+              const wash = o.gender === 'female'
+                ? 'linear-gradient(135deg, rgba(244,114,182,0.14), rgba(244,114,182,0.03))'
+                : 'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(96,165,250,0.03))';
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  onClick={() => pick(o.mode, o.gender)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '6px 0',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ position: 'relative', width: 80, height: 80 }}>
+                    <div
+                      style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: '50%',
+                        background: wash,
+                        border: `1px solid ${ring}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        color: accent,
+                      }}
+                    >
+                      <Silhouette kind={(o.mode === 'parent' ? 'older' : o.mode === 'child' ? 'child' : 'adult') + '-' + o.gender as SilhouetteKind} />
+                    </div>
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        position: 'absolute',
+                        bottom: -2,
+                        right: -2,
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))',
+                        color: '#0a0a0d',
+                        fontSize: 18,
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '2px solid var(--surface)',
+                        boxShadow: '0 2px 10px rgba(251,191,36,0.45)',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      +
+                    </span>
                   </div>
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      position: 'absolute',
-                      bottom: -3,
-                      right: -3,
-                      width: 22,
-                      height: 22,
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))',
-                      color: '#0a0a0d',
-                      fontSize: 14,
-                      fontWeight: 800,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '2px solid var(--surface)',
-                      boxShadow: '0 2px 8px rgba(251,191,36,0.4)',
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    +
-                  </span>
-                </div>
-                <div style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', lineHeight: 1.2 }}>{o.label}</div>
-              </button>
-            ))}
-          </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, textAlign: 'center', lineHeight: 1.25, whiteSpace: 'pre-line' }}>{o.label}</div>
+                </button>
+              );
+            })}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </>
       ) : (
         <>
@@ -327,13 +337,78 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
           )}
 
           <form onSubmit={onSubmit}>
+            {/* Gender override (role pre-selects, but user can flip if mistake) */}
+            <div style={{ display: 'flex', gap: 18, marginBottom: 14 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+                <input type="radio" name="gender" checked={gender === 'male'} onChange={() => setGender('male')} style={{ accentColor: 'var(--accent)' }} />
+                Мужчина
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+                <input type="radio" name="gender" checked={gender === 'female'} onChange={() => setGender('female')} style={{ accentColor: 'var(--accent)' }} />
+                Женщина
+              </label>
+            </div>
+
             <input className="auth-input" placeholder="Имя" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus />
-            <input className="auth-input" placeholder="Фамилия" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+
             {gender === 'female' && (
               <input className="auth-input" placeholder="Девичья фамилия" value={maidenName} onChange={(e) => setMaidenName(e.target.value)} />
             )}
+            <input
+              className="auth-input"
+              placeholder={gender === 'female' ? 'Фамилия (если другая после замужества)' : 'Фамилия'}
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+            />
             {middleName && <input className="auth-input" placeholder="Отчество" value={middleName} readOnly />}
-            <input className="auth-input" placeholder="Год рождения" inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+
+            {/* Birth date — custom wheel-picker (iPhone-style spinners). */}
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Дата рождения</div>
+            <DateWheelPicker
+              value={birthDate}
+              onChange={(iso) => { setBirthDate(iso); if (iso) setYear(''); }}
+            />
+            {!birthDate && (
+              <input
+                className="auth-input"
+                placeholder="Или только год (1985)"
+                inputMode="numeric"
+                value={year}
+                onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              />
+            )}
+
+            {/* Alive / Deceased toggle */}
+            <div style={{ display: 'flex', gap: 18, marginBottom: 14 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+                <input type="radio" name="alive" checked={isAlive} onChange={() => setIsAlive(true)} style={{ accentColor: 'var(--accent)' }} />
+                {gender === 'female' ? 'Жива' : 'Жив'}
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+                <input type="radio" name="alive" checked={!isAlive} onChange={() => setIsAlive(false)} style={{ accentColor: 'var(--accent)' }} />
+                {gender === 'female' ? 'Умерла' : 'Умер'}
+              </label>
+            </div>
+
+            {!isAlive && (
+              <>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Дата смерти</div>
+                <DateWheelPicker
+                  value={deathDate}
+                  onChange={(iso) => { setDeathDate(iso); if (iso) setDeathYear(''); }}
+                />
+                {!deathDate && (
+                  <input
+                    className="auth-input"
+                    placeholder="Или только год (2010)"
+                    inputMode="numeric"
+                    value={deathYear}
+                    onChange={(e) => setDeathYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  />
+                )}
+              </>
+            )}
+
             <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} className="auth-input" />
             <button type="submit" disabled={busy || !firstName.trim()} className="auth-btn">
               {busy ? 'Сохранение…' : 'Добавить'}

@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getFullTree } from '../api/trees';
+import { deletePerson } from '../api/persons';
 import { listEvents } from '../api/events';
 import type { FullTree, Person, FamilyEvent } from '../types';
 import { FamilyTreeLayout } from '../components/tree/FamilyTreeLayout';
 import { PersonSheet } from '../components/tree/PersonSheet';
 import { AddPersonForm } from '../components/tree/AddPersonForm';
+import { EditPersonForm } from '../components/tree/EditPersonForm';
 import { ShareModal } from '../components/share/ShareModal';
 import { Hero } from '../components/home/Hero';
 import { NudgeProgress } from '../components/home/NudgeProgress';
 import { QuickActions } from '../components/home/QuickActions';
-import { FAB } from '../components/home/FAB';
 import { Skeleton } from '../components/ui/Skeleton';
-import { LongPressMenu } from '../components/tree/LongPressMenu';
 import { TreeSearch } from '../components/tree/TreeSearch';
 
 export const TreeViewPage = () => {
@@ -21,9 +21,9 @@ export const TreeViewPage = () => {
   const [data, setData] = useState<FullTree | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [addOpen, setAddOpen] = useState<Person | null>(null);
+  const [editOpen, setEditOpen] = useState<Person | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
-  const [lpMenu, setLpMenu] = useState<{ person: Person; pos: { x: number; y: number } } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => { if (treeId) getFullTree(treeId).then(setData); }, [treeId]);
@@ -63,14 +63,13 @@ export const TreeViewPage = () => {
         onOpenCta={() => upcoming?.personId && setSelectedPerson(data.persons.find((p) => p.id === upcoming.personId) ?? null)}
       />
       <NudgeProgress pct={pct} hint={data.persons.length < 13 ? '+ бабушка раскроет 6 родственников' : '+ дядя по матери раскроет ещё ветку'} />
-      <div style={{padding:'12px 12px 24px',flex:1}}>
+      <div style={{padding:'48px 12px 24px',flex:1}}>
         <FamilyTreeLayout
           persons={data.persons}
           relationships={data.relationships}
           ownerId={data.tree.ownerPersonId}
           onPersonClick={(id) => setSelectedPerson(data.persons.find((p) => p.id === id) ?? null)}
           onPlusClick={(id) => { const p = data.persons.find((p) => p.id === id); if (p) setAddOpen(p); }}
-          onLongPress={(id, pos) => { const p = data.persons.find((x) => x.id === id); if (p) setLpMenu({ person: p, pos }); }}
         />
       </div>
       <QuickActions
@@ -79,14 +78,20 @@ export const TreeViewPage = () => {
         onGifts={() => alert('История подарков — Phase 2')}
         eventCount={events.length}
       />
-      <FAB onClick={() => data.tree.ownerPersonId && setAddOpen(data.persons.find((p) => p.id === data.tree.ownerPersonId) ?? null)} />
       <PersonSheet
         open={!!selectedPerson}
         onClose={() => setSelectedPerson(null)}
         person={selectedPerson}
-        onEdit={() => {}}
+        onEdit={() => { if (selectedPerson) { setEditOpen(selectedPerson); setSelectedPerson(null); } }}
         onAdd={() => { if (selectedPerson) { setAddOpen(selectedPerson); setSelectedPerson(null); } }}
-        onDelete={() => {}}
+        onDelete={async () => {
+          if (!selectedPerson || !treeId) return;
+          const fullName = [selectedPerson.firstName, selectedPerson.lastName].filter(Boolean).join(' ');
+          if (!window.confirm(`Удалить ${fullName}? Все связи с этим человеком тоже будут удалены. Действие необратимо.`)) return;
+          await deletePerson(treeId, selectedPerson.id);
+          setSelectedPerson(null);
+          reload();
+        }}
       />
       {addOpen && (
         <AddPersonForm
@@ -99,23 +104,16 @@ export const TreeViewPage = () => {
           onCreated={reload}
         />
       )}
-      {shareOpen && <ShareModal open onClose={() => setShareOpen(false)} treeId={treeId!} existingToken={data.tree.shareToken} />}
-      {lpMenu && (
-        <LongPressMenu
+      {editOpen && (
+        <EditPersonForm
           open
-          position={lpMenu.pos}
-          person={lpMenu.person}
-          hasUpcomingBirthday={false}
-          onClose={() => setLpMenu(null)}
-          onGift={() => alert('Phase 2')}
-          onGoBirthday={() => nav(`/trees/${treeId}/calendar`)}
-          onEdit={() => alert('TODO')}
-          onAddRelative={() => { setAddOpen(lpMenu.person); setLpMenu(null); }}
-          onHide={() => alert('TODO')}
-          onDelete={() => alert('TODO')}
-          onDive={() => { nav(`/trees/${treeId}/dive/${lpMenu.person.id}`); setLpMenu(null); }}
+          onClose={() => setEditOpen(null)}
+          treeId={treeId!}
+          person={editOpen}
+          onSaved={reload}
         />
       )}
+      {shareOpen && <ShareModal open onClose={() => setShareOpen(false)} treeId={treeId!} existingToken={data.tree.shareToken} />}
       {searchOpen && <TreeSearch persons={data.persons} onSelect={(id) => { document.querySelector(`[data-person-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onClose={() => setSearchOpen(false)} />}
     </div>
   );

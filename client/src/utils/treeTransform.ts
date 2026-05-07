@@ -9,7 +9,7 @@ export interface TreeNode {
   spouses: { id: string; type: 'married' | 'divorced' }[];
 }
 
-export const transformToTreeNodes = (persons: Person[], rels: Relationship[]): TreeNode[] => {
+export const transformToTreeNodes = (persons: Person[], rels: Relationship[], ownerId?: string | null): TreeNode[] => {
   const byId: Record<string, TreeNode> = {};
   for (const p of persons) byId[p.id] = { id: p.id, gender: p.gender, parents: [], children: [], siblings: [], spouses: [] };
 
@@ -45,6 +45,21 @@ export const transformToTreeNodes = (persons: Person[], rels: Relationship[]): T
         const t: 'blood' | 'half' = sharedCount >= 2 ? 'blood' : 'half';
         addUnique(node.siblings, { id: sib.id, type: t });
       }
+    }
+  }
+
+  // Place the owner in the middle of his sibling row by re-ordering each
+  // parent's `children` array (relatives-tree positions siblings in this order).
+  if (ownerId && byId[ownerId]) {
+    const owner = byId[ownerId];
+    for (const parentRef of owner.parents) {
+      const parent = byId[parentRef.id];
+      if (!parent || parent.children.length < 2) continue;
+      const idx = parent.children.findIndex((c) => c.id === ownerId);
+      if (idx === -1) continue;
+      const [ownerEntry] = parent.children.splice(idx, 1);
+      const mid = Math.floor(parent.children.length / 2);
+      parent.children.splice(mid, 0, ownerEntry);
     }
   }
 

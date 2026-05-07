@@ -52,8 +52,11 @@ export const createPerson = async (treeId: string, input: CreatePersonInput) => 
 
     for (const r of input.relationships ?? []) {
       let p1: string, p2: string;
-      if (r.role === 'parent') { p1 = r.otherPersonId; p2 = newPerson.id; }
-      else if (r.role === 'child') { p1 = newPerson.id; p2 = r.otherPersonId; }
+      // Convention (matches seed): person1 = parent, person2 = child for parent_child rows.
+      //   role='parent' → newPerson is the PARENT of otherPerson  → (newPerson, otherPerson)
+      //   role='child'  → newPerson is the CHILD  of otherPerson  → (otherPerson, newPerson)
+      if (r.role === 'parent') { p1 = newPerson.id; p2 = r.otherPersonId; }
+      else if (r.role === 'child') { p1 = r.otherPersonId; p2 = newPerson.id; }
       else { p1 = newPerson.id; p2 = r.otherPersonId; }
       await c.query(
         `INSERT INTO relationships (tree_id, category, person1_id, person2_id, couple_status, child_relation)

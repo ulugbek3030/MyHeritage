@@ -9,8 +9,11 @@ import { useDrag } from '../../hooks/useDrag';
 
 // Card grid units. NODE_W/NODE_H = full unit; relatives-tree uses half-units, so cards
 // occupy 2 half-units wide. Generous values give breathing room between siblings.
-const NODE_W = 110;
-const NODE_H = 132;
+const NODE_W = 188;
+const NODE_H = 250;
+// Empty buffer above the top generation so the user can scroll up and intuit
+// that more parents/grandparents can be added there.
+const TOP_PAD = 200;
 
 interface Props {
   persons: Person[];
@@ -19,14 +22,13 @@ interface Props {
   upcomingBirthdayIds?: Set<string>;
   onPersonClick?: (id: string) => void;
   onPlusClick?: (id: string) => void;
-  onLongPress?: (personId: string, pos: { x: number; y: number }) => void;
 }
 
-export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirthdayIds, onPersonClick, onPlusClick, onLongPress }: Props) => {
+export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirthdayIds, onPersonClick, onPlusClick }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
 
-  const nodes = useMemo(() => transformToTreeNodes(persons, relationships), [persons, relationships]);
+  const nodes = useMemo(() => transformToTreeNodes(persons, relationships, ownerId), [persons, relationships, ownerId]);
 
   const layout = useMemo(() => {
     if (!nodes.length) return null;
@@ -42,47 +44,212 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
     }
   }, [nodes, ownerId]);
 
+  // Build SVG <path d=...> strings for connectors with rounded corners.
+  // Two-pass approach:
+  //   1. For each junction with a perpendicular pair, compute ONE radius (min of
+  //      half each incident segment's screen length, capped at ARC_R). All segment
+  //      shortening AND all arcs at this junction use this exact radius — so the
+  //      shortened segment end and the arc's approach point are the same point.
+  //   2. Render each segment as a `M L` line shortened by junction[start].r and
+  //      junction[end].r where applicable. Then render Q-bezier arcs at each
+  //      junction for every perpendicular pair.
+  const connectorPaths = useMemo(() => {
+    if (!layout) return [] as string[];
+    const segs = layout.connectors;
+    const sX = NODE_W / 2;
+    const sY = NODE_H / 2;
+    const ARC_R = 14;
+    const key = (x: number, y: number) => `${Math.round(x * 100)},${Math.round(y * 100)}`;
+    type Item = { idx: number; isStart: boolean; far: [number, number] };
+    const incident = new Map<string, Item[]>();
+    segs.forEach((seg, i) => {
+      const k1 = key(seg[0], seg[1]);
+      const k2 = key(seg[2], seg[3]);
+      if (!incident.has(k1)) incident.set(k1, []);
+      if (!incident.has(k2)) incident.set(k2, []);
+      incident.get(k1)!.push({ idx: i, isStart: true, far: [seg[2], seg[3]] });
+      incident.get(k2)!.push({ idx: i, isStart: false, far: [seg[0], seg[1]] });
+    });
+    const isPerp = (ax: number, ay: number, bx: number, by: number) => {
+      const lenA = Math.hypot(ax, ay);
+      const lenB = Math.hypot(bx, by);
+      if (lenA < 1e-6 || lenB < 1e-6) return false;
+      return Math.abs((ax * bx + ay * by) / (lenA * lenB)) < 0.05;
+    };
+    const segScreenLen = (idx: number) => {
+      const s = segs[idx];
+      return Math.hypot((s[2] - s[0]) * sX, (s[3] - s[1]) * sY);
+    };
+    // Pass 1: determine each junction's radius (only if at least one perp pair exists).
+    const junctionR = new Map<string, number>();
+    incident.forEach((items, k) => {
+      if (items.length < 2) return;
+      let hasPerp = false;
+      for (let i = 0; i < items.length && !hasPerp; i++) {
+        for (let j = i + 1; j < items.length && !hasPerp; j++) {
+          const a = items[i];
+          const b = items[j];
+          const aSeg = segs[a.idx];
+          const bSeg = segs[b.idx];
+          const aNear = a.isStart ? [aSeg[0], aSeg[1]] : [aSeg[2], aSeg[3]];
+          const bNear = b.isStart ? [bSeg[0], bSeg[1]] : [bSeg[2], bSeg[3]];
+          if (isPerp(a.far[0] - aNear[0], a.far[1] - aNear[1], b.far[0] - bNear[0], b.far[1] - bNear[1])) {
+            hasPerp = true;
+          }
+        }
+      }
+      if (!hasPerp) return;
+      // r = min(ARC_R, half of shortest incident segment in screen px)
+      let minLen = Infinity;
+      items.forEach((it) => {
+        const len = segScreenLen(it.idx);
+        if (len < minLen) minLen = len;
+      });
+      junctionR.set(k, Math.min(ARC_R, minLen * 0.45));
+    });
+    const paths: string[] = [];
+    // Pass 2a: each segment as a line with ends shortened by the per-junction r.
+    segs.forEach((seg, i) => {
+      const x1p = seg[0] * sX;
+      const y1p = seg[1] * sY;
+      const x2p = seg[2] * sX;
+      const y2p = seg[3] * sY;
+      const dx = x2p - x1p;
+      const dy = y2p - y1p;
+      const len = Math.hypot(dx, dy);
+      if (len < 0.01) return;
+      const ux = dx / len;
+      const uy = dy / len;
+      const k1 = key(seg[0], seg[1]);
+      const k2 = key(seg[2], seg[3]);
+      const r1 = junctionR.get(k1) ?? 0;
+      const r2 = junctionR.get(k2) ?? 0;
+      const sx = x1p + ux * r1;
+      const sy = y1p + uy * r1;
+      const ex = x2p - ux * r2;
+      const ey = y2p - uy * r2;
+      paths.push(`M ${sx},${sy} L ${ex},${ey}`);
+    });
+    // Pass 2b: Q-bezier arc at each junction for every perpendicular pair.
+    const drawn = new Set<string>();
+    incident.forEach((items, k) => {
+      const r = junctionR.get(k);
+      if (r === undefined) return;
+      for (let i = 0; i < items.length; i++) {
+        for (let j = i + 1; j < items.length; j++) {
+          const a = items[i];
+          const b = items[j];
+          const aSeg = segs[a.idx];
+          const bSeg = segs[b.idx];
+          const aNear = a.isStart ? [aSeg[0], aSeg[1]] : [aSeg[2], aSeg[3]];
+          const bNear = b.isStart ? [bSeg[0], bSeg[1]] : [bSeg[2], bSeg[3]];
+          const aDx = a.far[0] - aNear[0];
+          const aDy = a.far[1] - aNear[1];
+          const bDx = b.far[0] - bNear[0];
+          const bDy = b.far[1] - bNear[1];
+          if (!isPerp(aDx, aDy, bDx, bDy)) continue;
+          const arcKey = a.idx < b.idx ? `${k}|${a.idx}-${b.idx}` : `${k}|${b.idx}-${a.idx}`;
+          if (drawn.has(arcKey)) continue;
+          drawn.add(arcKey);
+          const jx = aNear[0] * sX;
+          const jy = aNear[1] * sY;
+          const aDxs = aDx * sX;
+          const aDys = aDy * sY;
+          const bDxs = bDx * sX;
+          const bDys = bDy * sY;
+          const lenAs = Math.hypot(aDxs, aDys);
+          const lenBs = Math.hypot(bDxs, bDys);
+          const apAx = jx + (aDxs / lenAs) * r;
+          const apAy = jy + (aDys / lenAs) * r;
+          const apBx = jx + (bDxs / lenBs) * r;
+          const apBy = jy + (bDys / lenBs) * r;
+          paths.push(`M ${apAx},${apAy} Q ${jx},${jy} ${apBx},${apBy}`);
+        }
+      }
+    });
+    return paths;
+  }, [layout]);
+
   useZoom(content as React.RefObject<HTMLElement>);
   useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
 
-  // Center owner horizontally on first render (and when owner changes).
+  // Center owner in both axes on first render (and when owner changes).
+  // When the tree overflows the viewport, `place-content: safe center` falls back
+  // to start (top-left), so we scroll explicitly to bring the owner to viewport
+  // centre. We run inside a double rAF so layout is committed and clientWidth /
+  // clientHeight are non-zero before we read them.
   useEffect(() => {
-    if (!layout || !ownerId || !viewport.current) return;
+    if (!layout || !ownerId) return;
     const ownerNode = layout.nodes.find((n) => n.id === ownerId);
     if (!ownerNode) return;
-    const ownerLeftPx = ownerNode.left * (NODE_W / 2);
-    const vp = viewport.current;
-    const target = ownerLeftPx + NODE_W / 2 - vp.clientWidth / 2;
-    vp.scrollLeft = Math.max(0, target);
+    let raf2 = 0;
+    const center = () => {
+      const vp = viewport.current;
+      if (!vp || !vp.clientWidth || !vp.clientHeight) return;
+      const ownerLeftPx = ownerNode.left * (NODE_W / 2);
+      const ownerTopPx = ownerNode.top * (NODE_H / 2) + TOP_PAD;
+      const targetX = ownerLeftPx + NODE_W / 2 - vp.clientWidth / 2;
+      const targetY = ownerTopPx + NODE_H / 2 - vp.clientHeight / 2;
+      vp.scrollTo({
+        left: Math.max(0, Math.min(targetX, vp.scrollWidth - vp.clientWidth)),
+        top: Math.max(0, Math.min(targetY, vp.scrollHeight - vp.clientHeight)),
+        behavior: 'auto',
+      });
+    };
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(center);
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
   }, [layout, ownerId]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 
   const W = layout.canvas.width * NODE_W;
-  const H = layout.canvas.height * NODE_H;
+  const H = layout.canvas.height * NODE_H + TOP_PAD;
 
   const personById = new Map(persons.map((p) => [p.id, p]));
 
   return (
-    <div ref={viewport} className="tree-stage" style={{ position: 'relative', overflow: 'auto', width: '100%', minHeight: 360, padding: 18, cursor: 'grab' }}>
+    <div
+      ref={viewport}
+      className="tree-stage"
+      style={{
+        position: 'relative',
+        overflow: 'auto',
+        width: '100%',
+        // height: 100% pins viewport to the parent flex item's height so the
+        // viewport itself owns the vertical scroll (rather than growing to fit
+        // content). This is what makes scrollTop work — without it the viewport
+        // expands to fit and the page scrolls instead.
+        height: '100%',
+        minHeight: 360,
+        padding: 18,
+        cursor: 'grab',
+        // Grid + safe center: centers content in both axes when it fits the
+        // viewport; falls back to start (no clipping) when content overflows
+        // so the auto-scroll-to-owner can still position the owner correctly.
+        display: 'grid',
+        placeContent: 'safe center',
+      }}
+    >
       <div ref={content} style={{ position: 'relative', width: W, height: H, willChange: 'transform' }}>
-        <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
-          {layout.connectors.map((c, i) => {
-            // relatives-tree connector coords are in half-units, aligned to card centers
-            // when nodes are rendered at NODE_W/2 scale. No extra shift needed.
-            const [x1, y1, x2, y2] = c;
-            return (
-              <line
-                key={i}
-                x1={(x1 * NODE_W) / 2}
-                y1={(y1 * NODE_H) / 2}
-                x2={(x2 * NODE_W) / 2}
-                y2={(y2 * NODE_H) / 2}
-                stroke="rgba(255,255,255,0.4)"
-                strokeWidth="1.4"
-              />
-            );
-          })}
+        <svg width={W} height={H} style={{ position: 'absolute', top: TOP_PAD, left: 0, pointerEvents: 'none' }}>
+          {/* strokeLinecap="butt" — at junctions the segment's shortened end and
+              the arc's start share the same point; round caps would double up there
+              and render as a small dot. Butt caps are flush. */}
+          {connectorPaths.map((d, i) => (
+            <path
+              key={i}
+              d={d}
+              stroke="rgba(255,255,255,0.4)"
+              strokeWidth="1.4"
+              fill="none"
+              strokeLinecap="butt"
+            />
+          ))}
         </svg>
         {layout.nodes.map((n: ExtNode) => {
           const person = personById.get(n.id);
@@ -94,7 +261,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
               data-person-id={n.id}
               style={{
                 position: 'absolute',
-                transform: `translate(${n.left * (NODE_W / 2)}px, ${n.top * (NODE_H / 2)}px)`,
+                transform: `translate(${n.left * (NODE_W / 2)}px, ${n.top * (NODE_H / 2) + TOP_PAD}px)`,
                 width: NODE_W,
                 height: NODE_H,
                 display: 'flex',
@@ -108,8 +275,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
                 hasUpcomingBirthday={upcomingBirthdayIds?.has(person.id)}
                 onClick={onPersonClick}
                 onPlusClick={onPlusClick}
-                onLongPress={onLongPress}
-                showPlus={person.id === ownerId}
+                showPlus={true}
               />
             </div>
           );
