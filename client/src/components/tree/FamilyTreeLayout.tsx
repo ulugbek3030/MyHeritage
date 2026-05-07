@@ -16,9 +16,10 @@ interface Props {
   upcomingBirthdayIds?: Set<string>;
   onPersonClick?: (id: string) => void;
   onPlusClick?: (id: string) => void;
+  onLongPress?: (personId: string, pos: { x: number; y: number }) => void;
 }
 
-export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirthdayIds, onPersonClick, onPlusClick }: Props) => {
+export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirthdayIds, onPersonClick, onPlusClick, onLongPress }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
 
@@ -65,6 +66,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
                 hasUpcomingBirthday={upcomingBirthdayIds?.has(person.id)}
                 onClick={onPersonClick}
                 onPlusClick={onPlusClick}
+                onLongPress={onLongPress}
                 showPlus={person.id === ownerId}
               />
             </div>

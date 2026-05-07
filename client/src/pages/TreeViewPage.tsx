@@ -12,6 +12,7 @@ import { NudgeProgress } from '../components/home/NudgeProgress';
 import { QuickActions } from '../components/home/QuickActions';
 import { FAB } from '../components/home/FAB';
 import { Skeleton } from '../components/ui/Skeleton';
+import { LongPressMenu } from '../components/tree/LongPressMenu';
 
 export const TreeViewPage = () => {
   const { treeId } = useParams<{ treeId: string }>();
@@ -21,6 +22,7 @@ export const TreeViewPage = () => {
   const [addOpen, setAddOpen] = useState<Person | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
+  const [lpMenu, setLpMenu] = useState<{ person: Person; pos: { x: number; y: number } } | null>(null);
 
   useEffect(() => { if (treeId) getFullTree(treeId).then(setData); }, [treeId]);
 
@@ -65,6 +67,7 @@ export const TreeViewPage = () => {
           ownerId={data.tree.ownerPersonId}
           onPersonClick={(id) => setSelectedPerson(data.persons.find((p) => p.id === id) ?? null)}
           onPlusClick={(id) => { const p = data.persons.find((p) => p.id === id); if (p) setAddOpen(p); }}
+          onLongPress={(id, pos) => { const p = data.persons.find((x) => x.id === id); if (p) setLpMenu({ person: p, pos }); }}
         />
       </div>
       <QuickActions
@@ -94,6 +97,21 @@ export const TreeViewPage = () => {
         />
       )}
       {shareOpen && <ShareModal open onClose={() => setShareOpen(false)} treeId={treeId!} existingToken={data.tree.shareToken} />}
+      {lpMenu && (
+        <LongPressMenu
+          open
+          position={lpMenu.pos}
+          person={lpMenu.person}
+          hasUpcomingBirthday={false}
+          onClose={() => setLpMenu(null)}
+          onGift={() => alert('Phase 2')}
+          onGoBirthday={() => nav(`/trees/${treeId}/calendar`)}
+          onEdit={() => alert('TODO')}
+          onAddRelative={() => { setAddOpen(lpMenu.person); setLpMenu(null); }}
+          onHide={() => alert('TODO')}
+          onDelete={() => alert('TODO')}
+        />
+      )}
     </div>
   );
 };
