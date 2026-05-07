@@ -54,6 +54,7 @@ export const TreeViewPage = () => {
       </header>
       <Hero
         event={upcoming}
+        treeFillPct={pct}
         onOpenCta={() => upcoming?.personId && setSelectedPerson(data.persons.find((p) => p.id === upcoming.personId) ?? null)}
       />
       <NudgeProgress pct={pct} hint={data.persons.length < 13 ? '+ бабушка раскроет 6 родственников' : '+ дядя по матери раскроет ещё ветку'} />
