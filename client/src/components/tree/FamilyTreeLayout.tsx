@@ -170,8 +170,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
     return paths;
   }, [layout]);
 
-  const zoom = useZoom(content as React.RefObject<HTMLElement>);
-  const fittedRef = useRef(false);
+  useZoom(content as React.RefObject<HTMLElement>);
   useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
 
   // Center owner in both axes on first render (and when owner changes).
@@ -179,6 +178,9 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
   // to start (top-left), so we scroll explicitly to bring the owner to viewport
   // centre. We run inside a double rAF so layout is committed and clientWidth /
   // clientHeight are non-zero before we read them.
+  // Owner card always at viewport centre on entry. The content is wrapped with
+  // a half-viewport-sized padding so scrollLeft/scrollTop can reach any owner
+  // position regardless of how close to the edge it sits in the layout.
   useEffect(() => {
     if (!layout || !ownerId) return;
     const ownerNode = layout.nodes.find((n) => n.id === ownerId);
@@ -187,31 +189,15 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
     const center = () => {
       const vp = viewport.current;
       if (!vp || !vp.clientWidth || !vp.clientHeight) return;
-      const W = layout.canvas.width * NODE_W;
-      const H = layout.canvas.height * NODE_H + TOP_PAD;
-      // First-time fit-to-screen: shrink content if it's wider/taller than the
-      // viewport so the whole tree is visible without scrolling. Only ≤1 (don't
-      // enlarge). After this initial fit, the user is free to zoom/pan.
-      let scale = 1;
-      if (!fittedRef.current) {
-        scale = Math.min(vp.clientWidth / W, vp.clientHeight / H, 1);
-        zoom.setTo(scale);
-        fittedRef.current = true;
-      }
-      // With `transform: scale(s); transform-origin: top center`, content's
-      // visual bounds shrink while the layout box stays W×H. Centering math:
-      //   visual centre X = W/2  (transform-origin)
-      //   visual top      = 0
-      //   visual height   = H * s
-      const ownerLeftPx = ownerNode.left * (NODE_W / 2);
-      const ownerTopPx = ownerNode.top * (NODE_H / 2) + TOP_PAD;
-      const ownerScreenX = W / 2 + (ownerLeftPx + NODE_W / 2 - W / 2) * scale;
-      const ownerScreenY = ownerTopPx * scale + (NODE_H / 2) * scale;
-      const targetX = ownerScreenX - vp.clientWidth / 2;
-      const targetY = ownerScreenY - vp.clientHeight / 2;
+      // Owner card centre in *content* coordinates.
+      const ownerCenterX = ownerNode.left * (NODE_W / 2) + NODE_W / 2;
+      const ownerCenterY = ownerNode.top * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
+      // Wrapper adds vp/2 padding on every side, so owner at content (x,y) sits
+      // at scroll coords (vp.width/2 + x, vp.height/2 + y). To put it at the
+      // visible viewport centre, scrollLeft = ownerCenterX, scrollTop = ownerCenterY.
       vp.scrollTo({
-        left: Math.max(0, Math.min(targetX, vp.scrollWidth - vp.clientWidth)),
-        top: Math.max(0, Math.min(targetY, vp.scrollHeight - vp.clientHeight)),
+        left: Math.max(0, Math.min(ownerCenterX, vp.scrollWidth - vp.clientWidth)),
+        top: Math.max(0, Math.min(ownerCenterY, vp.scrollHeight - vp.clientHeight)),
         behavior: 'auto',
       });
     };
@@ -222,7 +208,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [layout, ownerId, zoom]);
+  }, [layout, ownerId]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 
@@ -239,21 +225,15 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
         position: 'relative',
         overflow: 'auto',
         width: '100%',
-        // height: 100% pins viewport to the parent flex item's height so the
-        // viewport itself owns the vertical scroll (rather than growing to fit
-        // content). This is what makes scrollTop work — without it the viewport
-        // expands to fit and the page scrolls instead.
         height: '100%',
         minHeight: 360,
-        padding: 18,
         cursor: 'grab',
-        // Grid + safe center: centers content in both axes when it fits the
-        // viewport; falls back to start (no clipping) when content overflows
-        // so the auto-scroll-to-owner can still position the owner correctly.
-        display: 'grid',
-        placeContent: 'safe center',
       }}
     >
+      {/* Half-viewport padding around the content so scrollLeft/scrollTop can
+          place any node at the visible viewport centre — even nodes near the
+          edges of the layout (e.g. an owner positioned at gen 0 with no parents). */}
+      <div style={{ padding: '50vh 50vw', display: 'inline-block' }}>
       <div ref={content} style={{ position: 'relative', width: W, height: H, willChange: 'transform' }}>
         <svg width={W} height={H} style={{ position: 'absolute', top: TOP_PAD, left: 0, pointerEvents: 'none' }}>
           {/* strokeLinecap="butt" — at junctions the segment's shortened end and
@@ -299,6 +279,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
