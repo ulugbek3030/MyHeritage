@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-const LERP = 0.15, SETTLE = 0.0005, MAX_SCALE = 1.8, MIN_SCALE = 0.4;
+const LERP = 0.15, SETTLE = 0.0005, MAX_SCALE = 1.8, MIN_SCALE = 0.2;
 
 export const useZoom = (containerRef: React.RefObject<HTMLElement>, onScale?: (s: number) => void) => {
   const scale = useRef(1);
@@ -82,5 +82,6 @@ export const useZoom = (containerRef: React.RefObject<HTMLElement>, onScale?: (s
     zoomIn: () => { target.current = Math.min(MAX_SCALE, target.current + 0.15); },
     zoomOut: () => { target.current = Math.max(MIN_SCALE, target.current - 0.15); },
     reset: () => { target.current = 1; },
+    setTo: (s: number) => { target.current = Math.max(MIN_SCALE, Math.min(MAX_SCALE, s)); },
   };
 };

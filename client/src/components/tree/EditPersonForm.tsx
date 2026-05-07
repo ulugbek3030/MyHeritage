@@ -76,6 +76,10 @@ export const EditPersonForm = ({ open, onClose, treeId, person, onSaved }: Props
       }
       onSaved();
       onClose();
+    } catch (err) {
+      console.error('[EditPerson] save failed', err);
+      const msg = err instanceof Error ? err.message : 'неизвестная ошибка';
+      alert(`Не удалось сохранить: ${msg}`);
     } finally {
       setBusy(false);
     }

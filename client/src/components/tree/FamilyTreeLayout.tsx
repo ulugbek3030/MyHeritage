@@ -170,7 +170,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
     return paths;
   }, [layout]);
 
-  useZoom(content as React.RefObject<HTMLElement>);
+  const zoom = useZoom(content as React.RefObject<HTMLElement>);
+  const fittedRef = useRef(false);
   useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
 
   // Center owner in both axes on first render (and when owner changes).
@@ -186,10 +187,28 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
     const center = () => {
       const vp = viewport.current;
       if (!vp || !vp.clientWidth || !vp.clientHeight) return;
+      const W = layout.canvas.width * NODE_W;
+      const H = layout.canvas.height * NODE_H + TOP_PAD;
+      // First-time fit-to-screen: shrink content if it's wider/taller than the
+      // viewport so the whole tree is visible without scrolling. Only ≤1 (don't
+      // enlarge). After this initial fit, the user is free to zoom/pan.
+      let scale = 1;
+      if (!fittedRef.current) {
+        scale = Math.min(vp.clientWidth / W, vp.clientHeight / H, 1);
+        zoom.setTo(scale);
+        fittedRef.current = true;
+      }
+      // With `transform: scale(s); transform-origin: top center`, content's
+      // visual bounds shrink while the layout box stays W×H. Centering math:
+      //   visual centre X = W/2  (transform-origin)
+      //   visual top      = 0
+      //   visual height   = H * s
       const ownerLeftPx = ownerNode.left * (NODE_W / 2);
       const ownerTopPx = ownerNode.top * (NODE_H / 2) + TOP_PAD;
-      const targetX = ownerLeftPx + NODE_W / 2 - vp.clientWidth / 2;
-      const targetY = ownerTopPx + NODE_H / 2 - vp.clientHeight / 2;
+      const ownerScreenX = W / 2 + (ownerLeftPx + NODE_W / 2 - W / 2) * scale;
+      const ownerScreenY = ownerTopPx * scale + (NODE_H / 2) * scale;
+      const targetX = ownerScreenX - vp.clientWidth / 2;
+      const targetY = ownerScreenY - vp.clientHeight / 2;
       vp.scrollTo({
         left: Math.max(0, Math.min(targetX, vp.scrollWidth - vp.clientWidth)),
         top: Math.max(0, Math.min(targetY, vp.scrollHeight - vp.clientHeight)),
@@ -203,7 +222,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [layout, ownerId]);
+  }, [layout, ownerId, zoom]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 

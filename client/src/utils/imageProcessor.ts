@@ -22,14 +22,11 @@ export const processAvatar = async (file: File, size = 256): Promise<Blob> => {
 };
 
 export const uploadPhoto = async (treeId: string, personId: string, blob: Blob): Promise<string> => {
+  // Use the shared axios client so token refresh + Authorization header behave
+  // the same as everywhere else (raw fetch silently failed on 401).
+  const { api } = await import('../api/client');
   const fd = new FormData();
   fd.append('photo', blob, 'photo.jpg');
-  const res = await fetch(`/api/trees/${treeId}/persons/${personId}/photo`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${localStorage.getItem('cf_access') ?? sessionStorage.getItem('cf_access')}` },
-    body: fd,
-  });
-  if (!res.ok) throw new Error('Upload failed');
-  const r = await res.json();
-  return r.photoUrl as string;
+  const r = await api.post<{ photoUrl: string }>(`/trees/${treeId}/persons/${personId}/photo`, fd);
+  return r.data.photoUrl;
 };

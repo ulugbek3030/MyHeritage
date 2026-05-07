@@ -187,6 +187,10 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
       }
       onCreated();
       handleClose();
+    } catch (err) {
+      console.error('[AddPerson] save failed', err);
+      const msg = err instanceof Error ? err.message : 'неизвестная ошибка';
+      alert(`Не удалось сохранить: ${msg}`);
     } finally {
       setBusy(false);
     }
