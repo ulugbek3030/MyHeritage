@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getFullTree } from '../api/trees';
-import type { FullTree } from '../types';
+import type { FullTree, Person } from '../types';
 import { FamilyTreeLayout } from '../components/tree/FamilyTreeLayout';
+import { PersonSheet } from '../components/tree/PersonSheet';
 
 export const TreeViewPage = () => {
   const { treeId } = useParams<{ treeId: string }>();
   const nav = useNavigate();
   const [data, setData] = useState<FullTree | null>(null);
+  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
 
   useEffect(() => { if (treeId) getFullTree(treeId).then(setData); }, [treeId]);
 
@@ -25,10 +27,18 @@ export const TreeViewPage = () => {
           persons={data.persons}
           relationships={data.relationships}
           ownerId={data.tree.ownerPersonId}
-          onPersonClick={(id) => console.log('tap', id)}
+          onPersonClick={(id) => setSelectedPerson(data.persons.find((p) => p.id === id) ?? null)}
           onPlusClick={(id) => console.log('plus on', id)}
         />
       </div>
+      <PersonSheet
+        open={!!selectedPerson}
+        onClose={() => setSelectedPerson(null)}
+        person={selectedPerson}
+        onEdit={() => {}}
+        onAdd={() => {}}
+        onDelete={() => {}}
+      />
     </div>
   );
 };
