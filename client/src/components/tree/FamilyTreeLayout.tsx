@@ -51,18 +51,18 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
       <div ref={content} style={{ position: 'relative', width: W, height: H, willChange: 'transform' }}>
         <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
           {layout.connectors.map((c, i) => {
-            // relatives-tree returns connector coords in HALF-units (same scale as node.left/top).
-            // Card positioning uses (NODE_W / 2) per-unit; connectors must match.
+            // relatives-tree connector coords are in half-units, already aligned to card centers
+            // when rendered at NODE_W/2 scale. No additional shift needed.
             const [x1, y1, x2, y2] = c;
             return (
               <line
                 key={i}
-                x1={(x1 * NODE_W) / 2 + NODE_W / 2}
-                y1={(y1 * NODE_H) / 2 + NODE_H / 2}
-                x2={(x2 * NODE_W) / 2 + NODE_W / 2}
-                y2={(y2 * NODE_H) / 2 + NODE_H / 2}
+                x1={(x1 * NODE_W) / 2}
+                y1={(y1 * NODE_H) / 2}
+                x2={(x2 * NODE_W) / 2}
+                y2={(y2 * NODE_H) / 2}
                 stroke="rgba(255,255,255,0.4)"
-                strokeWidth="1.3"
+                strokeWidth="1.4"
               />
             );
           })}
