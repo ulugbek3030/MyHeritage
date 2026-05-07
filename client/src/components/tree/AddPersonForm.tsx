@@ -24,6 +24,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
   const [lastName, setLastName] = useState(targetPerson.lastName ?? '');
   const [maidenName, setMaidenName] = useState('');
   const [year, setYear] = useState<string>('');
+  const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
   const hasParents = useMemo(() =>
@@ -70,7 +71,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         if (spouse) rels.push({ category: 'parent_child', otherPersonId: spouse.id, role: 'child', childRelation: 'biological' });
       }
 
-      await createPerson(treeId, {
+      const newPerson = await createPerson(treeId, {
         firstName: firstName.trim(),
         lastName: lastName.trim() || undefined,
         middleName: middleName || undefined,
@@ -79,6 +80,11 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         birthYear: year ? Number(year) : undefined,
         relationships: rels,
       });
+      if (photo) {
+        const { processAvatar, uploadPhoto } = await import('../../utils/imageProcessor');
+        const blob = await processAvatar(photo);
+        await uploadPhoto(treeId, newPerson.id, blob);
+      }
       onCreated();
       onClose();
     } finally { setBusy(false); }
@@ -127,6 +133,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         {gender === 'female' && <input className="auth-input" placeholder="Девичья фамилия" value={maidenName} onChange={(e) => setMaidenName(e.target.value)} />}
         {middleName && <input className="auth-input" placeholder="Отчество" value={middleName} readOnly />}
         <input className="auth-input" placeholder="Год рождения" inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+        <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} className="auth-input" />
         <button type="submit" disabled={busy || !firstName.trim()} className="auth-btn">{busy ? 'Сохранение…' : 'Добавить'}</button>
       </form>
     </BottomSheet>
