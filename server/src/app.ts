@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { env } from './config/env.js';
 import { authRoutes } from './routes/auth.routes.js';
+import { treesRoutes } from './routes/trees.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export const createApp = () => {
@@ -10,6 +11,7 @@ export const createApp = () => {
   app.use(express.json({ limit: '10mb' }));
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
   app.use('/api/auth', authRoutes);
+  app.use('/api/trees', treesRoutes);
   app.use(errorHandler);
   return app;
 };
