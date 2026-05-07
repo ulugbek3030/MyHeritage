@@ -4,6 +4,7 @@ import { env } from './config/env.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { treesRoutes } from './routes/trees.routes.js';
 import { personsRoutes } from './routes/persons.routes.js';
+import { relsRoutes } from './routes/relationships.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export const createApp = () => {
@@ -14,6 +15,7 @@ export const createApp = () => {
   app.use('/api/auth', authRoutes);
   app.use('/api/trees', treesRoutes);
   app.use('/api/trees/:treeId/persons', personsRoutes);
+  app.use('/api/trees/:treeId/relationships', relsRoutes);
   app.use(errorHandler);
   return app;
 };
