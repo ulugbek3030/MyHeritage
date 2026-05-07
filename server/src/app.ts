@@ -8,6 +8,7 @@ import { personsRoutes } from './routes/persons.routes.js';
 import { photosRoutes } from './routes/photos.routes.js';
 import { relsRoutes } from './routes/relationships.routes.js';
 import { eventsRoutes } from './routes/events.routes.js';
+import { shareRoutes, sharePublicRoutes } from './routes/share.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export const createApp = () => {
@@ -17,11 +18,13 @@ export const createApp = () => {
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
   app.use('/api/auth', authRoutes);
   app.use('/api', photoPublicRoutes);
+  app.use('/api', sharePublicRoutes);
   app.use('/api/trees', treesRoutes);
   app.use('/api/trees/:treeId/persons', personsRoutes);
   app.use('/api/trees/:treeId/persons', photosRoutes);
   app.use('/api/trees/:treeId/relationships', relsRoutes);
   app.use('/api/trees/:treeId/events', eventsRoutes);
+  app.use('/api/trees/:treeId/share', shareRoutes);
   app.use(errorHandler);
   return app;
 };
