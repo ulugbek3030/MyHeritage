@@ -230,31 +230,32 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
                   e.currentTarget.style.borderColor = 'var(--border)';
                 }}
               >
-                <div
-                  style={{
-                    position: 'relative',
-                    width: 64,
-                    height: 64,
-                    borderRadius: '50%',
-                    background:
-                      o.gender === 'female'
-                        ? 'linear-gradient(135deg, rgba(244,114,182,0.18), rgba(244,114,182,0.04))'
-                        : 'linear-gradient(135deg, rgba(96,165,250,0.18), rgba(96,165,250,0.04))',
-                    border: `1px solid ${o.gender === 'female' ? 'rgba(244,114,182,0.35)' : 'rgba(96,165,250,0.35)'}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                    color: o.gender === 'female' ? 'rgba(244,114,182,0.65)' : 'rgba(96,165,250,0.65)',
-                  }}
-                >
-                  <Silhouette kind={`${o.mode === 'child' ? 'child' : 'adult'}-${o.gender}` as 'adult-male' | 'adult-female' | 'child-male' | 'child-female'} />
+                <div style={{ position: 'relative', width: 64, height: 64 }}>
+                  <div
+                    style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: '50%',
+                      background:
+                        o.gender === 'female'
+                          ? 'linear-gradient(135deg, rgba(244,114,182,0.18), rgba(244,114,182,0.04))'
+                          : 'linear-gradient(135deg, rgba(96,165,250,0.18), rgba(96,165,250,0.04))',
+                      border: `1px solid ${o.gender === 'female' ? 'rgba(244,114,182,0.35)' : 'rgba(96,165,250,0.35)'}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      color: o.gender === 'female' ? 'rgba(244,114,182,0.65)' : 'rgba(96,165,250,0.65)',
+                    }}
+                  >
+                    <Silhouette kind={`${o.mode === 'child' ? 'child' : 'adult'}-${o.gender}` as 'adult-male' | 'adult-female' | 'child-male' | 'child-female'} />
+                  </div>
                   <span
                     aria-hidden="true"
                     style={{
                       position: 'absolute',
-                      bottom: -2,
-                      right: -2,
+                      bottom: -3,
+                      right: -3,
                       width: 22,
                       height: 22,
                       borderRadius: '50%',
@@ -267,6 +268,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
                       justifyContent: 'center',
                       border: '2px solid var(--surface)',
                       boxShadow: '0 2px 8px rgba(251,191,36,0.4)',
+                      pointerEvents: 'none',
                     }}
                   >
                     +
