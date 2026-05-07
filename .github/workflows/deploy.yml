@@ -1,0 +1,44 @@
+name: Deploy to staging
+
+on:
+  push:
+    branches: [main, mvp-phase1]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to 45.15.162.16
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H 45.15.162.16 >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Pull, build, restart
+        run: |
+          ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 root@45.15.162.16 \
+            'set -e; \
+             cd /opt/clickfamily/src && \
+             sudo -u clickfamily git fetch origin && \
+             sudo -u clickfamily git checkout "${GITHUB_REF_NAME:-mvp-phase1}" && \
+             sudo -u clickfamily git pull --ff-only origin "${GITHUB_REF_NAME:-mvp-phase1}" && \
+             sudo -u clickfamily -H pnpm install --frozen-lockfile 2>&1 | tail -3 && \
+             sudo -u clickfamily -H pnpm --filter client run build 2>&1 | tail -5 && \
+             sudo -u clickfamily -H pnpm --filter server run migrate 2>&1 | tail -3 && \
+             systemctl restart clickfamily && \
+             sleep 2 && systemctl is-active clickfamily && \
+             curl -fsS http://127.0.0.1:3001/api/health'
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+
+      - name: Smoke test public URL
+        run: |
+          curl -fsS https://45.15.162.16.nip.io/api/health
+          curl -fsS -o /dev/null -w "%{http_code}\n" https://45.15.162.16.nip.io/
