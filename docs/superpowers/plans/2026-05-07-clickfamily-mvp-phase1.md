@@ -109,8 +109,6 @@ clickfamily/
         │   ├── useDrag.ts                     # drag-to-pan
         │   └── useLongPress.ts
         ├── pages/
-        │   ├── LoginPage.tsx                  # phone input
-        │   ├── OtpPage.tsx                    # OTP code entry
         │   ├── TreesListPage.tsx
         │   ├── TreeViewPage.tsx               # main hybrid screen
         │   ├── FullTreePage.tsx               # zoom & pan, all 30+
@@ -2428,21 +2426,22 @@ api.interceptors.response.use((r) => r, async (err: AxiosError) => {
 });
 ```
 
-- [ ] **Step 3: `api/auth.ts`**
+- [ ] **Step 3: `api/auth.ts`** (dev-bypass — no UI flow)
 
 ```typescript
 import { api, setTokens, clearTokens } from './client';
 import type { User } from '../types';
 
-export const requestOtp = (phone: string) => api.post<{ ok: true; ttl: number }>('/auth/request-otp', { phone }).then((r) => r.data);
-export const verifyOtp = (phone: string, code: string, remember: boolean) =>
-  api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/verify-otp', { phone, code }).then((r) => {
-    setTokens(r.data.accessToken, r.data.refreshToken, remember);
+export const devLogin = (phone = '+998900000001') =>
+  api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/dev-login', { phone }).then((r) => {
+    setTokens(r.data.accessToken, r.data.refreshToken, true);
     return r.data.user;
   });
 export const me = () => api.get<User>('/auth/me').then((r) => r.data);
 export const logout = () => { clearTokens(); };
 ```
+
+> Note: T30 wires this devLogin into AuthContext for auto-login on first load.
 
 - [ ] **Step 4: `context/AuthContext.tsx`**
 
@@ -2459,6 +2458,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
+    // T30 will replace this with auto-login bypass; minimal placeholder for T28:
     if (!getAccess()) { setLoading(false); return; }
     authApi.me().then(setUser).catch(() => {}).finally(() => setLoading(false));
   }, []);
@@ -2494,8 +2494,6 @@ export const ProtectedRoute = ({ children }: { children: ReactNode }) => {
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { LoginPage } from './pages/LoginPage';
-import { OtpPage } from './pages/OtpPage';
 import { TreesListPage } from './pages/TreesListPage';
 import { TreeViewPage } from './pages/TreeViewPage';
 import { FullTreePage } from './pages/FullTreePage';
@@ -2506,8 +2504,6 @@ export const App = () => (
   <BrowserRouter>
     <AuthProvider>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/otp" element={<OtpPage />} />
         <Route path="/share/:token" element={<SharedTreePage />} />
         <Route path="/" element={<ProtectedRoute><TreesListPage /></ProtectedRoute>} />
         <Route path="/trees/:treeId" element={<ProtectedRoute><TreeViewPage /></ProtectedRoute>} />
@@ -2627,123 +2623,124 @@ git commit -m "feat(client): date formatting + UZ naming utilities"
 
 ---
 
-## Phase 1H: Frontend Auth UI
+## Phase 1H: Frontend Auth (dev bypass — no UI)
 
-### Task 30: LoginPage + OtpPage
+**Note:** UI для login/OTP — **не в MVP scope** (per user). Backend auth (T15-17) остаётся как заготовка для Phase 2. Frontend использует dev-bypass: при загрузке, если нет токена — автоматически логинится seed-юзером (`+998900000001`) через `/api/auth/dev-login`. В production endpoint выключен.
 
-**Files:** Modify `client/src/pages/LoginPage.tsx`, `client/src/pages/OtpPage.tsx`. Create `client/src/styles/auth.css`.
+### Task 30 [REPLACED]: Dev auto-login bypass
 
-- [ ] **Step 1: `auth.css`**
+**Files:**
+- Create: `server/src/routes/dev-auth.routes.ts`
+- Modify: `server/src/app.ts`, `client/src/context/AuthContext.tsx`, `client/src/api/auth.ts`, `client/src/App.tsx`
+- Remove: `client/src/pages/LoginPage.tsx`, `client/src/pages/OtpPage.tsx`
 
-```css
-.auth-screen { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; background: var(--bg); color: var(--text); }
-.auth-card { width: 100%; max-width: 420px; padding: 32px 24px; background: linear-gradient(180deg, var(--surface), var(--bg)); border: 1px solid var(--border); border-radius: 24px; }
-.auth-logo { width: 56px; height: 56px; background: linear-gradient(135deg, #fbbf24, #f59e0b); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-weight: 900; color: #0a0a0d; font-size: 24px; margin-bottom: 24px; box-shadow: 0 0 24px rgba(251,191,36,0.3); }
-.auth-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
-.auth-sub { color: var(--text-muted); font-size: 14px; margin-bottom: 28px; line-height: 1.5; }
-.auth-input { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; font-size: 16px; color: var(--text); font-family: inherit; margin-bottom: 14px; }
-.auth-input:focus { outline: none; border-color: var(--accent); }
-.auth-btn { width: 100%; background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #0a0a0d; font-weight: 800; padding: 14px; border: none; border-radius: 14px; font-size: 16px; box-shadow: 0 8px 24px rgba(251,191,36,0.3); }
-.auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.auth-error { color: #f87171; font-size: 13px; margin-top: 8px; }
-.auth-checkbox { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 13px; margin: 12px 0 16px; }
+- [ ] **Step 1: Server `dev-auth.routes.ts`**
+
+```typescript
+import { Router } from 'express';
+import { env } from '../config/env.js';
+import { upsertUserByPhone } from '../services/auth.service.js';
+import { signAccess, signRefresh } from '../config/auth.js';
+
+export const devAuthRoutes = Router();
+
+devAuthRoutes.post('/dev-login', async (req, res, next) => {
+  if (env.NODE_ENV === 'production') return res.status(404).end();
+  try {
+    const phone = (req.body?.phone as string | undefined) ?? '+998900000001';
+    const user = await upsertUserByPhone(phone);
+    const payload = { sub: user.id, phone: user.phone };
+    res.json({ user, accessToken: signAccess(payload), refreshToken: signRefresh(payload) });
+  } catch (e) { next(e); }
+});
 ```
 
-- [ ] **Step 2: `LoginPage.tsx`**
+- [ ] **Step 2: Mount in `app.ts`** (only in dev)
+
+```typescript
+import { devAuthRoutes } from './routes/dev-auth.routes.js';
+// ...
+if (env.NODE_ENV !== 'production') app.use('/api/auth', devAuthRoutes);
+```
+
+- [ ] **Step 3: `client/src/api/auth.ts` — replace requestOtp/verifyOtp with devLogin**
+
+```typescript
+import { api, setTokens, clearTokens } from './client';
+import type { User } from '../types';
+
+export const devLogin = (phone = '+998900000001') =>
+  api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/dev-login', { phone }).then((r) => {
+    setTokens(r.data.accessToken, r.data.refreshToken, true);
+    return r.data.user;
+  });
+export const me = () => api.get<User>('/auth/me').then((r) => r.data);
+export const logout = () => { clearTokens(); };
+```
+
+- [ ] **Step 4: Modify `AuthContext.tsx` — auto-login on first load**
 
 ```tsx
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { requestOtp } from '../api/auth';
-import '../styles/auth.css';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import type { User } from '../types';
+import * as authApi from '../api/auth';
+import { getAccess, clearTokens } from '../api/client';
 
-export const LoginPage = () => {
-  const nav = useNavigate();
-  const [phone, setPhone] = useState('+998');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
+interface Ctx { user: User | null; loading: boolean; setUser: (u: User | null) => void; signOut: () => void; }
+const AuthCtx = createContext<Ctx | null>(null);
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErr(''); setBusy(true);
-    try { await requestOtp(phone); nav('/otp', { state: { phone } }); }
-    catch (e: any) { setErr(e.response?.data?.message ?? 'Не удалось отправить код'); }
-    finally { setBusy(false); }
-  };
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    (async () => {
+      try {
+        const u = getAccess() ? await authApi.me() : await authApi.devLogin();
+        setUser(u);
+      } catch (e) {
+        console.error('[auth] init failed', e);
+        clearTokens();
+      } finally { setLoading(false); }
+    })();
+  }, []);
+  const signOut = () => { authApi.logout(); setUser(null); };
+  return <AuthCtx.Provider value={{ user, loading, setUser, signOut }}>{children}</AuthCtx.Provider>;
+};
 
-  return (
-    <div className="auth-screen">
-      <div className="auth-card">
-        <div className="auth-logo">click</div>
-        <div className="auth-title">Семья</div>
-        <div className="auth-sub">Введите телефон, чтобы получить код подтверждения</div>
-        <form onSubmit={onSubmit}>
-          <input className="auth-input" type="tel" inputMode="tel" placeholder="+998 90 123 45 67" value={phone} onChange={(e) => setPhone(e.target.value)} />
-          <button className="auth-btn" disabled={busy || phone.length < 9}>{busy ? 'Отправка…' : 'Получить код'}</button>
-          {err && <div className="auth-error">{err}</div>}
-        </form>
-      </div>
-    </div>
-  );
+export const useAuth = () => {
+  const c = useContext(AuthCtx);
+  if (!c) throw new Error('useAuth outside AuthProvider');
+  return c;
 };
 ```
 
-- [ ] **Step 3: `OtpPage.tsx`**
+- [ ] **Step 5: `App.tsx` — drop /login and /otp routes**
 
 ```tsx
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { verifyOtp } from '../api/auth';
-import { useAuth } from '../context/AuthContext';
-import '../styles/auth.css';
-
-export const OtpPage = () => {
-  const nav = useNavigate();
-  const { setUser } = useAuth();
-  const phone = (useLocation().state as any)?.phone as string | undefined;
-  const [code, setCode] = useState('');
-  const [remember, setRemember] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-
-  if (!phone) return <div className="auth-screen"><div className="auth-card">Сначала введите телефон. <a href="/login" style={{color:'var(--accent)'}}>На вход</a></div></div>;
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErr(''); setBusy(true);
-    try { const u = await verifyOtp(phone, code, remember); setUser(u); nav('/'); }
-    catch (e: any) { setErr(e.response?.data?.message ?? 'Неверный код'); }
-    finally { setBusy(false); }
-  };
-
-  return (
-    <div className="auth-screen">
-      <div className="auth-card">
-        <div className="auth-title">Код подтверждения</div>
-        <div className="auth-sub">Отправлен на <b style={{color:'var(--text)'}}>{phone}</b>. В dev-режиме всегда <code style={{color:'var(--accent)'}}>0000</code>.</div>
-        <form onSubmit={onSubmit}>
-          <input className="auth-input" type="text" inputMode="numeric" maxLength={6} placeholder="0000" value={code} onChange={(e) => setCode(e.target.value)} autoFocus />
-          <label className="auth-checkbox">
-            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Запомнить меня
-          </label>
-          <button className="auth-btn" disabled={busy || code.length < 4}>{busy ? 'Проверка…' : 'Войти'}</button>
-          {err && <div className="auth-error">{err}</div>}
-        </form>
-      </div>
-    </div>
-  );
-};
+// Remove imports of LoginPage, OtpPage
+// Remove <Route path="/login" .../> and <Route path="/otp" .../>
+// All routes are protected by ProtectedRoute as before
 ```
 
-- [ ] **Step 4: Smoke test**
-
-Run `pnpm dev`, open `:5173/login`, send `+998900000001` → land on OTP, enter `0000` → arrives at `/` (TreesListPage stub). Check `localStorage.cf_access` — JWT exists.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Delete unused page files**
 
 ```bash
-git add client/src/pages/LoginPage.tsx client/src/pages/OtpPage.tsx client/src/styles/auth.css
-git commit -m "feat(client): login + OTP pages (phone-based auth)"
+rm -f client/src/pages/LoginPage.tsx client/src/pages/OtpPage.tsx
+```
+
+- [ ] **Step 7: Smoke test**
+
+```bash
+pnpm dev
+```
+Open `http://localhost:5173/` — app auto-logs in as Улугбек, lands on TreesListPage. `localStorage.cf_access` contains JWT.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add server/src/routes/dev-auth.routes.ts server/src/app.ts client/src/api/auth.ts client/src/context/AuthContext.tsx client/src/App.tsx
+git rm client/src/pages/LoginPage.tsx client/src/pages/OtpPage.tsx
+git commit -m "feat: dev auto-login bypass (no UI for MVP, backend auth ready for Phase 2)"
 ```
 
 ---
@@ -3277,7 +3274,7 @@ export const FullTreePage = () => {
 
 - [ ] **Step 5: Smoke test**
 
-Run `pnpm dev`. Login (+998900000001 / 0000). After OTP land on `/`. If empty — click "Создать". OR, if you ran seed first → see "Семья Рустамовых-Каримовых · 30 человек". Click → tree renders.
+Run `pnpm dev`. App auto-logs in as Улугбек via dev-bypass. Lands on `/`. If seed ran → see "Семья Рустамовых-Каримовых · 30 человек". Click → tree renders.
 
 - [ ] **Step 6: Commit**
 
@@ -4078,7 +4075,7 @@ git commit -m "feat: skeletons + README + final polish"
 
 ## Phase 1N: Gap-Closure Tasks (Variant A — расширение MVP)
 
-Закрывает пробелы из coverage-аудита: погружение в подсемью, mini-month grid, поиск, "Зажечь свечу" для memorial, LongPressMenu полностью, Share QR + image export, активные UZ-степени родства.
+Закрывает пробелы из coverage-аудита: погружение в подсемью, mini-month grid, поиск, LongPressMenu полностью, Share QR + image export, активные UZ-степени родства.
 
 ### Task 44: Hero — 4 адаптивных состояния (memorial + anniversary)
 
@@ -4115,7 +4112,7 @@ export const Hero = ({ event, onOpenCta, treeFillPct = 0 }: Props) => {
 
   const tagText = isMemorial ? 'Сегодня годовщина' : `Через ${event.daysUntil} дн`;
   const titleText = isMemorial ? 'Помянём' : isAnniversary ? 'Годовщина свадьбы' : 'День рождения';
-  const ctaText = isMemorial ? 'Зажечь свечу' : isAnniversary ? 'Поздравить пару' : 'Подробнее';
+  const ctaText = isAnniversary ? 'Поздравить пару' : 'Подробнее';
 
   return (
     <div style={{margin:'0 18px 14px',padding:'16px 18px',borderRadius:22,background:styles.bg,border:`1px solid ${styles.border}`}}>
@@ -4126,8 +4123,7 @@ export const Hero = ({ event, onOpenCta, treeFillPct = 0 }: Props) => {
         {event.meta.ageOnEvent ? ` · ${event.meta.ageOnEvent} лет` : ''}
         {event.meta.yearsAgo ? ` · ${event.meta.yearsAgo} лет назад` : ''}
       </div>
-      <button onClick={onOpenCta} style={{width:'100%',padding:12,background:isMemorial?'rgba(255,255,255,0.06)':isAnniversary?'linear-gradient(135deg,#f472b6,#db2777)':'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:isMemorial?'var(--text)':'#0a0a0d',border:isMemorial?'1px solid var(--border)':'none',borderRadius:14,fontWeight:800}}>{ctaText}</button>
-      {isMemorial && <div style={{fontSize:10,textAlign:'center',color:'var(--text-dim)',marginTop:6}}>Без коммерции — только память</div>}
+      {!isMemorial && <button onClick={onOpenCta} style={{width:'100%',padding:12,background:isAnniversary?'linear-gradient(135deg,#f472b6,#db2777)':'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:'#0a0a0d',border:'none',borderRadius:14,fontWeight:800}}>{ctaText}</button>}
     </div>
   );
 };
