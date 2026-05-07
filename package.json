@@ -1,0 +1,20 @@
+{
+  "name": "clickfamily",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "dev:server": "pnpm --filter server run dev",
+    "dev:client": "pnpm --filter client run dev",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "db:migrate": "pnpm --filter server run migrate",
+    "db:seed": "pnpm --filter server run seed",
+    "db:up": "docker-compose up -d postgres",
+    "db:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
