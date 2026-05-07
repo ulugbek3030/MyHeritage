@@ -3,7 +3,9 @@ import { signAccess, signRefresh, verifyRefresh } from '../config/auth.js';
 import { UnauthorizedError } from '../utils/errors.js';
 import { verifyOtp } from './otp.service.js';
 
-export interface AuthUser { id: string; phone: string; displayName: string | null; avatarUrl: string | null; }
+// Index signature lets AuthUser satisfy `Record<string, unknown>` — the
+// generic constraint on db/pool's `query<T>()` (pg types use that bound).
+export interface AuthUser { id: string; phone: string; displayName: string | null; avatarUrl: string | null; [key: string]: unknown; }
 
 export const upsertUserByPhone = async (phone: string): Promise<AuthUser> => {
   const r = await query<AuthUser>(
