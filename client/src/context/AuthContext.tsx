@@ -12,7 +12,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     (async () => {
       try {
-        const u = getAccess() ? await authApi.me() : await authApi.devLogin();
+        let u: User | null = null;
+        if (getAccess()) {
+          try { u = await authApi.me(); }
+          catch { clearTokens(); /* token stale (e.g. user purged) — fall through to devLogin */ }
+        }
+        if (!u) u = await authApi.devLogin();
         setUser(u);
       } catch (e) {
         console.error('[auth] init failed', e);
