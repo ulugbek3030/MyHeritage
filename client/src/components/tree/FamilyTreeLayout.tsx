@@ -9,11 +9,11 @@ import { useDrag } from '../../hooks/useDrag';
 
 // Card grid units. NODE_W/NODE_H = full unit; relatives-tree uses half-units, so cards
 // occupy 2 half-units wide. Generous values give breathing room between siblings.
-const NODE_W = 140;
-const NODE_H = 180;
+const NODE_W = 104;
+const NODE_H = 134;
 // Empty buffer above the top generation so the user can scroll up and intuit
 // that more parents/grandparents can be added there.
-const TOP_PAD = 140;
+const TOP_PAD = 100;
 
 interface Props {
   persons: Person[];
