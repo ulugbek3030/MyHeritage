@@ -18,10 +18,10 @@ const NODE_H = 184;   // spacing between generations ≈ 92 px
 // placeholders for parentless persons one full generation above their card,
 // so this needs at least NODE_H of room to keep them on canvas.
 const TOP_PAD = 200;
-// Extra room below the bottom generation — same intent as TOP_PAD but for kids
-// being added below. 60% of the laid-out canvas height (the user asked for
-// repeated +20% bumps).
-const BOTTOM_PAD_RATIO = 0.6;
+// Extra room below the bottom generation — same intent as TOP_PAD but for
+// kids being added below. 25% is enough breathing room; the canvas grows
+// naturally as descendants get added.
+const BOTTOM_PAD_RATIO = 0.25;
 
 interface Props {
   persons: Person[];
@@ -292,6 +292,13 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         height: '100%',
         minHeight: 360,
         cursor: 'grab',
+        // Centre the content box when it's smaller than the viewport (e.g. a
+        // 1-person tree). `safe` keyword falls back to start-alignment when
+        // content overflows, so larger trees stay scrollable instead of
+        // getting clipped at top/left.
+        display: 'flex',
+        justifyContent: 'safe center',
+        alignItems: 'safe center',
       }}
     >
       <div ref={content} style={{ position: 'relative', width: W, height: H, willChange: 'transform' }}>
