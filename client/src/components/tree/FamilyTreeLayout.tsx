@@ -18,8 +18,9 @@ const NODE_H = 184;   // spacing between generations ≈ 92 px
 // that more parents/grandparents can be added there.
 const TOP_PAD = 100;
 // Extra room below the bottom generation — same intent as TOP_PAD but for kids
-// being added below. ~20% of the laid-out canvas height.
-const BOTTOM_PAD_RATIO = 0.2;
+// being added below. 40% of the laid-out canvas height (the user asked for
+// another +20% on top of the original 20%).
+const BOTTOM_PAD_RATIO = 0.4;
 
 interface Props {
   persons: Person[];
