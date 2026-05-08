@@ -72,8 +72,7 @@ export const TreeViewPage = () => {
 
   return (
     <div style={{minHeight:'calc(100dvh - var(--safe-top, 0px))',display:'flex',flexDirection:'column'}}>
-      <header style={{padding:'16px 18px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid var(--border)'}}>
-        <button onClick={() => nav('/')} style={{width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)'}}>←</button>
+      <header style={{padding:'0 18px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid var(--border)'}}>
         <div style={{flex:1,fontSize:17,fontWeight:800}}>{data.tree.name}</div>
         <button onClick={() => setSearchOpen(true)} aria-label="Поиск" style={{width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)',marginLeft:6,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
