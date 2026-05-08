@@ -423,14 +423,14 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
               </>
             )}
 
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Биография</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Короткое описание</div>
             <textarea
               className="auth-input"
-              placeholder="Где родился, чем занимается, важные события…"
-              rows={4}
+              placeholder="Чем занимается, где работает, любимое блюдо…"
+              rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              style={{ resize: 'vertical', minHeight: 80, fontFamily: 'inherit', lineHeight: 1.4 }}
+              style={{ resize: 'vertical', minHeight: 70, fontFamily: 'inherit', lineHeight: 1.4 }}
             />
 
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Фото</div>

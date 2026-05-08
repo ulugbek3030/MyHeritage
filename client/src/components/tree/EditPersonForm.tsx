@@ -169,14 +169,14 @@ export const EditPersonForm = ({ open, onClose, treeId, person, onSaved }: Props
           </>
         )}
 
-        <div style={dateLabel}>Биография</div>
+        <div style={dateLabel}>Короткое описание</div>
         <textarea
           className="auth-input"
-          placeholder="Где родился, чем занимается, важные события…"
-          rows={4}
+          placeholder="Чем занимается, где работает, любимое блюдо…"
+          rows={3}
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          style={{ resize: 'vertical', minHeight: 80, fontFamily: 'inherit', lineHeight: 1.4 }}
+          style={{ resize: 'vertical', minHeight: 70, fontFamily: 'inherit', lineHeight: 1.4 }}
         />
 
         <div style={dateLabel}>Фото</div>

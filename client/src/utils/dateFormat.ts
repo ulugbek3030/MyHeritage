@@ -1,4 +1,4 @@
-const MONTHS_RU_SHORT = ['янв.','фев.','мар.','апр.','мая','июн.','июл.','авг.','сен.','окт.','ноя.','дек.'];
+const MONTHS_RU_FULL = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 
 export const formatBirthCard = (p: { birthDate: string | null; birthYear: number | null; birthDateKnown: boolean }): string => {
   if (p.birthDateKnown && p.birthDate) return new Date(p.birthDate).getUTCFullYear().toString();
@@ -9,9 +9,9 @@ export const formatBirthCard = (p: { birthDate: string | null; birthYear: number
 export const formatBirthFull = (p: { birthDate: string | null; birthYear: number | null; birthDateKnown: boolean }): string => {
   if (p.birthDateKnown && p.birthDate) {
     const d = new Date(p.birthDate);
-    return `${d.getUTCDate()} ${MONTHS_RU_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    return `${d.getUTCDate()} ${MONTHS_RU_FULL[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
   }
-  if (p.birthYear) return p.birthYear.toString();
+  if (p.birthYear) return `${p.birthYear} г.`;
   return '–';
 };
 
@@ -26,9 +26,9 @@ export const formatDeathFull = (p: { deathDate: string | null; deathYear: number
   if (p.isAlive) return '';
   if (p.deathDateKnown && p.deathDate) {
     const d = new Date(p.deathDate);
-    return `${d.getUTCDate()} ${MONTHS_RU_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    return `${d.getUTCDate()} ${MONTHS_RU_FULL[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
   }
-  if (p.deathYear) return p.deathYear.toString();
+  if (p.deathYear) return `${p.deathYear} г.`;
   return '–';
 };
 

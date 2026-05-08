@@ -40,8 +40,8 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onE
         </div>
         <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.25 }}>{fullName}</div>
         {(person.birthDateKnown && person.birthDate) || person.birthYear ? (
-          <div style={{ fontSize: 19, color: 'var(--text-muted)', marginTop: 8, fontFeatureSettings: "'tnum' 1" }}>
-            {person.birthDateKnown && person.birthDate ? formatBirthFull(person) : `${person.birthYear} г.`}
+          <div style={{ fontSize: 22, color: 'var(--text)', marginTop: 10, fontFeatureSettings: "'tnum' 1", fontWeight: 600, lineHeight: 1.35, padding: '0 8px' }}>
+            {formatBirthFull(person)}
             {!person.isAlive && (person.deathDateKnown && person.deathDate ? ` — ${formatDeathFull(person)}` : person.deathYear ? ` — ${person.deathYear} г.` : '')}
           </div>
         ) : null}
@@ -60,7 +60,6 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onE
           // date in the hero already says everything ("Жив" added no info).
           !person.isAlive ? (person.gender === 'female' ? 'Умерла' : 'Умер') : null,
           person.gender === 'female' && person.maidenName ? `Девичья: ${person.maidenName}` : null,
-          person.note ?? null,
         ].filter((x) => x && String(x).trim() !== '');
         if (items.length === 0) return null;
         return (
@@ -71,6 +70,15 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onE
           </div>
         );
       })()}
+
+      {/* Short description / note. Pulled out of the centered items list so
+          it can wrap as proper paragraph text instead of a single bullet. */}
+      {person.note && person.note.trim() && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>Описание</div>
+          <div style={{ fontSize: 16, lineHeight: 1.5, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{person.note}</div>
+        </div>
+      )}
 
       {showCta && (
         <div style={{padding:12,marginBottom:14,borderRadius:16,border:'1px solid rgba(251,191,36,0.25)',background:'radial-gradient(140% 100% at 0% 0%,rgba(251,191,36,0.18),transparent 65%),linear-gradient(180deg,#1c1409,#0e0a04)'}}>
@@ -94,7 +102,7 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onE
         <button onClick={onAdd} style={{padding:16,background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:'#0a0a0d',border:'none',borderRadius:14,fontWeight:800,fontSize:16}}>+ Родственник</button>
       </div>
       {onEditBio && (
-        <button onClick={onEditBio} style={{width:'100%',padding:14,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:14,color:'var(--text)',fontSize:15,fontWeight:700,marginBottom:10}}>📝 Биография</button>
+        <button onClick={onEditBio} style={{width:'100%',padding:14,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:14,color:'var(--text)',fontSize:15,fontWeight:700,marginBottom:10}}>📝 Описание</button>
       )}
       <button onClick={onDelete} style={{width:'100%',padding:14,background:'transparent',border:'1px solid rgba(248,113,113,0.3)',borderRadius:14,color:'#f87171',fontSize:15}}>Удалить</button>
     </BottomSheet>

@@ -51,7 +51,7 @@ export const BiographyEditor = ({ open, onClose, treeId, person, onSaved }: Prop
       <header style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--border)' }}>
         <button onClick={onClose} type="button" aria-label="Назад" style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: 'none', color: 'var(--text)', fontSize: 18, cursor: 'pointer' }}>←</button>
         <div style={{ flex: 1, fontSize: 18, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          Биография
+          Описание
           {fullName && <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>{fullName}</div>}
         </div>
         <button onClick={onSave} disabled={busy} style={{ padding: '10px 18px', background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))', color: '#0a0a0d', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
