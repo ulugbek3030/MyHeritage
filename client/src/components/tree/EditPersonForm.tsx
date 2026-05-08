@@ -25,6 +25,7 @@ export const EditPersonForm = ({ open, onClose, treeId, person, onSaved }: Props
   const [deathDate, setDeathDate] = useState(person.deathDate ?? '');
   const [deathYear, setDeathYear] = useState(person.deathDate ? '' : (person.deathYear ? String(person.deathYear) : ''));
   const [photo, setPhoto] = useState<File | null>(null);
+  const [note, setNote] = useState<string>(person.note ?? '');
   const [busy, setBusy] = useState(false);
 
   // Re-sync state if the prop person flips while the sheet is open.
@@ -40,6 +41,7 @@ export const EditPersonForm = ({ open, onClose, treeId, person, onSaved }: Props
     setDeathDate(person.deathDate ?? '');
     setDeathYear(person.deathDate ? '' : (person.deathYear ? String(person.deathYear) : ''));
     setPhoto(null);
+    setNote(person.note ?? '');
   }, [person.id]);
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -68,6 +70,7 @@ export const EditPersonForm = ({ open, onClose, treeId, person, onSaved }: Props
         deathYear: !isAlive ? effectiveDeathYear : undefined,
         deathDate: !isAlive && fullDeathDate ? deathDate : undefined,
         deathDateKnown: !isAlive && fullDeathDate,
+        note: note.trim() || undefined,
       });
       if (photo) {
         const { processAvatar, uploadPhoto } = await import('../../utils/imageProcessor');
@@ -166,6 +169,17 @@ export const EditPersonForm = ({ open, onClose, treeId, person, onSaved }: Props
           </>
         )}
 
+        <div style={dateLabel}>Биография</div>
+        <textarea
+          className="auth-input"
+          placeholder="Где родился, чем занимается, важные события…"
+          rows={4}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          style={{ resize: 'vertical', minHeight: 80, fontFamily: 'inherit', lineHeight: 1.4 }}
+        />
+
+        <div style={dateLabel}>Фото</div>
         <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} className="auth-input" />
         <button type="submit" disabled={busy || !firstName.trim()} className="auth-btn">
           {busy ? 'Сохранение…' : 'Сохранить'}

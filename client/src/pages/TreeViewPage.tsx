@@ -69,7 +69,6 @@ export const TreeViewPage = () => {
       <QuickActions
         onCalendar={() => nav(`/trees/${treeId}/calendar`)}
         onShare={() => setShareOpen(true)}
-        onGifts={() => alert('История подарков — Phase 2')}
         eventCount={events.length}
       />
       <div style={{padding:'24px 12px 24px',flex:1}}>
@@ -77,6 +76,7 @@ export const TreeViewPage = () => {
           persons={data.persons}
           relationships={data.relationships}
           ownerId={data.tree.ownerPersonId}
+          upcomingBirthdayIds={new Set(events.filter((e) => (e.type === 'birthday' || e.type === 'child_birthday') && e.daysUntil >= 0 && e.daysUntil <= 14 && e.personId).map((e) => e.personId!))}
           onPersonClick={(id) => setSelectedPerson(data.persons.find((p) => p.id === id) ?? null)}
           onPlusClick={(id) => { const p = data.persons.find((p) => p.id === id); if (p) setAddOpen(p); }}
         />

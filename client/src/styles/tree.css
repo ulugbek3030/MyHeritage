@@ -3,8 +3,7 @@
 .pcard.male::before, .pcard.female::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
 .pcard.male::before { background: linear-gradient(180deg, rgba(96,165,250,0.55), transparent 60%); }
 .pcard.female::before { background: linear-gradient(180deg, rgba(244,114,182,0.55), transparent 60%); }
-/* deceased — same brightness as alive; only the † badge differentiates them */
-.pcard.deceased::after { content: '†'; position: absolute; top: 5px; left: 6px; color: var(--text-muted); font-size: 12px; font-weight: 800; }
+/* deceased — same brightness as alive; the "Умер/Умерла" pill on the bottom of the card is the indicator */
 .pcard.me { background: linear-gradient(180deg, #2a230b, #1a1408); border-color: rgba(251,191,36,0.4); box-shadow: 0 0 0 1px rgba(251,191,36,0.25), 0 6px 20px rgba(251,191,36,0.2); }
 .pcard.me::before { display: none; }
 .pcard-av { width: 32px; height: 32px; border-radius: 50%; margin: 0 auto 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.04); border: 1px solid var(--border); overflow: hidden; }
@@ -17,7 +16,7 @@
 .pcard-status { font-size: 7px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; padding: 1px 4px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 4px; display: inline-block; }
 .pcard-verified { position: absolute; top: 3px; right: 3px; width: 10px; height: 10px; background: var(--verified); color: #050507; border-radius: 50%; font-size: 7px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
 .pcard.me .pcard-verified { background: #0a0a0d; color: var(--accent); }
-.pcard-cake { position: absolute; bottom: -3px; right: -3px; background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #0a0a0d; width: 12px; height: 12px; border-radius: 50%; font-size: 8px; display: flex; align-items: center; justify-content: center; border: 1.5px solid #050507; box-shadow: 0 0 8px rgba(251,191,36,0.5); }
+.pcard-cake { position: absolute; top: -4px; right: -4px; background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #0a0a0d; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; border: 1.5px solid #050507; box-shadow: 0 0 8px rgba(251,191,36,0.6); }
 /* "+" sits inside the bottom half of a horizontal ellipse — flat top edge
    tucks 4px into the card so the top stroke is hidden, the arc forms the
    visible bowl below. */

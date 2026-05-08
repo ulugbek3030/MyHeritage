@@ -42,6 +42,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
   const [deathDate, setDeathDate] = useState<string>('');
   const [deathYear, setDeathYear] = useState<string>('');
   const [photo, setPhoto] = useState<File | null>(null);
+  const [note, setNote] = useState<string>('');
   const [busy, setBusy] = useState(false);
 
   const hasParents = useMemo(
@@ -98,6 +99,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
     setDeathDate('');
     setDeathYear('');
     setPhoto(null);
+    setNote('');
     setStep('select');
   };
 
@@ -178,6 +180,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         deathYear: !isAlive ? effectiveDeathYear : undefined,
         deathDate: !isAlive && fullDeathDate ? deathDate : undefined,
         deathDateKnown: !isAlive && fullDeathDate,
+        note: note.trim() || undefined,
         relationships: rels,
       });
       if (photo) {
@@ -413,6 +416,17 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
               </>
             )}
 
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Биография</div>
+            <textarea
+              className="auth-input"
+              placeholder="Где родился, чем занимается, важные события…"
+              rows={4}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              style={{ resize: 'vertical', minHeight: 80, fontFamily: 'inherit', lineHeight: 1.4 }}
+            />
+
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Фото</div>
             <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} className="auth-input" />
             <button type="submit" disabled={busy || !firstName.trim()} className="auth-btn">
               {busy ? 'Сохранение…' : 'Добавить'}

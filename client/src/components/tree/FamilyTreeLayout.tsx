@@ -264,11 +264,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
         cursor: 'grab',
       }}
     >
-      <div ref={content} style={{ position: 'relative', width: W, height: H, willChange: 'transform', outline: '1px dashed rgba(251,191,36,0.45)' }}>
-        {/* Debug: visualise the actual canvas box. Top-left badge shows pixel size. */}
-        <div style={{ position: 'absolute', top: 4, left: 4, padding: '3px 7px', fontSize: 11, fontWeight: 700, color: '#0a0a0d', background: 'var(--accent)', borderRadius: 6, fontFeatureSettings: "'tnum' 1", pointerEvents: 'none', zIndex: 5 }}>
-          {Math.round(W)} × {Math.round(H)} px
-        </div>
+      <div ref={content} style={{ position: 'relative', width: W, height: H, willChange: 'transform' }}>
         <svg width={W} height={H} style={{ position: 'absolute', top: TOP_PAD, left: 0, pointerEvents: 'none' }}>
           {/* strokeLinecap="butt" — at junctions the segment's shortened end and
               the arc's start share the same point; round caps would double up there

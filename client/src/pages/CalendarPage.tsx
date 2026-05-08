@@ -16,7 +16,9 @@ export const CalendarPage = () => {
   useEffect(() => {
     if (!treeId) return;
     const from = new Date().toISOString();
-    const to = new Date(Date.now() + 90 * 86400000).toISOString();
+    // 365-day window so every birthday in the next year shows up; previously
+    // the page was empty if no one's birthday fell in the next 3 months.
+    const to = new Date(Date.now() + 365 * 86400000).toISOString();
     listEvents(treeId, from, to).then(setEvents).finally(() => setLoading(false));
   }, [treeId]);
 

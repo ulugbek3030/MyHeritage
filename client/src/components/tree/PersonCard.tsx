@@ -38,7 +38,7 @@ export const PersonCard = ({ person, isOwner, hasUpcomingBirthday, onClick, onPl
       <div className="pcard-status" aria-hidden={person.isAlive} style={{ visibility: person.isAlive ? 'hidden' : 'visible' }}>
         {person.gender === 'female' ? 'Умерла' : 'Умер'}
       </div>
-      {hasUpcomingBirthday && <div className="pcard-cake">🎂</div>}
+      {hasUpcomingBirthday && <div className="pcard-cake" aria-label="Скоро день рождения">🎁</div>}
       {showPlus && (
         <div className="pcard-plus" onClick={(e) => { e.stopPropagation(); onPlusClick?.(person.id); }}>
           {/* Bottom half of a horizontal ellipse. Two paths so the top edge
