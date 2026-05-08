@@ -174,7 +174,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
     return paths;
   }, [layout]);
 
-  useZoom(content as React.RefObject<HTMLElement>);
+  const zoom = useZoom(content as React.RefObject<HTMLElement>);
+  const fittedRef = useRef(false);
 
   // Observe the viewport size so we know exactly half of it for padding +
   // centering. Updates when WebView resizes, orientation changes, etc.
@@ -195,11 +196,10 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
   // to start (top-left), so we scroll explicitly to bring the owner to viewport
   // centre. We run inside a double rAF so layout is committed and clientWidth /
   // clientHeight are non-zero before we read them.
-  // Auto-scroll so the owner card is at viewport centre on entry. Uses the
-  // native scrollIntoView({block:'center',inline:'center'}) — the browser
-  // handles all the edge cases (clientHeight=0, scroll bounds, etc.) and
-  // simply does nothing if it can't centre yet, so we retry across a few
-  // animation frames until layout settles inside Click's WebView.
+  // First entry: zoom out so the whole tree fits the viewport, THEN scroll the
+  // owner card to centre. Subsequent re-renders only re-centre (don't re-fit).
+  // We retry across a few rAFs because Click's WebView occasionally has its
+  // layout settle a couple of frames after first paint.
   useEffect(() => {
     if (!layout || !ownerId) return;
     let attempts = 0;
@@ -211,10 +211,17 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
       if (!vp) return;
       const card = vp.querySelector<HTMLElement>(`[data-person-id="${ownerId}"]`);
       if (card && vp.clientWidth && vp.clientHeight) {
+        // First-time fit-to-screen — only when we know real dimensions.
+        if (!fittedRef.current) {
+          const W = layout.canvas.width * NODE_W;
+          const H = layout.canvas.height * NODE_H + TOP_PAD;
+          const fit = Math.min(vp.clientWidth / W, vp.clientHeight / H, 1);
+          if (fit < 1) zoom.setTo(fit);
+          fittedRef.current = true;
+        }
         card.scrollIntoView({ block: 'center', inline: 'center' });
         return;
       }
-      // Layout not ready yet — try again.
       if (attempts < 20) {
         timer = setTimeout(() => { raf = requestAnimationFrame(tryCentre); }, 50);
       }
@@ -224,7 +231,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
       if (raf != null) cancelAnimationFrame(raf);
       if (timer != null) clearTimeout(timer);
     };
-  }, [layout, ownerId, vpSize.w, vpSize.h]);
+  }, [layout, ownerId, vpSize.w, vpSize.h, zoom]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 
