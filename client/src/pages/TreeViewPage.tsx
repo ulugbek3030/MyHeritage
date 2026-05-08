@@ -10,7 +10,6 @@ import { AddPersonForm } from '../components/tree/AddPersonForm';
 import { EditPersonForm } from '../components/tree/EditPersonForm';
 import { BiographyEditor } from '../components/tree/BiographyEditor';
 import { ShareModal } from '../components/share/ShareModal';
-import { Hero } from '../components/home/Hero';
 import { QuickActions } from '../components/home/QuickActions';
 import { Skeleton } from '../components/ui/Skeleton';
 import { TreeSearch } from '../components/tree/TreeSearch';
@@ -46,8 +45,6 @@ export const TreeViewPage = () => {
     </div>
   );
 
-  const upcoming = events.filter((e) => e.daysUntil >= 0).sort((a, b) => a.daysUntil - b.daysUntil)[0] ?? null;
-  const pct = Math.min(100, Math.round((data.persons.length / 45) * 100));
 
   return (
     <div style={{minHeight:'100dvh',display:'flex',flexDirection:'column'}}>
@@ -62,11 +59,6 @@ export const TreeViewPage = () => {
         </button>
         <button onClick={() => setShareOpen(true)} style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',border:'none',color:'#0a0a0d',fontWeight:800,fontSize:14,marginLeft:6}}>⤴</button>
       </header>
-      <Hero
-        event={upcoming}
-        treeFillPct={pct}
-        onOpenCta={() => upcoming?.personId && setSelectedPerson(data.persons.find((p) => p.id === upcoming.personId) ?? null)}
-      />
       <QuickActions
         onCalendar={() => nav(`/trees/${treeId}/calendar`)}
         onShare={() => setShareOpen(true)}
