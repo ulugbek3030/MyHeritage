@@ -10,7 +10,6 @@ import { AddPersonForm } from '../components/tree/AddPersonForm';
 import { EditPersonForm } from '../components/tree/EditPersonForm';
 import { ShareModal } from '../components/share/ShareModal';
 import { Hero } from '../components/home/Hero';
-import { NudgeProgress } from '../components/home/NudgeProgress';
 import { QuickActions } from '../components/home/QuickActions';
 import { Skeleton } from '../components/ui/Skeleton';
 import { TreeSearch } from '../components/tree/TreeSearch';
@@ -67,8 +66,13 @@ export const TreeViewPage = () => {
         treeFillPct={pct}
         onOpenCta={() => upcoming?.personId && setSelectedPerson(data.persons.find((p) => p.id === upcoming.personId) ?? null)}
       />
-      <NudgeProgress pct={pct} hint={data.persons.length < 13 ? '+ бабушка раскроет 6 родственников' : '+ дядя по матери раскроет ещё ветку'} />
-      <div style={{padding:'48px 12px 24px',flex:1}}>
+      <QuickActions
+        onCalendar={() => nav(`/trees/${treeId}/calendar`)}
+        onShare={() => setShareOpen(true)}
+        onGifts={() => alert('История подарков — Phase 2')}
+        eventCount={events.length}
+      />
+      <div style={{padding:'24px 12px 24px',flex:1}}>
         <FamilyTreeLayout
           persons={data.persons}
           relationships={data.relationships}
@@ -77,12 +81,6 @@ export const TreeViewPage = () => {
           onPlusClick={(id) => { const p = data.persons.find((p) => p.id === id); if (p) setAddOpen(p); }}
         />
       </div>
-      <QuickActions
-        onCalendar={() => nav(`/trees/${treeId}/calendar`)}
-        onShare={() => setShareOpen(true)}
-        onGifts={() => alert('История подарков — Phase 2')}
-        eventCount={events.length}
-      />
       <PersonSheet
         open={!!selectedPerson}
         onClose={() => setSelectedPerson(null)}
