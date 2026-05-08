@@ -1,5 +1,9 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-family); -webkit-font-smoothing: antialiased; }
+/* Block horizontal page scroll and the elastic rubber-band that exposed the
+   light Click WebView background when panning the tree past its viewport. */
+html, body { overflow-x: hidden; }
+body { overscroll-behavior: none; }
 button { font-family: inherit; cursor: pointer; }
 
 /* Top inset that page-level elements use so nothing hides under iOS notch
