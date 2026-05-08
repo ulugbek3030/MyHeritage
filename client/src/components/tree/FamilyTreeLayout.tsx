@@ -213,7 +213,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
       if (card && vp.clientWidth && vp.clientHeight) {
         // First-time fit-to-screen — only when we know real dimensions.
         if (!fittedRef.current) {
-          const W = layout.canvas.width * (NODE_W / 2);
+          const W = layout.canvas.width * (NODE_W / 2) * 1.2;
           const H = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
           const fit = Math.min(vp.clientWidth / W, vp.clientHeight / H, 1);
           if (fit < 1) zoom.setTo(fit);
@@ -244,7 +244,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
   // so the rendered box must be NODE_W/2 × NODE_H/2 per half-unit — NOT
   // NODE_W × NODE_H, which would give us double the actual content size and
   // a huge empty area below + right of the tree.
-  const W = layout.canvas.width * (NODE_W / 2);
+  // +20% horizontal slack so wide names / future siblings can breathe.
+  const W = layout.canvas.width * (NODE_W / 2) * 1.2;
   const H = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
 
   const personById = new Map(persons.map((p) => [p.id, p]));
