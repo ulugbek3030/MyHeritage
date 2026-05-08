@@ -9,17 +9,18 @@ const AuthCtx = createContext<Ctx | null>(null);
 const WEB_SESSION_KEY = 'cf_click_web_session';
 
 /**
- * Find the Click web_session for this app load. Click typically passes it as
+ * Find the Click web_session for this app load. Click passes it as
  * `?web_session=...` when opening the mini-app webview; we cache it in
- * sessionStorage so refreshing inside the app doesn't lose it.
+ * sessionStorage so client-side navigation inside the app doesn't lose it.
  */
-const readWebSession = (): string | null => {
-  const url = new URL(window.location.href);
-  const fromQs = url.searchParams.get('web_session');
+const readWebSessionFromUrl = (): string | null => {
+  const fromQs = new URL(window.location.href).searchParams.get('web_session');
   if (fromQs) {
     try { sessionStorage.setItem(WEB_SESSION_KEY, fromQs); } catch { /* ignore */ }
-    return fromQs;
   }
+  return fromQs;
+};
+const readCachedWebSession = (): string | null => {
   try { return sessionStorage.getItem(WEB_SESSION_KEY); } catch { return null; }
 };
 
@@ -29,7 +30,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     (async () => {
       try {
-        // 1) Existing JWT? Trust it.
+        // 1) Fresh launch from Click (web_session in URL) — always re-validate
+        //    via Click's user.profile so we don't end up serving stale JWTs
+        //    for a different user. This costs one extra Click round-trip per
+        //    app open but keeps SSO authoritative.
+        const wsFromUrl = readWebSessionFromUrl();
+        if (wsFromUrl) {
+          try {
+            clearTokens();
+            const u = await authApi.loginWithClickSession(wsFromUrl);
+            setUser(u);
+            return;
+          } catch (e) {
+            console.warn('[auth] fresh click-session failed', e);
+            // Fall through — maybe a cached JWT is still good.
+          }
+        }
+
+        // 2) Existing JWT? Trust it.
         if (getAccess()) {
           try {
             const u = await authApi.me();
@@ -37,20 +55,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           } catch { clearTokens(); /* stale, fall through */ }
         }
 
-        // 2) Click SSO via web_session.
-        const ws = readWebSession();
-        if (ws) {
+        // 3) Cached web_session (we've seen one this session, but it's not in
+        //    the URL right now — e.g. user reloaded a deep link). Try Click.
+        const wsCached = readCachedWebSession();
+        if (wsCached) {
           try {
-            const u = await authApi.loginWithClickSession(ws);
+            const u = await authApi.loginWithClickSession(wsCached);
             setUser(u);
             return;
           } catch (e) {
-            console.warn('[auth] click-session failed', e);
-            // fall through to "show login" path
+            console.warn('[auth] cached click-session failed', e);
           }
         }
 
-        // 3) No JWT, no web_session → user lands on /login (router handles it).
+        // 4) No JWT, no web_session → user lands on /login.
         setUser(null);
       } catch (e) {
         console.error('[auth] init failed', e);
@@ -58,7 +76,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } finally { setLoading(false); }
     })();
   }, []);
-  const signOut = () => { authApi.logout(); setUser(null); };
+  const signOut = () => {
+    authApi.logout();
+    try { sessionStorage.removeItem(WEB_SESSION_KEY); } catch { /* ignore */ }
+    setUser(null);
+  };
   return <AuthCtx.Provider value={{ user, loading, setUser, signOut }}>{children}</AuthCtx.Provider>;
 };
 

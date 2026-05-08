@@ -89,18 +89,22 @@ export const loginWithEmail = async (email: string, password: string) => {
 };
 
 /**
- * First-time-only seeder: when a Click user has no trees yet, create their
- * default tree and an owner person populated from the Click profile (name,
- * surname, patronym, gender, phone). Idempotent — once the user has any
- * tree, this is a no-op so a manually-created tree never gets shadowed by
- * an auto-created one.
+ * First-login seeder: makes sure a Click user is represented as a person in
+ * a tree of their own. Idempotent on persons (not on trees) — if the user
+ * already manually created an empty tree before this seeder shipped, we
+ * adopt that tree and drop the owner person into it instead of creating a
+ * second tree alongside it.
+ *
+ * Skip condition: user already has ≥1 person across all their trees.
  */
-const ensureClickUserHasTree = async (userId: string, profile: ClickProfile): Promise<void> => {
-  const existing = await query<{ c: string }>(
-    'SELECT COUNT(*)::text AS c FROM trees WHERE user_id = $1',
+const ensureClickUserHasOwnerPerson = async (userId: string, profile: ClickProfile): Promise<void> => {
+  const existingPersons = await query<{ c: string }>(
+    `SELECT COUNT(p.id)::text AS c
+     FROM persons p JOIN trees t ON p.tree_id = t.id
+     WHERE t.user_id = $1`,
     [userId]
   );
-  if (Number(existing.rows[0]?.c ?? 0) > 0) return;
+  if (Number(existingPersons.rows[0]?.c ?? 0) > 0) return;
 
   const surname = String(profile.surname ?? '').trim();
   const firstName = String(profile.name ?? '').trim() || 'Я';
@@ -116,11 +120,23 @@ const ensureClickUserHasTree = async (userId: string, profile: ClickProfile): Pr
   const c = await pool.connect();
   try {
     await c.query('BEGIN');
-    const t = await c.query<{ id: string }>(
-      'INSERT INTO trees (user_id, name) VALUES ($1, $2) RETURNING id',
-      [userId, treeName]
+    // Prefer an existing tree (oldest) so we don't fork a user who already
+    // tapped "Создать" before this seeder existed. Only insert a new one if
+    // they truly have nothing yet.
+    const existingTree = await c.query<{ id: string }>(
+      'SELECT id FROM trees WHERE user_id = $1 ORDER BY created_at LIMIT 1',
+      [userId]
     );
-    const treeId = t.rows[0].id;
+    let treeId: string;
+    if (existingTree.rows[0]) {
+      treeId = existingTree.rows[0].id;
+    } else {
+      const t = await c.query<{ id: string }>(
+        'INSERT INTO trees (user_id, name) VALUES ($1, $2) RETURNING id',
+        [userId, treeName]
+      );
+      treeId = t.rows[0].id;
+    }
     const p = await c.query<{ id: string }>(
       `INSERT INTO persons (tree_id, first_name, last_name, middle_name, gender, is_alive, verified, phone)
        VALUES ($1, $2, $3, $4, $5, true, true, $6)
@@ -178,7 +194,7 @@ export const loginWithClickSession = async (webSession: string) => {
     [clientId, phone, display, profileJson]
   );
   if (byClick.rows[0]) {
-    await ensureClickUserHasTree(byClick.rows[0].id, profile);
+    await ensureClickUserHasOwnerPerson(byClick.rows[0].id, profile);
     return tokensFor(byClick.rows[0]);
   }
 
@@ -195,7 +211,7 @@ export const loginWithClickSession = async (webSession: string) => {
       [clientId, phone, display, profileJson]
     );
     if (byPhone.rows[0]) {
-      await ensureClickUserHasTree(byPhone.rows[0].id, profile);
+      await ensureClickUserHasOwnerPerson(byPhone.rows[0].id, profile);
       return tokensFor(byPhone.rows[0]);
     }
   }
@@ -206,7 +222,7 @@ export const loginWithClickSession = async (webSession: string) => {
      RETURNING ${USER_COLS}`,
     [clientId, phone, display, profileJson]
   );
-  await ensureClickUserHasTree(inserted.rows[0].id, profile);
+  await ensureClickUserHasOwnerPerson(inserted.rows[0].id, profile);
   return tokensFor(inserted.rows[0]);
 };
 
