@@ -3,7 +3,7 @@ import type { FamilyEvent } from '../../types';
 const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
-const dotColor = (e: FamilyEvent) => e.type === 'memorial' ? '#71717a' : e.type === 'anniversary' ? '#f472b6' : e.type === 'child_birthday' ? '#60a5fa' : '#fbbf24';
+const eventIcon = (e: FamilyEvent) => e.type === 'memorial' ? '🕯' : e.type === 'anniversary' ? '💍' : e.type === 'child_birthday' ? '🎈' : '🎂';
 
 export const MonthMini = ({ events, monthOffset = 0, onMonthChange }: { events: FamilyEvent[]; monthOffset?: number; onMonthChange?: (delta: number) => void }) => {
   const today = new Date();
@@ -43,11 +43,14 @@ export const MonthMini = ({ events, monthOffset = 0, onMonthChange }: { events: 
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:6}}>
         {cells.map((c, i) => c === null ? <div key={i} /> : (
-          <div key={i} style={{position:'relative',aspectRatio:'1',display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:isToday(c.day)?800:600,color:isToday(c.day)?'#0a0a0d':'var(--text)',borderRadius:10,background:isToday(c.day)?'linear-gradient(135deg,var(--accent),var(--accent-hover))':'transparent'}}>
-            {c.day}
+          <div key={i} style={{position:'relative',aspectRatio:'1',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontSize:18,fontWeight:isToday(c.day)?800:600,color:isToday(c.day)?'#0a0a0d':'var(--text)',borderRadius:10,background:isToday(c.day)?'linear-gradient(135deg,var(--accent),var(--accent-hover))':'transparent',gap:1,paddingTop:c.events.length>0?2:0}}>
+            <span style={{lineHeight:1}}>{c.day}</span>
             {c.events.length > 0 && (
-              <div style={{position:'absolute',bottom:3,left:'50%',transform:'translateX(-50%)',display:'flex',gap:2}}>
-                {c.events.slice(0, 3).map((e, j) => <span key={j} style={{width:4,height:4,borderRadius:'50%',background:isToday(c.day)?'#0a0a0d':dotColor(e)}} />)}
+              <div style={{display:'flex',gap:1,fontSize:11,lineHeight:1}}>
+                {/* Distinct event types only — no dupes when multiple kids share a birthday in the same family on the same day. */}
+                {Array.from(new Set(c.events.map((e) => eventIcon(e)))).slice(0, 3).map((icon, j) => (
+                  <span key={j} aria-hidden="true" style={{filter:isToday(c.day)?'grayscale(0.5) brightness(0.6)':'none'}}>{icon}</span>
+                ))}
               </div>
             )}
           </div>
