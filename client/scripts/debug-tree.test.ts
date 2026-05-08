@@ -47,10 +47,45 @@ test('debug — production tree layout', () => {
   }
 
   console.log('\n=== Counts of REAL persons in layout for every possible root ===');
+  let best: ReturnType<typeof calcTree> | null = null;
+  let bestCount = -1;
+  let bestRoot = '';
+  const personIdSet = new Set(persons.map((pp) => pp.id));
   for (const p of persons) {
     const layout = calcTree(nodes as any, { rootId: p.id, placeholders: true });
-    const real = layout.nodes.filter((n) => persons.some((pp) => pp.id === n.id));
+    const real = layout.nodes.filter((n) => personIdSet.has(n.id));
     console.log(`root=${(p.firstName).padEnd(10)} → real=${real.length}/${persons.length}, total=${layout.nodes.length}, canvas=${layout.canvas.width}×${layout.canvas.height}`);
+    if (real.length > bestCount) {
+      best = layout;
+      bestCount = real.length;
+      bestRoot = p.firstName;
+    }
+  }
+  console.log(`\n=== picker chose root=${bestRoot} (${bestCount}/${persons.length}) ===`);
+  if (best) {
+    console.log(`canvas: ${best.canvas.width} × ${best.canvas.height}`);
+    for (const n of best.nodes) {
+      const name = nameById.get(n.id) ?? `phantom(${n.id.slice(0, 6)})`;
+      console.log(`  (${String(n.left).padStart(2)},${String(n.top).padStart(2)})  ${name}`);
+    }
+    // Now compute extras
+    const layoutById = new Map(best.nodes.map((n) => [n.id, n]));
+    const occupied = new Set(best.nodes.map((n) => `${n.left},${n.top}`));
+    console.log(`\n=== extras for missing persons ===`);
+    for (const p of persons) {
+      if (layoutById.has(p.id)) continue;
+      const node = nodes.find((n) => n.id === p.id);
+      if (!node) continue;
+      const sib = node.siblings.map((s) => layoutById.get(s.id)).filter(Boolean)[0] as { left: number; top: number } | undefined;
+      const par = node.parents.map((s) => layoutById.get(s.id)).filter(Boolean)[0] as { left: number; top: number } | undefined;
+      const sp = node.spouses.map((s) => layoutById.get(s.id)).filter(Boolean)[0] as { left: number; top: number } | undefined;
+      const target = sib ?? sp ?? par;
+      let l = target ? target.left + 2 : 0;
+      const t = sib ? sib.top : sp ? sp.top : par ? par.top + 2 : 0;
+      while (occupied.has(`${l},${t}`)) l += 2;
+      occupied.add(`${l},${t}`);
+      console.log(`  +${nameById.get(p.id)} → (${l},${t}) anchored to ${sib ? 'sibling' : sp ? 'spouse' : 'parent'}`);
+    }
   }
 
   expect(true).toBe(true);
