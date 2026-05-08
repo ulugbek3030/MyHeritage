@@ -120,6 +120,23 @@ const ensureClickUserHasOwnerPerson = async (userId: string, profile: ClickProfi
   const c = await pool.connect();
   try {
     await c.query('BEGIN');
+    // Serialize concurrent seeders for the same user. Without this two
+    // simultaneous Click SSO requests can both pass the existing-persons
+    // check, both fall through to INSERT, and end up creating two trees
+    // ('Семья Abdukadirov' twice) before either can commit.
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`cf-seed:${userId}`]);
+    // Re-check inside the lock — by the time we got here someone else may
+    // have already finished the seed.
+    const personsAgain = await c.query<{ c: string }>(
+      `SELECT COUNT(p.id)::text AS c
+       FROM persons p JOIN trees t ON p.tree_id = t.id
+       WHERE t.user_id = $1`,
+      [userId]
+    );
+    if (Number(personsAgain.rows[0]?.c ?? 0) > 0) {
+      await c.query('COMMIT');
+      return;
+    }
     // Prefer an existing tree (oldest) so we don't fork a user who already
     // tapped "Создать" before this seeder existed. Only insert a new one if
     // they truly have nothing yet.
