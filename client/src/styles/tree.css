@@ -1,5 +1,5 @@
 .tree-stage { background: radial-gradient(80% 60% at 50% 0%, rgba(251,191,36,0.04), transparent 70%), #050507; border: 1px solid var(--border); border-radius: 22px; }
-.pcard { width: 128px; background: linear-gradient(180deg, var(--surface-2), #0f0f12); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 22px 12px 26px; text-align: center; font-size: 13px; position: relative; }
+.pcard { width: 96px; background: linear-gradient(180deg, var(--surface-2), #0f0f12); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px 8px 16px; text-align: center; font-size: 11px; position: relative; }
 .pcard.male::before, .pcard.female::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
 .pcard.male::before { background: linear-gradient(180deg, rgba(96,165,250,0.55), transparent 60%); }
 .pcard.female::before { background: linear-gradient(180deg, rgba(244,114,182,0.55), transparent 60%); }
@@ -7,27 +7,27 @@
 .pcard.deceased::after { content: '†'; position: absolute; top: 5px; left: 6px; color: var(--text-muted); font-size: 12px; font-weight: 800; }
 .pcard.me { background: linear-gradient(180deg, #2a230b, #1a1408); border-color: rgba(251,191,36,0.4); box-shadow: 0 0 0 1px rgba(251,191,36,0.25), 0 6px 20px rgba(251,191,36,0.2); }
 .pcard.me::before { display: none; }
-.pcard-av { width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; background: rgba(255,255,255,0.04); border: 1px solid var(--border); overflow: hidden; }
+.pcard-av { width: 42px; height: 42px; border-radius: 50%; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; background: rgba(255,255,255,0.04); border: 1px solid var(--border); overflow: hidden; }
 .pcard.male .pcard-av { color: rgba(96,165,250,0.7); background: linear-gradient(135deg, rgba(96,165,250,0.14), rgba(96,165,250,0.03)); border-color: rgba(96,165,250,0.3); }
 .pcard.female .pcard-av { color: rgba(244,114,182,0.7); background: linear-gradient(135deg, rgba(244,114,182,0.14), rgba(244,114,182,0.03)); border-color: rgba(244,114,182,0.3); }
 .pcard.me .pcard-av { background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #0a0a0d; border: none; }
 .pcard-av img { width: 100%; height: 100%; object-fit: cover; }
-.pcard-name { font-weight: 700; color: var(--text); line-height: 1.2; letter-spacing: -0.01em; font-size: 13px; }
-.pcard-year { color: var(--text-dim); font-size: 11px; margin-top: 4px; font-feature-settings: 'tnum' 1; }
-.pcard-status { font-size: 9px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 4px; padding: 2px 6px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 6px; display: inline-block; }
-.pcard-verified { position: absolute; top: 5px; right: 5px; width: 14px; height: 14px; background: var(--verified); color: #050507; border-radius: 50%; font-size: 9px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+.pcard-name { font-weight: 700; color: var(--text); line-height: 1.2; letter-spacing: -0.01em; font-size: 11px; }
+.pcard-year { color: var(--text-dim); font-size: 9px; margin-top: 3px; font-feature-settings: 'tnum' 1; }
+.pcard-status { font-size: 8px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; padding: 1px 5px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 5px; display: inline-block; }
+.pcard-verified { position: absolute; top: 4px; right: 4px; width: 12px; height: 12px; background: var(--verified); color: #050507; border-radius: 50%; font-size: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
 .pcard.me .pcard-verified { background: #0a0a0d; color: var(--accent); }
-.pcard-cake { position: absolute; bottom: -5px; right: -4px; background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #0a0a0d; width: 18px; height: 18px; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; border: 1.5px solid #050507; box-shadow: 0 0 8px rgba(251,191,36,0.5); }
+.pcard-cake { position: absolute; bottom: -4px; right: -3px; background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #0a0a0d; width: 14px; height: 14px; border-radius: 50%; font-size: 9px; display: flex; align-items: center; justify-content: center; border: 1.5px solid #050507; box-shadow: 0 0 8px rgba(251,191,36,0.5); }
 /* "+" sits inside the bottom half of a horizontal ellipse — flat top edge
    tucks 4px into the card so the top stroke is hidden, the arc forms the
    visible bowl below. */
 .pcard-plus {
   position: absolute;
-  bottom: -22px;       /* small gap below the card so its bottom line stays visible */
+  bottom: -18px;       /* small gap below the card so its bottom line stays visible */
   left: 50%;
   transform: translateX(-50%);
-  width: 70px;
-  height: 19px;
+  width: 54px;
+  height: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
