@@ -43,12 +43,18 @@ export const initMetrika = (): void => {
     first?.parentNode?.insertBefore(script, first);
   }
 
+  // `defer: true` — let RouteTracker fire the first hit so SPA navigation
+  // doesn't double-count the initial page. The rest mirrors the snippet
+  // Метрика generates for static sites (clickmap, trackLinks, webvisor,
+  // accurateTrackBounce, ecommerce dataLayer).
   window.ym?.(COUNTER_ID, 'init', {
     defer: true,
+    ssr: true,
     clickmap: true,
     trackLinks: true,
     accurateTrackBounce: true,
     webvisor: true,
+    ecommerce: 'dataLayer',
   });
 };
 
