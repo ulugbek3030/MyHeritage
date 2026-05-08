@@ -219,7 +219,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
           if (fit < 1) zoom.setTo(fit);
           fittedRef.current = true;
         }
+        // Two passes: now (transform may have just been applied) and again on
+        // the next animation frame so the browser sees the scaled rect.
         card.scrollIntoView({ block: 'center', inline: 'center' });
+        raf = requestAnimationFrame(() => {
+          card.scrollIntoView({ block: 'center', inline: 'center' });
+        });
         return;
       }
       if (attempts < 20) {

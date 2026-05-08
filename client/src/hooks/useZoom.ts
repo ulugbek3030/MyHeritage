@@ -82,6 +82,21 @@ export const useZoom = (containerRef: React.RefObject<HTMLElement>, onScale?: (s
     zoomIn: () => { target.current = Math.min(MAX_SCALE, target.current + 0.15); },
     zoomOut: () => { target.current = Math.max(MIN_SCALE, target.current - 0.15); },
     reset: () => { target.current = 1; },
-    setTo: (s: number) => { target.current = Math.max(MIN_SCALE, Math.min(MAX_SCALE, s)); },
+    /**
+     * Apply a scale immediately (bypassing the LERP tween). Use for the
+     * fit-to-screen pass on first entry — we need the transform applied
+     * synchronously so a follow-up scrollIntoView reads the post-scale
+     * element rect.
+     */
+    setTo: (s: number) => {
+      const clamped = Math.max(MIN_SCALE, Math.min(MAX_SCALE, s));
+      target.current = clamped;
+      scale.current = clamped;
+      const el = containerRef.current;
+      if (el) {
+        el.style.transform = `scale(${clamped})`;
+        el.style.transformOrigin = 'top center';
+      }
+    },
   };
 };
