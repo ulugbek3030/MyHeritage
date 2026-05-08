@@ -268,6 +268,19 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
 
   const personById = new Map(persons.map((p) => [p.id, p]));
 
+  // "Add father" / "Add mother" placeholders are only useful at the highest
+  // visible generation — once the user has parents above them, anyone lower
+  // down in the tree who happens to be parentless (e.g. a married-in
+  // ancestor whose own parents we didn't seed) shouldn't get a row of
+  // dashed cards in the middle of the layout. Pin placeholders to the
+  // smallest node.top among parentless real persons.
+  let topMostParentlessRow = Infinity;
+  for (const n of layout.nodes) {
+    if (parentlessIds.has(n.id) && personById.get(n.id) && n.top < topMostParentlessRow) {
+      topMostParentlessRow = n.top;
+    }
+  }
+
   return (
     <div
       ref={viewport}
@@ -334,6 +347,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
           {layout.nodes.map((n: ExtNode) => {
             if (!parentlessIds.has(n.id) || !personById.get(n.id)) return null;
+            if (n.top !== topMostParentlessRow) return null;
             const cardWrapperX = n.left * (NODE_W / 2);
             const cardWrapperY = n.top * (NODE_H / 2) + TOP_PAD;
             const childCenterX = cardWrapperX + NODE_W / 2;
@@ -354,6 +368,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
 
         {layout.nodes.map((n: ExtNode) => {
           if (!parentlessIds.has(n.id) || !personById.get(n.id)) return null;
+          if (n.top !== topMostParentlessRow) return null;
           const cardWrapperX = n.left * (NODE_W / 2);
           const cardWrapperY = n.top * (NODE_H / 2) + TOP_PAD;
           const fatherX = cardWrapperX;
