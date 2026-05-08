@@ -307,16 +307,74 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 
+  const personById = new Map(persons.map((p) => [p.id, p]));
+
+  // Cover the calcTree gap: relatives-tree drops nodes that don't reach
+  // through siblings/spouse-parent paths. For each missing real person we
+  // infer a slot relative to a related node that DID land in layout.
+  // Strategy: prefer a sibling's right side (same row, col +2 in half-units)
+  // → fall back to a parent below → spouse adjacent.
+  type ExtraNode = { id: string; left: number; top: number; sourceParents?: string[] };
+  const layoutById = new Map(layout.nodes.map((n) => [n.id, n]));
+  const occupied = new Set(layout.nodes.map((n) => `${n.left},${n.top}`));
+  const reserve = (left: number, top: number) => {
+    while (occupied.has(`${left},${top}`)) left += 2;
+    occupied.add(`${left},${top}`);
+    return left;
+  };
+  const extras: ExtraNode[] = [];
+  for (const p of persons) {
+    if (layoutById.has(p.id)) continue;
+    const node = nodes.find((n) => n.id === p.id);
+    if (!node) continue;
+    let placed = false;
+    // Sibling on same row.
+    for (const sib of node.siblings) {
+      const sibPos = layoutById.get(sib.id);
+      if (!sibPos) continue;
+      const left = reserve(sibPos.left + 2, sibPos.top);
+      extras.push({ id: p.id, left, top: sibPos.top, sourceParents: node.parents.map((pp) => pp.id) });
+      placed = true;
+      break;
+    }
+    if (placed) continue;
+    // Below a parent (one full row down).
+    for (const par of node.parents) {
+      const parPos = layoutById.get(par.id);
+      if (!parPos) continue;
+      const left = reserve(parPos.left, parPos.top + 2);
+      extras.push({ id: p.id, left, top: parPos.top + 2, sourceParents: node.parents.map((pp) => pp.id) });
+      placed = true;
+      break;
+    }
+    if (placed) continue;
+    // Adjacent to a spouse.
+    for (const sp of node.spouses) {
+      const spPos = layoutById.get(sp.id);
+      if (!spPos) continue;
+      const left = reserve(spPos.left + 2, spPos.top);
+      extras.push({ id: p.id, left, top: spPos.top });
+      placed = true;
+      break;
+    }
+  }
+
+  // Effective canvas covers BOTH layout-laid and extras.
+  let canvasW = layout.canvas.width;
+  let canvasH = layout.canvas.height;
+  for (const e of extras) {
+    canvasW = Math.max(canvasW, e.left + 2);
+    canvasH = Math.max(canvasH, e.top + 2);
+  }
+
   // canvas.width/height come back in HALF-units (same scale as node.left/top),
   // so the rendered box must be NODE_W/2 × NODE_H/2 per half-unit. Spacing
   // and canvas size are now both driven by NODE_W/NODE_H — no extra fudge.
   // We pad the rendered canvas an extra 20% below the bottom generation so
   // there's room to scroll past the lowest cards (helps when adding children).
-  const W = layout.canvas.width * (NODE_W / 2);
-  const layoutH = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
+  const W = canvasW * (NODE_W / 2);
+  const layoutH = canvasH * (NODE_H / 2) + TOP_PAD;
   const H = Math.round(layoutH * (1 + BOTTOM_PAD_RATIO));
-
-  const personById = new Map(persons.map((p) => [p.id, p]));
 
   // Two flavours of parent-slot placeholders coexist:
   //   1. "topRow" — one pair (father + mother) above each parentless person
@@ -426,8 +484,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         return (
           <div style={{ position: 'fixed', top: 8, right: 8, zIndex: 100, padding: 8, background: 'rgba(0,0,0,0.85)', border: '1px solid var(--accent)', borderRadius: 8, fontSize: 9, fontFamily: 'ui-monospace, Menlo, monospace', color: 'var(--text)', maxWidth: 240, maxHeight: '60vh', overflow: 'auto' }}>
             <div style={{ color: 'var(--accent)', fontWeight: 800, marginBottom: 4 }}>tree debug</div>
-            <div>canvas: {layout.canvas.width}×{layout.canvas.height}</div>
-            <div>nodes: {layout.nodes.length} (real {layout.nodes.filter((n) => personById.get(n.id)).length})</div>
+            <div>canvas: {canvasW}×{canvasH}</div>
+            <div>layout: {layout.nodes.length} (real {layout.nodes.filter((n) => personById.get(n.id)).length}), extras: {extras.length}</div>
             <div style={{ marginTop: 4 }}>
               {layout.nodes.map((n) => {
                 const p = personById.get(n.id);
@@ -437,6 +495,11 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                   </div>
                 );
               })}
+              {extras.map((e) => (
+                <div key={e.id} style={{ color: 'var(--accent)' }}>
+                  ({e.left},{e.top}) +{personById.get(e.id)?.firstName}
+                </div>
+              ))}
             </div>
           </div>
         );
@@ -468,6 +531,59 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               style={{
                 position: 'absolute',
                 transform: `translate(${n.left * (NODE_W / 2)}px, ${n.top * (NODE_H / 2) + TOP_PAD}px)`,
+                width: NODE_W,
+                height: NODE_H,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <PersonCard
+                person={person}
+                isOwner={person.id === ownerId}
+                eventIcons={personEventIcons?.[person.id]}
+                onClick={onPersonClick}
+                onPlusClick={onPlusClick}
+                showPlus={true}
+              />
+            </div>
+          );
+        })}
+
+        {/* Extras: persons relatives-tree dropped from the layout. We
+            position them by their best-known relation and draw a small V
+            connector from their parents' couple-line down to them. */}
+        {extras.length > 0 && (
+          <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
+            {extras.map((e) => {
+              if (!e.sourceParents || e.sourceParents.length === 0) return null;
+              // Find any layout-positioned parent to anchor the connector to.
+              const parentPos = e.sourceParents.map((id) => layoutById.get(id)).filter(Boolean) as Array<{ left: number; top: number }>;
+              if (parentPos.length === 0) return null;
+              const parentBottomY = parentPos[0].top * (NODE_H / 2) + TOP_PAD + (NODE_H + 92) / 2;
+              const childTopY = e.top * (NODE_H / 2) + TOP_PAD + (NODE_H - 92) / 2;
+              const childCenterX = e.left * (NODE_W / 2) + NODE_W / 2;
+              return (
+                <line
+                  key={`extra-conn-${e.id}`}
+                  x1={childCenterX} y1={parentBottomY}
+                  x2={childCenterX} y2={childTopY}
+                  stroke="rgba(255,255,255,0.4)" strokeWidth="1.4"
+                />
+              );
+            })}
+          </svg>
+        )}
+        {extras.map((e) => {
+          const person = personById.get(e.id);
+          if (!person) return null;
+          return (
+            <div
+              key={`extra-${e.id}`}
+              data-person-id={e.id}
+              style={{
+                position: 'absolute',
+                transform: `translate(${e.left * (NODE_W / 2)}px, ${e.top * (NODE_H / 2) + TOP_PAD}px)`,
                 width: NODE_W,
                 height: NODE_H,
                 display: 'flex',
