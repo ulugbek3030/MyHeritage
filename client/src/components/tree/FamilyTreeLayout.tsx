@@ -400,6 +400,28 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         alignItems: 'safe center',
       }}
     >
+      {(() => {
+        try {
+          if (!new URL(window.location.href).searchParams.has('debug')) return null;
+        } catch { return null; }
+        return (
+          <div style={{ position: 'fixed', top: 8, right: 8, zIndex: 100, padding: 8, background: 'rgba(0,0,0,0.85)', border: '1px solid var(--accent)', borderRadius: 8, fontSize: 9, fontFamily: 'ui-monospace, Menlo, monospace', color: 'var(--text)', maxWidth: 240, maxHeight: '60vh', overflow: 'auto' }}>
+            <div style={{ color: 'var(--accent)', fontWeight: 800, marginBottom: 4 }}>tree debug</div>
+            <div>canvas: {layout.canvas.width}×{layout.canvas.height}</div>
+            <div>nodes: {layout.nodes.length} (real {layout.nodes.filter((n) => personById.get(n.id)).length})</div>
+            <div style={{ marginTop: 4 }}>
+              {layout.nodes.map((n) => {
+                const p = personById.get(n.id);
+                return (
+                  <div key={n.id} style={{ color: p ? 'var(--text)' : 'var(--text-muted)' }}>
+                    ({n.left},{n.top}) {p ? p.firstName : '·phantom'}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
       <div ref={content} style={{ position: 'relative', width: W, height: H, willChange: 'transform' }}>
         <svg width={W} height={H} style={{ position: 'absolute', top: TOP_PAD, left: 0, pointerEvents: 'none' }}>
           {/* strokeLinecap="butt" — at junctions the segment's shortened end and
