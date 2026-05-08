@@ -1,4 +1,4 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-family); -webkit-font-smoothing: antialiased; }
 /* Block horizontal page scroll and the elastic rubber-band that exposed the
    light Click WebView background when panning the tree past its viewport. */
