@@ -68,12 +68,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
     if (!nodes.length) return null;
     try {
       const root = ownerId && nodes.some((n) => n.id === ownerId) ? ownerId : nodes[0].id;
-      // placeholders: false — relatives-tree's invisible spouse/parent anchors
-      // generate stray connector segments (an H-bar plus side V-stubs) that
-      // overlap our own "Add father / Add mother" placeholder T-junction. We
-      // own the parent-slot rendering ourselves now, so we don't need
-      // relatives-tree's phantom column anchors.
-      return calcTree(nodes as any, { rootId: root, placeholders: false });
+      // placeholders: true — relatives-tree adds invisible spouse/parent
+      // anchors so multi-branch trees (e.g. owner's parents AND wife's
+      // parents on the top row) lay out without one branch swallowing the
+      // other. We filter the phantom-derived connector segments below so
+      // they don't leak through as stray dashes near our own placeholders.
+      return calcTree(nodes as any, { rootId: root, placeholders: true });
     } catch (e) {
       console.warn('[tree] layout fallback', e);
       return null;
@@ -91,7 +91,20 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   //      junction for every perpendicular pair.
   const connectorPaths = useMemo(() => {
     if (!layout) return [] as string[];
-    const segs = layout.connectors;
+    // Drop segments whose endpoints fall inside a phantom node's bounding
+    // box. relatives-tree emits couple/parent stubs for its invisible spouse
+    // and parent anchors (placeholders=true is required for multi-branch
+    // layout but we don't render those nodes), and otherwise they show up
+    // as floating dashes around our own "Add father / Add mother" cards.
+    const personIdSet = new Set(persons.map((p) => p.id));
+    const phantomBoxes = layout.nodes
+      .filter((n) => !personIdSet.has(n.id))
+      .map((n) => ({ left: n.left, top: n.top }));
+    const inPhantom = (x: number, y: number) =>
+      phantomBoxes.some((b) => x >= b.left && x <= b.left + 2 && y >= b.top && y <= b.top + 2);
+    const segs = layout.connectors.filter(
+      (s) => !(inPhantom(s[0], s[1]) || inPhantom(s[2], s[3]))
+    );
     const sX = NODE_W / 2;
     const sY = NODE_H / 2;
     const ARC_R = 14;
@@ -204,7 +217,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       }
     });
     return paths;
-  }, [layout]);
+  }, [layout, persons]);
 
   const zoom = useZoom(content as React.RefObject<HTMLElement>);
   useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
