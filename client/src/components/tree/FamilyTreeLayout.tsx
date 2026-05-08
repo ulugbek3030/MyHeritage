@@ -67,18 +67,37 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   const layout = useMemo(() => {
     if (!nodes.length) return null;
     try {
-      const root = ownerId && nodes.some((n) => n.id === ownerId) ? ownerId : nodes[0].id;
-      // placeholders: true — relatives-tree adds invisible spouse/parent
-      // anchors so multi-branch trees (e.g. owner's parents AND wife's
-      // parents on the top row) lay out without one branch swallowing the
-      // other. We filter the phantom-derived connector segments below so
-      // they don't leak through as stray dashes near our own placeholders.
-      return calcTree(nodes as any, { rootId: root, placeholders: true });
+      // relatives-tree silently drops nodes it can't reach from `rootId`
+      // (it doesn't traverse siblings of non-root nodes nor spouse-of-
+      // spouse parents). For multi-branch trees that means owner-rooted
+      // calcTree skips wife's parents, while shared-child-rooted skips the
+      // owner's siblings. We brute-force every person as a root, keep the
+      // layout with the most real persons present, and only stop early if
+      // one of them lands on the full set.
+      // Fast path: if total persons is small enough, this is cheap.
+      let best: ReturnType<typeof calcTree> | null = null;
+      let bestCount = -1;
+      const personIdSet = new Set(persons.map((p) => p.id));
+      const candidates: string[] = [];
+      if (ownerId && nodes.some((n) => n.id === ownerId)) candidates.push(ownerId);
+      for (const n of nodes) if (n.id !== ownerId) candidates.push(n.id);
+      for (const rootId of candidates) {
+        try {
+          const l = calcTree(nodes as any, { rootId, placeholders: true });
+          const realCount = l.nodes.filter((nn) => personIdSet.has(nn.id)).length;
+          if (realCount > bestCount) {
+            best = l;
+            bestCount = realCount;
+            if (realCount >= persons.length) break;
+          }
+        } catch { /* root incompatible with calcTree, skip */ }
+      }
+      return best;
     } catch (e) {
       console.warn('[tree] layout fallback', e);
       return null;
     }
-  }, [nodes, ownerId]);
+  }, [nodes, ownerId, persons]);
 
   // Build SVG <path d=...> strings for connectors with rounded corners.
   // Two-pass approach:
