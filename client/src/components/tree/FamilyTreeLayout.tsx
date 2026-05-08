@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
 import calcTree from 'relatives-tree';
 import type { ExtNode } from 'relatives-tree/lib/types';
 import type { Person, Relationship } from '../../types';
@@ -26,6 +26,10 @@ interface Props {
 
 export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirthdayIds, onPersonClick, onPlusClick }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
+  // Track real viewport size so the half-vp padding and the auto-scroll target
+  // both use the same numbers. CSS `50vh/50vw` is window-relative, which breaks
+  // inside Click's WebView where the tree-stage isn't full window.
+  const [vpSize, setVpSize] = useState({ w: 0, h: 0 });
   const content = useRef<HTMLDivElement>(null);
 
   const nodes = useMemo(() => transformToTreeNodes(persons, relationships, ownerId), [persons, relationships, ownerId]);
@@ -171,6 +175,19 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
   }, [layout]);
 
   useZoom(content as React.RefObject<HTMLElement>);
+
+  // Observe the viewport size so we know exactly half of it for padding +
+  // centering. Updates when WebView resizes, orientation changes, etc.
+  useEffect(() => {
+    const vp = viewport.current;
+    if (!vp) return;
+    const update = () => setVpSize({ w: vp.clientWidth, h: vp.clientHeight });
+    update();
+    if (typeof ResizeObserver === 'undefined') return;
+    const obs = new ResizeObserver(update);
+    obs.observe(vp);
+    return () => obs.disconnect();
+  }, []);
   useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
 
   // Center owner in both axes on first render (and when owner changes).
@@ -178,37 +195,33 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
   // to start (top-left), so we scroll explicitly to bring the owner to viewport
   // centre. We run inside a double rAF so layout is committed and clientWidth /
   // clientHeight are non-zero before we read them.
-  // Owner card always at viewport centre on entry. The content is wrapped with
-  // a half-viewport-sized padding so scrollLeft/scrollTop can reach any owner
-  // position regardless of how close to the edge it sits in the layout.
+  // Owner card always at viewport centre on entry. The padding wrapper adds
+  // vpSize.w/2 + vpSize.h/2 of slack on each side so scrollLeft/scrollTop can
+  // reach any node regardless of where it sits in the layout. Re-runs once
+  // viewport size becomes known (vpSize.w > 0) so this works even when the
+  // first paint happens before clientWidth is settled (Click WebView mini-app).
   useEffect(() => {
-    if (!layout || !ownerId) return;
+    if (!layout || !ownerId || !vpSize.w || !vpSize.h) return;
     const ownerNode = layout.nodes.find((n) => n.id === ownerId);
     if (!ownerNode) return;
-    let raf2 = 0;
-    const center = () => {
-      const vp = viewport.current;
-      if (!vp || !vp.clientWidth || !vp.clientHeight) return;
-      // Owner card centre in *content* coordinates.
-      const ownerCenterX = ownerNode.left * (NODE_W / 2) + NODE_W / 2;
-      const ownerCenterY = ownerNode.top * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
-      // Wrapper adds vp/2 padding on every side, so owner at content (x,y) sits
-      // at scroll coords (vp.width/2 + x, vp.height/2 + y). To put it at the
-      // visible viewport centre, scrollLeft = ownerCenterX, scrollTop = ownerCenterY.
-      vp.scrollTo({
-        left: Math.max(0, Math.min(ownerCenterX, vp.scrollWidth - vp.clientWidth)),
-        top: Math.max(0, Math.min(ownerCenterY, vp.scrollHeight - vp.clientHeight)),
+    const vp = viewport.current;
+    if (!vp) return;
+    // Owner centre in content coords. Wrapper adds (vpSize.w/2, vpSize.h/2)
+    // of padding, so to place owner at the visible viewport centre,
+    // scrollLeft = ownerCenterX (and same for Y).
+    const ownerCenterX = ownerNode.left * (NODE_W / 2) + NODE_W / 2;
+    const ownerCenterY = ownerNode.top * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
+    const raf = requestAnimationFrame(() => {
+      const v = viewport.current;
+      if (!v) return;
+      v.scrollTo({
+        left: Math.max(0, Math.min(ownerCenterX, v.scrollWidth - v.clientWidth)),
+        top: Math.max(0, Math.min(ownerCenterY, v.scrollHeight - v.clientHeight)),
         behavior: 'auto',
       });
-    };
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(center);
     });
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-    };
-  }, [layout, ownerId]);
+    return () => cancelAnimationFrame(raf);
+  }, [layout, ownerId, vpSize.w, vpSize.h]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 
@@ -230,10 +243,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
         cursor: 'grab',
       }}
     >
-      {/* Half-viewport padding around the content so scrollLeft/scrollTop can
-          place any node at the visible viewport centre — even nodes near the
-          edges of the layout (e.g. an owner positioned at gen 0 with no parents). */}
-      <div style={{ padding: '50vh 50vw', display: 'inline-block' }}>
+      {/* Half-of-actual-viewport padding around the content so scrollLeft/
+          scrollTop can place any node at the visible viewport centre — even
+          nodes near the edges of the layout. We compute padding from the real
+          tree-stage size (via ResizeObserver) instead of CSS `vh`/`vw`, which
+          are window-relative and break inside Click's WebView. */}
+      <div style={{ padding: `${vpSize.h / 2}px ${vpSize.w / 2}px`, display: 'inline-block' }}>
       <div ref={content} style={{ position: 'relative', width: W, height: H, willChange: 'transform' }}>
         <svg width={W} height={H} style={{ position: 'absolute', top: TOP_PAD, left: 0, pointerEvents: 'none' }}>
           {/* strokeLinecap="butt" — at junctions the segment's shortened end and
