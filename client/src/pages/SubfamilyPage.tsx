@@ -28,7 +28,7 @@ export const SubfamilyPage = () => {
 
   if (!data || !root) return <div style={{padding:24}}>Загрузка…</div>;
   return (
-    <div style={{minHeight:'100dvh',display:'flex',flexDirection:'column'}}>
+    <div style={{minHeight:'calc(100dvh - var(--safe-top, 0px))',display:'flex',flexDirection:'column'}}>
       <header style={{padding:'10px 18px',display:'flex',alignItems:'center',gap:10,borderBottom:'1px solid var(--border)'}}>
         <button onClick={() => nav(`/trees/${treeId}`)} style={{width:34,height:34,borderRadius:'50%',background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:'#0a0a0d',border:'none',fontSize:15,fontWeight:800,boxShadow:'0 0 14px rgba(251,191,36,0.4)'}}>←</button>
         <div style={{flex:1}}>

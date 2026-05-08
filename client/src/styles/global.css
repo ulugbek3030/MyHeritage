@@ -1,3 +1,15 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-family); -webkit-font-smoothing: antialiased; }
 button { font-family: inherit; cursor: pointer; }
+
+/* Top inset that page-level elements use so nothing hides under iOS notch
+   or Click SuperApp's own title bar. In Click WebView env() reports only
+   the device status bar, so we floor the value at 96px to also clear
+   Click's "My Heritage" / close-button row. */
+:root { --safe-top: env(safe-area-inset-top, 0px); }
+html.cf-click { --safe-top: max(env(safe-area-inset-top, 0px), 96px); }
+body { padding-top: var(--safe-top); }
+/* Pages that pin to the viewport with `100dvh` need to subtract the inset
+   so the bottom edge stays inside the visible area. */
+.full-vh { height: calc(100dvh - var(--safe-top)); }
+.full-vh-min { min-height: calc(100dvh - var(--safe-top)); }

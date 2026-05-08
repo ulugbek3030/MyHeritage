@@ -4,7 +4,7 @@
  * registration lands, the form will live here.
  */
 export const LoginPage = () => (
-  <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center', gap: 18 }}>
+  <div style={{ minHeight: 'calc(100dvh - var(--safe-top, 0px))', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center', gap: 18 }}>
     <div style={{ fontSize: 48 }}>🌳</div>
     <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em' }}>Click Family</div>
     <div style={{ fontSize: 14, color: 'var(--text-muted)', maxWidth: 320, lineHeight: 1.5 }}>

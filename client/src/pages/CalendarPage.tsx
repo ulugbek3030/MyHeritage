@@ -36,7 +36,7 @@ export const CalendarPage = () => {
   }, [filtered]);
 
   return (
-    <div style={{minHeight:'100dvh',display:'flex',flexDirection:'column'}}>
+    <div style={{minHeight:'calc(100dvh - var(--safe-top, 0px))',display:'flex',flexDirection:'column'}}>
       <header style={{padding:'14px 18px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid var(--border)'}}>
         <button onClick={() => nav(-1 as any)} style={{width:40,height:40,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)',fontSize:18,cursor:'pointer'}}>←</button>
         <div style={{flex:1,fontSize:22,fontWeight:800,letterSpacing:'-0.02em'}}>Календарь</div>
