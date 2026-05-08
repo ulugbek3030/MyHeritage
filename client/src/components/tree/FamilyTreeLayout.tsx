@@ -402,30 +402,58 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           );
         })}
 
-        {/* Owner-only parent slots. Connectors only render when both parents
-            are missing (T-junction); for the half-parented case the existing
-            parent's relatives-tree connector covers the spouse line, and the
-            new placeholder sits next to them visually as a spouse position. */}
-        {connectorAnchor && ownerId && (() => {
+        {/* Dashed connectors that hint at the future relationship the user
+            will create when they tap a placeholder. Two cases:
+              - Both parents missing → full T-junction down to the owner.
+              - One parent exists → couple-line between the existing parent
+                and the placeholder (their future spouse position), so the
+                user can see they'll be paired up. */}
+        {ownerId && (connectorAnchor || parentSlots.length === 1) && (() => {
           const ownerNode = layout.nodes.find((n) => n.id === ownerId);
           if (!ownerNode) return null;
-          const cardWrapperX = ownerNode.left * (NODE_W / 2);
-          const cardWrapperY = ownerNode.top * (NODE_H / 2) + TOP_PAD;
-          const childCenterX = cardWrapperX + NODE_W / 2;
-          const fatherCenterX = connectorAnchor.fatherSlotX + NODE_W / 4;
-          const motherCenterX = connectorAnchor.motherSlotX + NODE_W / 4;
+          const stroke = { stroke: 'rgba(255,255,255,0.3)', strokeWidth: '1.4', strokeDasharray: '3 3' };
           const PLACEHOLDER_H = 82;
           const PERSON_H = 92;
-          const parentBottomY = connectorAnchor.parentY + (NODE_H + PLACEHOLDER_H) / 2;
-          const childTopY = cardWrapperY + (NODE_H - PERSON_H) / 2;
-          const stubY = parentBottomY + (childTopY - parentBottomY) / 2;
-          const stroke = { stroke: 'rgba(255,255,255,0.3)', strokeWidth: '1.4', strokeDasharray: '3 3' };
+
+          if (connectorAnchor) {
+            const cardWrapperX = ownerNode.left * (NODE_W / 2);
+            const cardWrapperY = ownerNode.top * (NODE_H / 2) + TOP_PAD;
+            const childCenterX = cardWrapperX + NODE_W / 2;
+            const fatherCenterX = connectorAnchor.fatherSlotX + NODE_W / 4;
+            const motherCenterX = connectorAnchor.motherSlotX + NODE_W / 4;
+            const parentBottomY = connectorAnchor.parentY + (NODE_H + PLACEHOLDER_H) / 2;
+            const childTopY = cardWrapperY + (NODE_H - PERSON_H) / 2;
+            const stubY = parentBottomY + (childTopY - parentBottomY) / 2;
+            return (
+              <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
+                <line x1={fatherCenterX} y1={parentBottomY} x2={fatherCenterX} y2={stubY} {...stroke} />
+                <line x1={motherCenterX} y1={parentBottomY} x2={motherCenterX} y2={stubY} {...stroke} />
+                <line x1={fatherCenterX} y1={stubY} x2={motherCenterX} y2={stubY} {...stroke} />
+                <line x1={childCenterX} y1={stubY} x2={childCenterX} y2={childTopY} {...stroke} />
+              </svg>
+            );
+          }
+
+          // Half-missing case: dashed couple line between the existing parent
+          // and the placeholder, drawn at card-vertical-centre Y.
+          const slot = parentSlots[0];
+          const existingId = slot.gender === 'male' ? ownerParents?.motherId : ownerParents?.fatherId;
+          if (!existingId) return null;
+          const exNode = layout.nodes.find((n) => n.id === existingId);
+          if (!exNode) return null;
+          const exWrapperX = exNode.left * (NODE_W / 2);
+          const exWrapperY = exNode.top * (NODE_H / 2) + TOP_PAD;
+          const exCardLeftX  = exWrapperX + (NODE_W - 72) / 2;       // 36
+          const exCardRightX = exWrapperX + (NODE_W + 72) / 2;       // 108
+          const phCardLeftX  = slot.x + (NODE_W / 2 - 60) / 2;       // 6
+          const phCardRightX = slot.x + (NODE_W / 2 + 60) / 2;       // 66
+          const coupleY = exWrapperY + NODE_H / 2;
+          const placeholderToRight = slot.x > exWrapperX;
+          const x1 = placeholderToRight ? exCardRightX : phCardRightX;
+          const x2 = placeholderToRight ? phCardLeftX  : exCardLeftX;
           return (
             <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
-              <line x1={fatherCenterX} y1={parentBottomY} x2={fatherCenterX} y2={stubY} {...stroke} />
-              <line x1={motherCenterX} y1={parentBottomY} x2={motherCenterX} y2={stubY} {...stroke} />
-              <line x1={fatherCenterX} y1={stubY} x2={motherCenterX} y2={stubY} {...stroke} />
-              <line x1={childCenterX} y1={stubY} x2={childCenterX} y2={childTopY} {...stroke} />
+              <line x1={x1} y1={coupleY} x2={x2} y2={coupleY} {...stroke} />
             </svg>
           );
         })()}
