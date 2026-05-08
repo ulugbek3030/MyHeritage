@@ -8,11 +8,19 @@ import { fetchClickProfile } from './click.service.js';
 // Index signature lets AuthUser satisfy `Record<string, unknown>` — the
 // generic constraint on db/pool's `query<T>()` (pg types use that bound).
 // Phone is now nullable: email-only signups don't have one.
-export interface AuthUser { id: string; phone: string | null; email: string | null; displayName: string | null; avatarUrl: string | null; [key: string]: unknown; }
+export interface AuthUser {
+  id: string;
+  phone: string | null;
+  email: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  clickClientId: number | null;
+  [key: string]: unknown;
+}
 
 const BCRYPT_ROUNDS = 12;
 
-const USER_COLS = `id, phone, email, display_name AS "displayName", avatar_url AS "avatarUrl"`;
+const USER_COLS = `id, phone, email, display_name AS "displayName", avatar_url AS "avatarUrl", click_client_id AS "clickClientId"`;
 
 export const upsertUserByPhone = async (phone: string): Promise<AuthUser> => {
   const r = await query<AuthUser>(
@@ -81,24 +89,69 @@ export const loginWithEmail = async (email: string, password: string) => {
 };
 
 /**
- * Exchange a Click web_session for our JWT pair. Looks up the user by phone
- * (returned by Click), creates one if missing, and stamps display_name with
- * "Name Surname" when the row was new (or empty).
+ * Exchange a Click web_session for our JWT pair.
+ *
+ * Lookup priority:
+ *   1. click_client_id — Click's permanent ID for this user. Survives phone
+ *      number changes, so this is the strongest match if we've seen them
+ *      before.
+ *   2. phone — for users we onboarded via OTP/legacy before they ever logged
+ *      in via Click (or before this column existed). We adopt that row and
+ *      stamp click_client_id on it.
+ *   3. fresh INSERT.
+ *
+ * On every call we refresh phone, display_name (only if currently empty) and
+ * the cached profile JSON so it's never more than one login stale.
  */
 export const loginWithClickSession = async (webSession: string) => {
   const profile = await fetchClickProfile(webSession);
-  const phone = String(profile.phone_number ?? '').trim();
-  if (!phone) throw new UnauthorizedError('Click profile has no phone_number');
-  const display = [profile.name, profile.surname].filter(Boolean).join(' ').trim();
-  const r = await query<AuthUser>(
-    `INSERT INTO users (phone, display_name) VALUES ($1, $2)
-     ON CONFLICT (phone) DO UPDATE SET
-       display_name = COALESCE(NULLIF(users.display_name, ''), EXCLUDED.display_name),
+  const clientId = Number(profile.client_id);
+  if (!Number.isFinite(clientId) || clientId <= 0) {
+    throw new UnauthorizedError('Click profile has no client_id');
+  }
+  const phone = String(profile.phone_number ?? '').trim() || null;
+  const display = [profile.name, profile.surname].filter(Boolean).join(' ').trim() || null;
+  const profileJson = JSON.stringify(profile);
+
+  // Try click_client_id first; if that row doesn't exist, fall back to phone.
+  // We do an explicit two-step (instead of a single ON CONFLICT) because we
+  // need to upgrade legacy phone-only rows by stamping click_client_id on
+  // them, and ON CONFLICT can only handle one constraint at a time.
+  const byClick = await query<AuthUser>(
+    `UPDATE users SET
+       phone = COALESCE($2, phone),
+       display_name = COALESCE(NULLIF(display_name, ''), $3),
+       click_profile = $4::jsonb,
+       click_synced_at = NOW(),
        updated_at = NOW()
+     WHERE click_client_id = $1
      RETURNING ${USER_COLS}`,
-    [phone, display || null]
+    [clientId, phone, display, profileJson]
   );
-  return tokensFor(r.rows[0]);
+  if (byClick.rows[0]) return tokensFor(byClick.rows[0]);
+
+  if (phone) {
+    const byPhone = await query<AuthUser>(
+      `UPDATE users SET
+         click_client_id = $1,
+         display_name = COALESCE(NULLIF(display_name, ''), $3),
+         click_profile = $4::jsonb,
+         click_synced_at = NOW(),
+         updated_at = NOW()
+       WHERE phone = $2
+       RETURNING ${USER_COLS}`,
+      [clientId, phone, display, profileJson]
+    );
+    if (byPhone.rows[0]) return tokensFor(byPhone.rows[0]);
+  }
+
+  const inserted = await query<AuthUser>(
+    `INSERT INTO users (click_client_id, phone, display_name, click_profile, click_synced_at)
+     VALUES ($1, $2, $3, $4::jsonb, NOW())
+     RETURNING ${USER_COLS}`,
+    [clientId, phone, display, profileJson]
+  );
+  return tokensFor(inserted.rows[0]);
 };
 
 export const refreshTokens = (token: string) => {
