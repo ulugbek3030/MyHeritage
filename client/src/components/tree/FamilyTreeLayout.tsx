@@ -41,7 +41,10 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   // or chrome height changes.
   const [vpSize, setVpSize] = useState({ w: 0, h: 0 });
   const content = useRef<HTMLDivElement>(null);
-  const fittedRef = useRef(false);
+  // Remember the canvas dimensions we last auto-fit for. When the tree grows
+  // (or shrinks) — i.e. someone adds/removes a person — the dims string
+  // changes and we re-run fit. Manual zooms between additions stay intact.
+  const lastFitDimsRef = useRef<string>('');
 
   const nodes = useMemo(() => transformToTreeNodes(persons, relationships, ownerId), [persons, relationships, ownerId]);
 
@@ -229,12 +232,17 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       if (!vp) return;
       const card = vp.querySelector<HTMLElement>(`[data-person-id="${ownerId}"]`);
       if (card && vp.clientWidth && vp.clientHeight) {
-        if (!fittedRef.current) {
+        // Re-fit when the canvas changed shape (someone got added/removed).
+        // dimsKey also includes viewport size so an orientation change
+        // re-fits too. Manual user zooms between additions stay intact —
+        // the dimsKey hasn't changed.
+        const dimsKey = `${layout.canvas.width}x${layout.canvas.height}@${vp.clientWidth}x${vp.clientHeight}`;
+        if (lastFitDimsRef.current !== dimsKey) {
           const W = layout.canvas.width * (NODE_W / 2);
           const H = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
           const fit = Math.min(vp.clientWidth / W, vp.clientHeight / H, 1);
-          if (fit < 1) zoom.setTo(fit);
-          fittedRef.current = true;
+          zoom.setTo(fit < 1 ? fit : 1);
+          lastFitDimsRef.current = dimsKey;
         }
         const centreOwner = () => {
           const vpRect = vp.getBoundingClientRect();
