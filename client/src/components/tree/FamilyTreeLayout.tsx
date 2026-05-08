@@ -9,8 +9,11 @@ import { useDrag } from '../../hooks/useDrag';
 
 // Card grid units. NODE_W/NODE_H = full unit; relatives-tree uses half-units, so cards
 // occupy 2 half-units wide. Generous values give breathing room between siblings.
-const NODE_W = 104;
-const NODE_H = 134;
+// NODE_W/NODE_H control BOTH the per-card grid step (i.e. spacing between
+// siblings/parents) AND the total canvas size. Cards themselves are sized in
+// CSS (.pcard width=72, height ≈92). The gap between cards is NODE_W − 72.
+const NODE_W = 144;   // spacing between siblings ≈ 72 px
+const NODE_H = 184;   // spacing between generations ≈ 92 px
 // Empty buffer above the top generation so the user can scroll up and intuit
 // that more parents/grandparents can be added there.
 const TOP_PAD = 100;
@@ -213,8 +216,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
       if (card && vp.clientWidth && vp.clientHeight) {
         // First-time fit-to-screen — only when we know real dimensions.
         if (!fittedRef.current) {
-          const W = layout.canvas.width * (NODE_W / 2) * 1.2 * 0.9;
-          const H = (layout.canvas.height * (NODE_H / 2) + TOP_PAD) * 0.9;
+          const W = layout.canvas.width * (NODE_W / 2);
+          const H = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
           const fit = Math.min(vp.clientWidth / W, vp.clientHeight / H, 1);
           if (fit < 1) zoom.setTo(fit);
           fittedRef.current = true;
@@ -241,13 +244,10 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 
   // canvas.width/height come back in HALF-units (same scale as node.left/top),
-  // so the rendered box must be NODE_W/2 × NODE_H/2 per half-unit — NOT
-  // NODE_W × NODE_H, which would give us double the actual content size and
-  // a huge empty area below + right of the tree.
-  // +20% horizontal slack for wide names, then trim the whole DOM box by 10%.
-  const SHRINK = 0.9;
-  const W = layout.canvas.width * (NODE_W / 2) * 1.2 * SHRINK;
-  const H = (layout.canvas.height * (NODE_H / 2) + TOP_PAD) * SHRINK;
+  // so the rendered box must be NODE_W/2 × NODE_H/2 per half-unit. Spacing
+  // and canvas size are now both driven by NODE_W/NODE_H — no extra fudge.
+  const W = layout.canvas.width * (NODE_W / 2);
+  const H = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
 
   const personById = new Map(persons.map((p) => [p.id, p]));
 
