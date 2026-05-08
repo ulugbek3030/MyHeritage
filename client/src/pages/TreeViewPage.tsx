@@ -14,7 +14,6 @@ import { ShareModal } from '../components/share/ShareModal';
 import { QuickActions } from '../components/home/QuickActions';
 import { Skeleton } from '../components/ui/Skeleton';
 import { TreeSearch } from '../components/tree/TreeSearch';
-import { AuthDebugStrip } from '../components/debug/AuthDebugStrip';
 
 export const TreeViewPage = () => {
   const { treeId } = useParams<{ treeId: string }>();
@@ -89,7 +88,6 @@ export const TreeViewPage = () => {
         onShare={() => setShareOpen(true)}
         eventCount={events.length}
       />
-      <AuthDebugStrip />
       <div style={{padding:'24px 12px 24px',flex:1}}>
         <FamilyTreeLayout
           persons={data.persons}
