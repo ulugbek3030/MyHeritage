@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import calcTree from 'relatives-tree';
 import type { ExtNode } from 'relatives-tree/lib/types';
 import type { Person, Relationship } from '../../types';
@@ -33,10 +33,6 @@ interface Props {
 
 export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
-  // Track real viewport size so the half-vp padding and the auto-scroll target
-  // both use the same numbers. CSS `50vh/50vw` is window-relative, which breaks
-  // inside Click's WebView where the tree-stage isn't full window.
-  const [vpSize, setVpSize] = useState({ w: 0, h: 0 });
   const content = useRef<HTMLDivElement>(null);
 
   const nodes = useMemo(() => transformToTreeNodes(persons, relationships, ownerId), [persons, relationships, ownerId]);
@@ -181,75 +177,11 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
     return paths;
   }, [layout]);
 
-  const zoom = useZoom(content as React.RefObject<HTMLElement>);
-  const fittedRef = useRef(false);
-
-  // Observe the viewport size so we know exactly half of it for padding +
-  // centering. Updates when WebView resizes, orientation changes, etc.
-  useEffect(() => {
-    const vp = viewport.current;
-    if (!vp) return;
-    const update = () => setVpSize({ w: vp.clientWidth, h: vp.clientHeight });
-    update();
-    if (typeof ResizeObserver === 'undefined') return;
-    const obs = new ResizeObserver(update);
-    obs.observe(vp);
-    return () => obs.disconnect();
-  }, []);
+  // Pinch/scroll-to-zoom + pan. No auto-fit / auto-centre on entry — the user
+  // found that disorienting; the page opens at the canvas's natural top-left
+  // and they pan/zoom themselves.
+  useZoom(content as React.RefObject<HTMLElement>);
   useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
-
-  // Center owner in both axes on first render (and when owner changes).
-  // When the tree overflows the viewport, `place-content: safe center` falls back
-  // to start (top-left), so we scroll explicitly to bring the owner to viewport
-  // centre. We run inside a double rAF so layout is committed and clientWidth /
-  // clientHeight are non-zero before we read them.
-  // First entry: zoom out so the whole tree fits the viewport, THEN scroll the
-  // owner card to centre. Subsequent re-renders only re-centre (don't re-fit).
-  // We retry across a few rAFs because Click's WebView occasionally has its
-  // layout settle a couple of frames after first paint.
-  useEffect(() => {
-    if (!layout || !ownerId) return;
-    let attempts = 0;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let raf: number | null = null;
-    const tryCentre = () => {
-      attempts += 1;
-      const vp = viewport.current;
-      if (!vp) return;
-      const card = vp.querySelector<HTMLElement>(`[data-person-id="${ownerId}"]`);
-      if (card && vp.clientWidth && vp.clientHeight) {
-        // First-time fit-to-screen — only when we know real dimensions.
-        if (!fittedRef.current) {
-          const W = layout.canvas.width * (NODE_W / 2);
-          const H = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
-          const fit = Math.min(vp.clientWidth / W, vp.clientHeight / H, 1);
-          if (fit < 1) zoom.setTo(fit);
-          fittedRef.current = true;
-        }
-        // Centre the owner in the viewport WITHOUT touching ancestor scrolls —
-        // `scrollIntoView` walks up the scroll chain and was yanking the
-        // surrounding page (header, quick actions) out of view. Compute the
-        // delta in viewport coords and apply it to .tree-stage only.
-        const centreOwner = () => {
-          const vpRect = vp.getBoundingClientRect();
-          const cardRect = card.getBoundingClientRect();
-          vp.scrollLeft += (cardRect.left + cardRect.width / 2) - (vpRect.left + vpRect.width / 2);
-          vp.scrollTop  += (cardRect.top  + cardRect.height / 2) - (vpRect.top  + vpRect.height / 2);
-        };
-        centreOwner();
-        raf = requestAnimationFrame(centreOwner);
-        return;
-      }
-      if (attempts < 20) {
-        timer = setTimeout(() => { raf = requestAnimationFrame(tryCentre); }, 50);
-      }
-    };
-    raf = requestAnimationFrame(tryCentre);
-    return () => {
-      if (raf != null) cancelAnimationFrame(raf);
-      if (timer != null) clearTimeout(timer);
-    };
-  }, [layout, ownerId, vpSize.w, vpSize.h, zoom]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 
