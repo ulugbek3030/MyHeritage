@@ -21,10 +21,12 @@
 /* Empty-slot card for missing parents — clicking it opens AddPersonForm
    pre-targeted to "Add father" / "Add mother". Sized to match .pcard so it
    sits cleanly in the same NODE_W × NODE_H grid wrapper. */
-.pcard-placeholder { width: 72px; min-height: 88px; background: transparent; border: 1.5px dashed rgba(255,255,255,0.25); border-radius: var(--radius-card); padding: 10px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+/* Half of NODE_W per slot (NODE_W=144 → 72px wrapper). The card itself is
+   ~60px wide so it visually breathes inside the wrapper. */
+.pcard-placeholder { width: 60px; min-height: 82px; background: transparent; border: 1.5px dashed rgba(255,255,255,0.25); border-radius: var(--radius-card); padding: 8px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
 .pcard-placeholder:hover, .pcard-placeholder:active { border-color: rgba(251,191,36,0.55); background: rgba(251,191,36,0.05); }
-.pcard-placeholder-plus { font-size: 20px; font-weight: 800; color: rgba(255,255,255,0.55); line-height: 1; }
-.pcard-placeholder-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.7); line-height: 1.2; text-align: center; letter-spacing: -0.005em; }
+.pcard-placeholder-plus { font-size: 18px; font-weight: 800; color: rgba(255,255,255,0.55); line-height: 1; }
+.pcard-placeholder-label { font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.7); line-height: 1.2; text-align: center; letter-spacing: -0.005em; }
 /* "+" sits inside the bottom half of a horizontal ellipse — flat top edge
    tucks 4px into the card so the top stroke is hidden, the arc forms the
    visible bowl below. */

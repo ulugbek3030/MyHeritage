@@ -327,17 +327,18 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           );
         })}
 
-        {/* Parent-slot placeholders + their connectors. Rendered after the
-            real cards so they share z-stacking; lines are dashed to read as
-            "potential", not "established". */}
+        {/* Parent-slot placeholders + their connectors. Each parentless card
+            gets a father slot in the LEFT half of its column and a mother
+            slot in the RIGHT half — so two adjacent spouses don't share a
+            column, which would overlap their labels into mush. */}
         <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
           {layout.nodes.map((n: ExtNode) => {
             if (!parentlessIds.has(n.id) || !personById.get(n.id)) return null;
             const cardWrapperX = n.left * (NODE_W / 2);
             const cardWrapperY = n.top * (NODE_H / 2) + TOP_PAD;
             const childCenterX = cardWrapperX + NODE_W / 2;
-            const fatherCenterX = cardWrapperX;
-            const motherCenterX = cardWrapperX + NODE_W;
+            const fatherCenterX = cardWrapperX + NODE_W / 4;
+            const motherCenterX = cardWrapperX + (3 * NODE_W) / 4;
             // Visible card sits centred in its NODE_H wrapper at ≈92px tall.
             const cardH = 92;
             const parentBottomY = (cardWrapperY - NODE_H) + (NODE_H + cardH) / 2;
@@ -355,7 +356,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           if (!parentlessIds.has(n.id) || !personById.get(n.id)) return null;
           const cardWrapperX = n.left * (NODE_W / 2);
           const cardWrapperY = n.top * (NODE_H / 2) + TOP_PAD;
-          const fatherX = cardWrapperX - NODE_W / 2;
+          const fatherX = cardWrapperX;
           const motherX = cardWrapperX + NODE_W / 2;
           const parentY = cardWrapperY - NODE_H;
           return (
@@ -366,7 +367,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                   style={{
                     position: 'absolute',
                     transform: `translate(${g === 'male' ? fatherX : motherX}px, ${parentY}px)`,
-                    width: NODE_W,
+                    width: NODE_W / 2,
                     height: NODE_H,
                     display: 'flex',
                     alignItems: 'center',
