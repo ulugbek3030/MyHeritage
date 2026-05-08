@@ -43,6 +43,9 @@ export const fetchClickProfile = async (webSession: string): Promise<ClickProfil
     throw new Error(`Click integration HTTP ${res.status}: ${await res.text().catch(() => '')}`);
   }
   const json = (await res.json()) as { result?: ClickProfile; error?: { code: number; message: string } };
+  // Verbose debug log so we can see exactly what Click sent back. Cheap (one
+  // line per SSO) — fine to keep on while we're stabilising the flow.
+  console.log('[click-sso] response keys=%o result=%o error=%o', Object.keys(json), json.result, json.error);
   if (json.error) {
     throw new UnauthorizedError(`Click rejected web_session: ${json.error.message}`);
   }
