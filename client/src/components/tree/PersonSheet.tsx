@@ -71,6 +71,15 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onE
         );
       })()}
 
+      {/* Phone — tappable on mobile (tel: link). Shown only when set; the
+          Click-SSO auto-seeded owner person comes with it filled in. */}
+      {person.phone && (
+        <div style={{ marginBottom: 24, textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>Телефон</div>
+          <a href={`tel:${person.phone}`} style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', fontFeatureSettings: "'tnum' 1", textDecoration: 'none' }}>{person.phone}</a>
+        </div>
+      )}
+
       {/* Short description / note. Pulled out of the centered items list so
           it can wrap as proper paragraph text instead of a single bullet. */}
       {person.note && person.note.trim() && (

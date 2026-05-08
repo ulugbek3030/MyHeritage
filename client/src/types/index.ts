@@ -6,6 +6,7 @@ export interface Person {
   birthDate: string | null; birthYear: number | null; birthDateKnown: boolean;
   isAlive: boolean; deathDate: string | null; deathYear: number | null; deathDateKnown: boolean;
   verified: boolean; note: string | null; photoUrl: string | null;
+  phone: string | null;
 }
 export type CoupleStatus = 'married' | 'civil' | 'dating' | 'divorced' | 'widowed' | 'other';
 export type ChildRelation = 'biological' | 'adopted' | 'foster' | 'guardianship' | 'stepchild';

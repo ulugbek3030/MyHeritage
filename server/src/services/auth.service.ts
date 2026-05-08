@@ -1,9 +1,9 @@
 import bcrypt from 'bcrypt';
-import { query } from '../db/pool.js';
+import { pool, query } from '../db/pool.js';
 import { signAccess, signRefresh, verifyRefresh } from '../config/auth.js';
 import { UnauthorizedError, ValidationError } from '../utils/errors.js';
 import { verifyOtp } from './otp.service.js';
-import { fetchClickProfile } from './click.service.js';
+import { fetchClickProfile, type ClickProfile } from './click.service.js';
 
 // Index signature lets AuthUser satisfy `Record<string, unknown>` — the
 // generic constraint on db/pool's `query<T>()` (pg types use that bound).
@@ -89,6 +89,55 @@ export const loginWithEmail = async (email: string, password: string) => {
 };
 
 /**
+ * First-time-only seeder: when a Click user has no trees yet, create their
+ * default tree and an owner person populated from the Click profile (name,
+ * surname, patronym, gender, phone). Idempotent — once the user has any
+ * tree, this is a no-op so a manually-created tree never gets shadowed by
+ * an auto-created one.
+ */
+const ensureClickUserHasTree = async (userId: string, profile: ClickProfile): Promise<void> => {
+  const existing = await query<{ c: string }>(
+    'SELECT COUNT(*)::text AS c FROM trees WHERE user_id = $1',
+    [userId]
+  );
+  if (Number(existing.rows[0]?.c ?? 0) > 0) return;
+
+  const surname = String(profile.surname ?? '').trim();
+  const firstName = String(profile.name ?? '').trim() || 'Я';
+  const patronym = String(profile.patronym ?? '').trim() || null;
+  const phone = String(profile.phone_number ?? '').trim() || null;
+  // Click sometimes sends gender as 'M'/'F', sometimes as 'male'/'female',
+  // sometimes localised. Treat anything that starts with f/ж/Ж as female,
+  // everything else as male.
+  const gen = String(profile.gender ?? '').trim().toLowerCase();
+  const gender: 'male' | 'female' = /^[fж]/.test(gen) ? 'female' : 'male';
+  const treeName = surname ? `Семья ${surname}` : 'Моё дерево';
+
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    const t = await c.query<{ id: string }>(
+      'INSERT INTO trees (user_id, name) VALUES ($1, $2) RETURNING id',
+      [userId, treeName]
+    );
+    const treeId = t.rows[0].id;
+    const p = await c.query<{ id: string }>(
+      `INSERT INTO persons (tree_id, first_name, last_name, middle_name, gender, is_alive, verified, phone)
+       VALUES ($1, $2, $3, $4, $5, true, true, $6)
+       RETURNING id`,
+      [treeId, firstName, surname || null, patronym, gender, phone]
+    );
+    await c.query('UPDATE trees SET owner_person_id = $1 WHERE id = $2', [p.rows[0].id, treeId]);
+    await c.query('COMMIT');
+  } catch (e) {
+    await c.query('ROLLBACK');
+    throw e;
+  } finally {
+    c.release();
+  }
+};
+
+/**
  * Exchange a Click web_session for our JWT pair.
  *
  * Lookup priority:
@@ -128,7 +177,10 @@ export const loginWithClickSession = async (webSession: string) => {
      RETURNING ${USER_COLS}`,
     [clientId, phone, display, profileJson]
   );
-  if (byClick.rows[0]) return tokensFor(byClick.rows[0]);
+  if (byClick.rows[0]) {
+    await ensureClickUserHasTree(byClick.rows[0].id, profile);
+    return tokensFor(byClick.rows[0]);
+  }
 
   if (phone) {
     const byPhone = await query<AuthUser>(
@@ -142,7 +194,10 @@ export const loginWithClickSession = async (webSession: string) => {
        RETURNING ${USER_COLS}`,
       [clientId, phone, display, profileJson]
     );
-    if (byPhone.rows[0]) return tokensFor(byPhone.rows[0]);
+    if (byPhone.rows[0]) {
+      await ensureClickUserHasTree(byPhone.rows[0].id, profile);
+      return tokensFor(byPhone.rows[0]);
+    }
   }
 
   const inserted = await query<AuthUser>(
@@ -151,6 +206,7 @@ export const loginWithClickSession = async (webSession: string) => {
      RETURNING ${USER_COLS}`,
     [clientId, phone, display, profileJson]
   );
+  await ensureClickUserHasTree(inserted.rows[0].id, profile);
   return tokensFor(inserted.rows[0]);
 };
 

@@ -39,6 +39,7 @@ export const createPersonSchema = z.object({
   deathYear: z.number().int().min(1800).max(2100).optional(),
   deathDateKnown: z.boolean().default(false),
   note: z.string().optional(),
+  phone: z.string().regex(/^\+?\d{9,15}$/).optional(),
   relationships: z
     .array(
       z.object({
