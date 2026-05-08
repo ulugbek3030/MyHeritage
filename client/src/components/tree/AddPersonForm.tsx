@@ -36,13 +36,25 @@ interface RoleOption {
 }
 
 
-export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, relationships, onCreated }: Props) => {
-  const [step, setStep] = useState<'select' | 'form'>('select');
-  const [mode, setMode] = useState<Mode>('parent');
-  const [gender, setGender] = useState<'male' | 'female'>('male');
+export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, relationships, onCreated, presetRole }: Props) => {
+  // Mirror what `pick()` would compute for a given (mode, gender) so a presetRole
+  // arrives with the same smart-surname defaults a manual click would set.
+  const tLast = targetPerson.lastName ?? '';
+  const presetLastName = presetRole
+    ? (presetRole.gender === 'male'
+        ? adjustSurnameForGender(tLast, 'male')
+        : '')
+    : tLast;
+  const presetMaidenName = presetRole && presetRole.gender === 'female' && presetRole.mode !== 'parent'
+    ? adjustSurnameForGender(tLast, 'female')
+    : '';
+
+  const [step, setStep] = useState<'select' | 'form'>(presetRole ? 'form' : 'select');
+  const [mode, setMode] = useState<Mode>(presetRole?.mode ?? 'parent');
+  const [gender, setGender] = useState<'male' | 'female'>(presetRole?.gender ?? 'male');
   const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState(targetPerson.lastName ?? '');
-  const [maidenName, setMaidenName] = useState('');
+  const [lastName, setLastName] = useState(presetLastName);
+  const [maidenName, setMaidenName] = useState(presetMaidenName);
   const [birthDate, setBirthDate] = useState<string>(''); // YYYY-MM-DD via <input type="date">
   const [year, setYear] = useState<string>('');           // year-only fallback
   const [isAlive, setIsAlive] = useState(true);
@@ -98,8 +110,10 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
 
   const reset = () => {
     setFirstName('');
-    setLastName(targetPerson.lastName ?? '');
-    setMaidenName('');
+    // Re-apply the same surname defaults the form opened with so a presetRole
+    // (e.g. "Add father") doesn't lose its computed surname on close+reopen.
+    setLastName(presetLastName);
+    setMaidenName(presetMaidenName);
     setBirthDate('');
     setYear('');
     setIsAlive(true);
@@ -107,7 +121,9 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
     setDeathYear('');
     setPhoto(null);
     setNote('');
-    setStep('select');
+    // When opened with a presetRole the role-picker step is bypassed entirely;
+    // skipping back to it would land the user on a meaningless screen.
+    setStep(presetRole ? 'form' : 'select');
   };
 
   const pick = (m: Mode, g: 'male' | 'female') => {
@@ -325,7 +341,10 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <button
-              onClick={() => setStep('select')}
+              // Preset opens the form directly with no role-picker behind it,
+              // so "Back" should dismiss the sheet rather than land the user
+              // on a step they were never meant to see.
+              onClick={presetRole ? handleClose : () => setStep('select')}
               type="button"
               style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: 'none', color: 'var(--text)', fontSize: 16, cursor: 'pointer' }}
               aria-label="Назад"

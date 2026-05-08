@@ -21,6 +21,10 @@ export const TreeViewPage = () => {
   const [data, setData] = useState<FullTree | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [addOpen, setAddOpen] = useState<Person | null>(null);
+  // When set, AddPersonForm skips the role-picker step and lands directly on
+  // the form (used by the "Add father" / "Add mother" placeholders above
+  // parentless cards).
+  const [addPreset, setAddPreset] = useState<{ mode: 'parent'; gender: 'male' | 'female' } | null>(null);
   const [editOpen, setEditOpen] = useState<Person | null>(null);
   const [bioOpen, setBioOpen] = useState<Person | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
@@ -91,7 +95,13 @@ export const TreeViewPage = () => {
           ownerId={data.tree.ownerPersonId}
           personEventIcons={personEventIcons}
           onPersonClick={(id) => setSelectedPerson(data.persons.find((p) => p.id === id) ?? null)}
-          onPlusClick={(id) => { const p = data.persons.find((p) => p.id === id); if (p) setAddOpen(p); }}
+          onPlusClick={(id) => { const p = data.persons.find((p) => p.id === id); if (p) { setAddPreset(null); setAddOpen(p); } }}
+          onAddParent={(id, gender) => {
+            const p = data.persons.find((pp) => pp.id === id);
+            if (!p) return;
+            setAddPreset({ mode: 'parent', gender });
+            setAddOpen(p);
+          }}
         />
       </div>
       <PersonSheet
@@ -113,12 +123,13 @@ export const TreeViewPage = () => {
       {addOpen && (
         <AddPersonForm
           open
-          onClose={() => setAddOpen(null)}
+          onClose={() => { setAddOpen(null); setAddPreset(null); }}
           treeId={treeId!}
           targetPerson={addOpen}
           persons={data.persons}
           relationships={data.relationships}
           onCreated={reload}
+          presetRole={addPreset ?? undefined}
         />
       )}
       {editOpen && (

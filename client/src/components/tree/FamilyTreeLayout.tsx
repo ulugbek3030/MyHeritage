@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from 'react';
+import { Fragment, useMemo, useRef, useState, useEffect } from 'react';
 import calcTree from 'relatives-tree';
 import type { ExtNode } from 'relatives-tree/lib/types';
 import type { Person, Relationship } from '../../types';
@@ -14,9 +14,10 @@ import { useDrag } from '../../hooks/useDrag';
 // CSS (.pcard width=72, height ≈92). The gap between cards is NODE_W − 72.
 const NODE_W = 144;   // spacing between siblings ≈ 72 px
 const NODE_H = 184;   // spacing between generations ≈ 92 px
-// Empty buffer above the top generation so the user can scroll up and intuit
-// that more parents/grandparents can be added there.
-const TOP_PAD = 100;
+// Empty buffer above the top generation. We render "Add father" / "Add mother"
+// placeholders for parentless persons one full generation above their card,
+// so this needs at least NODE_H of room to keep them on canvas.
+const TOP_PAD = 200;
 // Extra room below the bottom generation — same intent as TOP_PAD but for kids
 // being added below. 60% of the laid-out canvas height (the user asked for
 // repeated +20% bumps).
@@ -30,9 +31,11 @@ interface Props {
   personEventIcons?: Record<string, string[]>;
   onPersonClick?: (id: string) => void;
   onPlusClick?: (id: string) => void;
+  /** Click on an empty parent slot above a person without parents. */
+  onAddParent?: (personId: string, gender: 'male' | 'female') => void;
 }
 
-export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick }: Props) => {
+export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick, onAddParent }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
   // Track real viewport size — re-runs the auto-centre when WebView orientation
   // or chrome height changes.
@@ -41,6 +44,14 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   const fittedRef = useRef(false);
 
   const nodes = useMemo(() => transformToTreeNodes(persons, relationships, ownerId), [persons, relationships, ownerId]);
+
+  // Persons with NO parent_child relationship pointing at them — they get
+  // "Add father" / "Add mother" placeholders rendered one generation above.
+  const parentlessIds = useMemo(() => {
+    const hasParent = new Set<string>();
+    for (const r of relationships) if (r.category === 'parent_child') hasParent.add(r.person2Id);
+    return new Set(persons.filter((p) => !hasParent.has(p.id)).map((p) => p.id));
+  }, [persons, relationships]);
 
   const layout = useMemo(() => {
     if (!nodes.length) return null;
@@ -313,6 +324,68 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                 showPlus={true}
               />
             </div>
+          );
+        })}
+
+        {/* Parent-slot placeholders + their connectors. Rendered after the
+            real cards so they share z-stacking; lines are dashed to read as
+            "potential", not "established". */}
+        <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
+          {layout.nodes.map((n: ExtNode) => {
+            if (!parentlessIds.has(n.id) || !personById.get(n.id)) return null;
+            const cardWrapperX = n.left * (NODE_W / 2);
+            const cardWrapperY = n.top * (NODE_H / 2) + TOP_PAD;
+            const childCenterX = cardWrapperX + NODE_W / 2;
+            const fatherCenterX = cardWrapperX;
+            const motherCenterX = cardWrapperX + NODE_W;
+            // Visible card sits centred in its NODE_H wrapper at ≈92px tall.
+            const cardH = 92;
+            const parentBottomY = (cardWrapperY - NODE_H) + (NODE_H + cardH) / 2;
+            const childTopY = cardWrapperY + (NODE_H - cardH) / 2;
+            return (
+              <g key={`ph-conn-${n.id}`}>
+                <line x1={fatherCenterX} y1={parentBottomY} x2={motherCenterX} y2={parentBottomY} stroke="rgba(255,255,255,0.3)" strokeWidth="1.4" strokeDasharray="3 3" />
+                <line x1={childCenterX} y1={parentBottomY} x2={childCenterX} y2={childTopY} stroke="rgba(255,255,255,0.3)" strokeWidth="1.4" strokeDasharray="3 3" />
+              </g>
+            );
+          })}
+        </svg>
+
+        {layout.nodes.map((n: ExtNode) => {
+          if (!parentlessIds.has(n.id) || !personById.get(n.id)) return null;
+          const cardWrapperX = n.left * (NODE_W / 2);
+          const cardWrapperY = n.top * (NODE_H / 2) + TOP_PAD;
+          const fatherX = cardWrapperX - NODE_W / 2;
+          const motherX = cardWrapperX + NODE_W / 2;
+          const parentY = cardWrapperY - NODE_H;
+          return (
+            <Fragment key={`ph-${n.id}`}>
+              {(['male', 'female'] as const).map((g) => (
+                <div
+                  key={g}
+                  style={{
+                    position: 'absolute',
+                    transform: `translate(${g === 'male' ? fatherX : motherX}px, ${parentY}px)`,
+                    width: NODE_W,
+                    height: NODE_H,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <div
+                    className="pcard-placeholder"
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); onAddParent?.(n.id, g); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAddParent?.(n.id, g); } }}
+                  >
+                    <span className="pcard-placeholder-plus" aria-hidden="true">+</span>
+                    <span className="pcard-placeholder-label">Добавить<br />{g === 'male' ? 'отца' : 'мать'}</span>
+                  </div>
+                </div>
+              ))}
+            </Fragment>
           );
         })}
       </div>
