@@ -57,10 +57,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
     if (!nodes.length) return null;
     try {
       const root = ownerId && nodes.some((n) => n.id === ownerId) ? ownerId : nodes[0].id;
-      // placeholders: true — relatives-tree adds invisible spouse/parent anchors so connector
-      // lines don't bleed into wrong columns (e.g. spouse's parents row). We skip rendering
-      // any node not present in personById (placeholders fall through that filter).
-      return calcTree(nodes as any, { rootId: root, placeholders: true });
+      // placeholders: false — relatives-tree's invisible spouse/parent anchors
+      // generate stray connector segments (an H-bar plus side V-stubs) that
+      // overlap our own "Add father / Add mother" placeholder T-junction. We
+      // own the parent-slot rendering ourselves now, so we don't need
+      // relatives-tree's phantom column anchors.
+      return calcTree(nodes as any, { rootId: root, placeholders: false });
     } catch (e) {
       console.warn('[tree] layout fallback', e);
       return null;
