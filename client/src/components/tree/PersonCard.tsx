@@ -6,7 +6,8 @@ import '../../styles/tree.css';
 interface Props {
   person: Person;
   isOwner?: boolean;
-  hasUpcomingBirthday?: boolean;
+  /** Distinct icons for events in the current month (matches calendar). */
+  eventIcons?: string[];
   onClick?: (id: string) => void;
   onPlusClick?: (id: string) => void;
   showPlus?: boolean;
@@ -20,7 +21,7 @@ const silhouetteKindFor = (p: Person): SilhouetteKind => {
   return `adult-${p.gender}` as SilhouetteKind;
 };
 
-export const PersonCard = ({ person, isOwner, hasUpcomingBirthday, onClick, onPlusClick, showPlus }: Props) => {
+export const PersonCard = ({ person, isOwner, eventIcons, onClick, onPlusClick, showPlus }: Props) => {
   const cls = ['pcard', person.gender, !person.isAlive ? 'deceased' : '', isOwner ? 'me' : ''].filter(Boolean).join(' ');
 
   return (
@@ -38,7 +39,11 @@ export const PersonCard = ({ person, isOwner, hasUpcomingBirthday, onClick, onPl
       <div className="pcard-status" aria-hidden={person.isAlive} style={{ visibility: person.isAlive ? 'hidden' : 'visible' }}>
         {person.gender === 'female' ? 'Умерла' : 'Умер'}
       </div>
-      {hasUpcomingBirthday && <div className="pcard-cake" aria-label="Скоро день рождения">🎁</div>}
+      {eventIcons && eventIcons.length > 0 && (
+        <div className="pcard-events" aria-label="События в этом месяце">
+          {eventIcons.slice(0, 3).map((icon, i) => <span key={i} aria-hidden="true">{icon}</span>)}
+        </div>
+      )}
       {showPlus && (
         <div className="pcard-plus" onClick={(e) => { e.stopPropagation(); onPlusClick?.(person.id); }}>
           {/* Bottom half of a horizontal ellipse. Two paths so the top edge

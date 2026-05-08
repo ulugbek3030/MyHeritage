@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getFullTree } from '../api/trees';
 import { deletePerson } from '../api/persons';
 import { listEvents } from '../api/events';
 import type { FullTree, Person, FamilyEvent } from '../types';
+import { eventIcon } from '../utils/eventIcons';
 import { FamilyTreeLayout } from '../components/tree/FamilyTreeLayout';
 import { PersonSheet } from '../components/tree/PersonSheet';
 import { AddPersonForm } from '../components/tree/AddPersonForm';
@@ -37,6 +38,25 @@ export const TreeViewPage = () => {
 
   const reload = () => { if (treeId) getFullTree(treeId).then(setData); };
 
+  // Per-person distinct icons for events in the current calendar month, so the
+  // tree mirrors the calendar's month view: a person with two events in the
+  // month gets two icons stacked next to their card.
+  const personEventIcons = useMemo<Record<string, string[]>>(() => {
+    const out: Record<string, string[]> = {};
+    const month = new Date().getMonth();
+    const push = (id: string, icon: string) => {
+      const arr = out[id] ?? (out[id] = []);
+      if (!arr.includes(icon)) arr.push(icon);
+    };
+    for (const e of events) {
+      if (new Date(e.date).getMonth() !== month) continue;
+      const icon = eventIcon(e.type);
+      if (e.personId) push(e.personId, icon);
+      if (e.personIds) for (const id of e.personIds) push(id, icon);
+    }
+    return out;
+  }, [events]);
+
   if (!data) return (
     <div style={{padding:24,display:'flex',flexDirection:'column',gap:8}}>
       <Skeleton height={48} radius={14} />
@@ -69,7 +89,7 @@ export const TreeViewPage = () => {
           persons={data.persons}
           relationships={data.relationships}
           ownerId={data.tree.ownerPersonId}
-          upcomingBirthdayIds={new Set(events.filter((e) => (e.type === 'birthday' || e.type === 'child_birthday') && e.daysUntil >= 0 && e.daysUntil <= 14 && e.personId).map((e) => e.personId!))}
+          personEventIcons={personEventIcons}
           onPersonClick={(id) => setSelectedPerson(data.persons.find((p) => p.id === id) ?? null)}
           onPlusClick={(id) => { const p = data.persons.find((p) => p.id === id); if (p) setAddOpen(p); }}
         />

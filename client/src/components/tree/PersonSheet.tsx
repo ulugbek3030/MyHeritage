@@ -2,6 +2,9 @@ import type { Person } from '../../types';
 import { BottomSheet } from '../ui/BottomSheet';
 import { formatBirthFull, formatDeathFull } from '../../utils/dateFormat';
 
+// Avatar sized at 25% larger than the previous 120px hero.
+const AVATAR = 150;
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -16,7 +19,6 @@ interface Props {
 export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onEdit, onAdd, onDelete, onEditBio }: Props) => {
   if (!person) return null;
   const fullName = [person.firstName, person.lastName, person.middleName].filter(Boolean).join(' ');
-  const lifespan = person.isAlive ? formatBirthFull(person) : `${formatBirthFull(person)} – ${formatDeathFull(person)}`;
   const showCta = person.isAlive && typeof upcomingBirthdayInDays === 'number' && upcomingBirthdayInDays >= 0 && upcomingBirthdayInDays <= 14;
 
   return (
@@ -33,7 +35,7 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onE
       </div>
       {/* Centered hero: avatar + name + birth date — no field labels. */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: 24 }}>
-        <div style={{ width: 120, height: 120, borderRadius: '50%', background: person.gender === 'female' ? 'linear-gradient(135deg,#fce7f3,#f9c8dd)' : 'linear-gradient(135deg,#dbeafe,#c3d9f7)', color: person.gender === 'female' ? '#e87ba8' : '#4a90d9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, fontWeight: 800, border: `2px solid ${person.gender === 'female' ? 'rgba(244,114,182,0.4)' : 'rgba(96,165,250,0.4)'}`, overflow: 'hidden', marginBottom: 16 }}>
+        <div style={{ width: AVATAR, height: AVATAR, borderRadius: '50%', background: person.gender === 'female' ? 'linear-gradient(135deg,#fce7f3,#f9c8dd)' : 'linear-gradient(135deg,#dbeafe,#c3d9f7)', color: person.gender === 'female' ? '#e87ba8' : '#4a90d9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 56, fontWeight: 800, border: `2px solid ${person.gender === 'female' ? 'rgba(244,114,182,0.4)' : 'rgba(96,165,250,0.4)'}`, overflow: 'hidden', marginBottom: 16 }}>
           {person.photoUrl ? <img src={person.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : person.firstName?.[0]}
         </div>
         <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.25 }}>{fullName}</div>
@@ -54,9 +56,9 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onE
         const items: Array<string | null> = [
           age !== null ? `${age} ${age % 10 === 1 && age % 100 !== 11 ? 'год' : age % 10 >= 2 && age % 10 <= 4 && (age % 100 < 10 || age % 100 >= 20) ? 'года' : 'лет'}${person.isAlive ? '' : ' (на момент смерти)'}` : null,
           person.gender === 'male' ? 'Мужской' : 'Женский',
-          person.isAlive
-            ? (person.gender === 'female' ? 'Жива' : 'Жив')
-            : (person.gender === 'female' ? 'Умерла' : 'Умер'),
+          // Status line only for the deceased — for living people the birth
+          // date in the hero already says everything ("Жив" added no info).
+          !person.isAlive ? (person.gender === 'female' ? 'Умерла' : 'Умер') : null,
           person.gender === 'female' && person.maidenName ? `Девичья: ${person.maidenName}` : null,
           person.note ?? null,
         ].filter((x) => x && String(x).trim() !== '');

@@ -1,9 +1,8 @@
 import type { FamilyEvent } from '../../types';
+import { distinctEventIcons } from '../../utils/eventIcons';
 
 const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-
-const eventIcon = (e: FamilyEvent) => e.type === 'memorial' ? '🕯' : e.type === 'anniversary' ? '💍' : e.type === 'child_birthday' ? '🎈' : '🎂';
 
 export const MonthMini = ({ events, monthOffset = 0, onMonthChange }: { events: FamilyEvent[]; monthOffset?: number; onMonthChange?: (delta: number) => void }) => {
   const today = new Date();
@@ -48,7 +47,7 @@ export const MonthMini = ({ events, monthOffset = 0, onMonthChange }: { events: 
             {c.events.length > 0 && (
               <div style={{display:'flex',gap:1,fontSize:11,lineHeight:1}}>
                 {/* Distinct event types only — no dupes when multiple kids share a birthday in the same family on the same day. */}
-                {Array.from(new Set(c.events.map((e) => eventIcon(e)))).slice(0, 3).map((icon, j) => (
+                {distinctEventIcons(c.events).slice(0, 3).map((icon, j) => (
                   <span key={j} aria-hidden="true" style={{filter:isToday(c.day)?'grayscale(0.5) brightness(0.6)':'none'}}>{icon}</span>
                 ))}
               </div>

@@ -22,12 +22,13 @@ interface Props {
   persons: Person[];
   relationships: Relationship[];
   ownerId?: string | null;
-  upcomingBirthdayIds?: Set<string>;
+  /** Per-person event icons for the current month (e.g. ['🎂','💍']). */
+  personEventIcons?: Record<string, string[]>;
   onPersonClick?: (id: string) => void;
   onPlusClick?: (id: string) => void;
 }
 
-export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirthdayIds, onPersonClick, onPlusClick }: Props) => {
+export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
   // Track real viewport size so the half-vp padding and the auto-scroll target
   // both use the same numbers. CSS `50vh/50vw` is window-relative, which breaks
@@ -301,7 +302,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
               <PersonCard
                 person={person}
                 isOwner={person.id === ownerId}
-                hasUpcomingBirthday={upcomingBirthdayIds?.has(person.id)}
+                eventIcons={personEventIcons?.[person.id]}
                 onClick={onPersonClick}
                 onPlusClick={onPlusClick}
                 showPlus={true}
