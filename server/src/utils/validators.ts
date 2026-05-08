@@ -1,10 +1,20 @@
 import { z } from 'zod';
 
 export const phoneSchema = z.string().regex(/^\+?\d{9,15}$/, 'Invalid phone');
+export const emailSchema = z.string().email('Invalid email').max(254);
+// 8 chars min: keeps it usable while still above the OWASP minimum.
+export const passwordSchema = z.string().min(8, 'Password too short').max(200);
 
 export const requestOtpSchema = z.object({ phone: phoneSchema });
 export const verifyOtpSchema = z.object({ phone: phoneSchema, code: z.string().regex(/^\d{4,6}$/) });
 export const refreshSchema = z.object({ refreshToken: z.string().min(10) });
+
+export const registerSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  displayName: z.string().min(1).max(200).optional(),
+});
+export const loginEmailSchema = z.object({ email: emailSchema, password: passwordSchema });
 
 export const createTreeSchema = z.object({
   name: z.string().min(1).max(200),

@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { validate } from '../middleware/validate.js';
 import { authenticate } from '../middleware/authenticate.js';
-import { requestOtpSchema, verifyOtpSchema, refreshSchema } from '../utils/validators.js';
+import { requestOtpSchema, verifyOtpSchema, refreshSchema, registerSchema, loginEmailSchema } from '../utils/validators.js';
 import { generateOtp } from '../services/otp.service.js';
-import { loginWithOtp, loginWithClickSession, refreshTokens, getMe } from '../services/auth.service.js';
+import { loginWithOtp, loginWithClickSession, registerWithEmail, loginWithEmail, refreshTokens, getMe } from '../services/auth.service.js';
 
 export const authRoutes = Router();
 
@@ -21,6 +21,18 @@ authRoutes.post('/verify-otp', validate(verifyOtpSchema), async (req, res, next)
 
 authRoutes.post('/refresh', validate(refreshSchema), (req, res, next) => {
   try { res.json(refreshTokens(req.body.refreshToken)); }
+  catch (e) { next(e); }
+});
+
+// Email + password — used when the user opens the app outside Click SuperApp
+// (web link, share preview) and isn't returning with a cached JWT.
+authRoutes.post('/register', validate(registerSchema), async (req, res, next) => {
+  try { res.json(await registerWithEmail(req.body.email, req.body.password, req.body.displayName)); }
+  catch (e) { next(e); }
+});
+
+authRoutes.post('/login', validate(loginEmailSchema), async (req, res, next) => {
+  try { res.json(await loginWithEmail(req.body.email, req.body.password)); }
   catch (e) { next(e); }
 });
 

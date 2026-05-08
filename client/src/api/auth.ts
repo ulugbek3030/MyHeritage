@@ -18,5 +18,28 @@ export const loginWithClickSession = (webSession: string) =>
     return r.data.user;
   });
 
+export const requestOtp = (phone: string) =>
+  api.post<{ ok: true; ttl: number }>('/auth/request-otp', { phone }).then((r) => r.data);
+
+export const verifyOtp = (phone: string, code: string) =>
+  api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/verify-otp', { phone, code }).then((r) => {
+    setTokens(r.data.accessToken, r.data.refreshToken, true);
+    return r.data.user;
+  });
+
+/** Email + password registration. Backend hashes via bcrypt(12) and returns
+ *  the JWT pair just like phone-OTP / Click SSO. */
+export const registerWithEmail = (email: string, password: string, displayName?: string) =>
+  api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/register', { email, password, displayName }).then((r) => {
+    setTokens(r.data.accessToken, r.data.refreshToken, true);
+    return r.data.user;
+  });
+
+export const loginWithEmail = (email: string, password: string) =>
+  api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/login', { email, password }).then((r) => {
+    setTokens(r.data.accessToken, r.data.refreshToken, true);
+    return r.data.user;
+  });
+
 export const me = () => api.get<User>('/auth/me').then((r) => r.data);
 export const logout = () => { clearTokens(); };
