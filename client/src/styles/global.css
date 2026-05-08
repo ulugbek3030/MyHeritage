@@ -6,13 +6,13 @@ html, body { overflow-x: hidden; }
 body { overscroll-behavior: none; }
 button { font-family: inherit; cursor: pointer; }
 
-/* Top inset that page-level elements use so nothing hides under iOS notch
-   in a normal browser. Click SuperApp's WebView already starts below their
-   chrome bar, so we set the inset to 0 inside Click — anything else just
-   stacks an extra empty band above our content. */
+/* No top inset on the body — Click's WebView already sits below their
+   chrome, so anything we add stacks an empty band on top of our content.
+   --safe-top stays exposed as a CSS variable for any page that wants to
+   handle iOS-notch overflow itself. */
 :root { --safe-top: env(safe-area-inset-top, 0px); }
 html.cf-click { --safe-top: 0px; }
-body { padding-top: var(--safe-top); }
+body { padding-top: 0; }
 /* Pages that pin to the viewport with `100dvh` need to subtract the inset
    so the bottom edge stays inside the visible area. */
 .full-vh { height: calc(100dvh - var(--safe-top)); }
