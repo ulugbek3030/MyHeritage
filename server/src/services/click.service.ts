@@ -25,15 +25,15 @@ export interface ClickProfile {
  */
 export const fetchClickProfile = async (webSession: string): Promise<ClickProfile> => {
   if (!webSession) throw new UnauthorizedError('Missing web_session');
-  if (!env.CLICK_INTEGRATION_API_KEY) {
-    throw new Error('CLICK_INTEGRATION_API_KEY not configured on the server');
+  if (!env.CLICK_INTEGRATION_TOKEN) {
+    throw new Error('CLICK_INTEGRATION_TOKEN not configured on the server');
   }
 
   const res = await fetch(env.CLICK_INTEGRATION_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${env.CLICK_INTEGRATION_API_KEY}`,
+      Authorization: `Bearer ${env.CLICK_INTEGRATION_TOKEN}`,
       web_session: webSession,
     },
     body: JSON.stringify({ jsonrpc: '2.0', method: 'user.profile', id: 321 }),
