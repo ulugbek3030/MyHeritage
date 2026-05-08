@@ -286,52 +286,83 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
 
   const personById = new Map(persons.map((p) => [p.id, p]));
 
-  // Compute owner-only parent placeholder slots. We deliberately don't show
-  // placeholders for anyone except the owner: it's THEIR tree and the most
-  // important UX is letting them complete their own parents row. Slots:
-  //   - Both missing → father/mother dashed cards above the owner.
-  //   - Father exists, mother missing → mother slot RIGHT of father (his
-  //     spouse position).
-  //   - Mother exists, father missing → father slot LEFT of mother.
-  //   - Neither missing → no slots, no rendering at all.
-  // Each slot also drives the corresponding T-junction connector.
+  // Two flavours of parent-slot placeholders coexist:
+  //   1. "topRow" — one pair (father + mother) above each parentless person
+  //      on the topmost parentless row. Lets the user grow ancestry for
+  //      anyone visible up there, including their parents-in-law. Each pair
+  //      gets a full T-junction down to its child.
+  //   2. "ownerSpouse" — when the owner already has one parent (so they
+  //      aren't in (1)), a single placeholder is rendered next to the
+  //      existing parent in the spouse position with a dashed couple-line.
+  //      Lets the owner finish their own parents row without having to dig
+  //      into the role-picker.
   type ParentSlot = { gender: 'male' | 'female'; x: number; y: number };
-  const parentSlots: ParentSlot[] = [];
-  let connectorAnchor: { fatherSlotX: number; motherSlotX: number; parentY: number } | null = null;
-  if (ownerId && ownerParents) {
-    const ownerNode = layout.nodes.find((n) => n.id === ownerId);
-    if (ownerNode) {
-      const ownerWX = ownerNode.left * (NODE_W / 2);
-      const ownerWY = ownerNode.top * (NODE_H / 2) + TOP_PAD;
-      const missingFather = !ownerParents.fatherId;
-      const missingMother = !ownerParents.motherId;
-      if (missingFather && missingMother) {
-        const parentY = ownerWY - NODE_H;
-        parentSlots.push({ gender: 'male',   x: ownerWX,                  y: parentY });
-        parentSlots.push({ gender: 'female', x: ownerWX + NODE_W / 2,     y: parentY });
-        connectorAnchor = {
-          fatherSlotX: ownerWX,
-          motherSlotX: ownerWX + NODE_W / 2,
-          parentY,
+  type TopRowEntry = {
+    childId: string;
+    childWrapperX: number;
+    childWrapperY: number;
+    fatherSlot: ParentSlot;
+    motherSlot: ParentSlot;
+  };
+
+  const parentlessIds = new Set<string>();
+  {
+    const hasParent = new Set<string>();
+    for (const r of relationships) if (r.category === 'parent_child') hasParent.add(r.person2Id);
+    for (const p of persons) if (!hasParent.has(p.id)) parentlessIds.add(p.id);
+  }
+
+  let topMostParentlessRow = Infinity;
+  for (const n of layout.nodes) {
+    if (parentlessIds.has(n.id) && personById.get(n.id) && n.top < topMostParentlessRow) {
+      topMostParentlessRow = n.top;
+    }
+  }
+
+  const topRowSlots: TopRowEntry[] = [];
+  for (const n of layout.nodes) {
+    if (!parentlessIds.has(n.id) || !personById.get(n.id)) continue;
+    if (n.top !== topMostParentlessRow) continue;
+    const childWrapperX = n.left * (NODE_W / 2);
+    const childWrapperY = n.top * (NODE_H / 2) + TOP_PAD;
+    const parentY = childWrapperY - NODE_H;
+    topRowSlots.push({
+      childId: n.id,
+      childWrapperX,
+      childWrapperY,
+      fatherSlot: { gender: 'male',   x: childWrapperX,                y: parentY },
+      motherSlot: { gender: 'female', x: childWrapperX + NODE_W / 2,   y: parentY },
+    });
+  }
+
+  // Owner-spouse-slot placeholder. Only when owner is NOT already in
+  // topRowSlots (i.e. owner already has at least one parent so the topmost
+  // parentless row is occupied by someone else).
+  let ownerSpouseSlot: ParentSlot | null = null;
+  let ownerSpouseExistingId: string | null = null;
+  const ownerInTopRow = topRowSlots.some((s) => s.childId === ownerId);
+  if (!ownerInTopRow && ownerId && ownerParents) {
+    const missingFather = !ownerParents.fatherId;
+    const missingMother = !ownerParents.motherId;
+    if (missingMother && ownerParents.fatherId) {
+      const fNode = layout.nodes.find((n) => n.id === ownerParents.fatherId);
+      if (fNode) {
+        ownerSpouseSlot = {
+          gender: 'female',
+          x: fNode.left * (NODE_W / 2) + NODE_W,
+          y: fNode.top * (NODE_H / 2) + TOP_PAD,
         };
-      } else if (missingMother && ownerParents.fatherId) {
-        const fNode = layout.nodes.find((n) => n.id === ownerParents.fatherId);
-        if (fNode) {
-          parentSlots.push({
-            gender: 'female',
-            x: fNode.left * (NODE_W / 2) + NODE_W,
-            y: fNode.top * (NODE_H / 2) + TOP_PAD,
-          });
-        }
-      } else if (missingFather && ownerParents.motherId) {
-        const mNode = layout.nodes.find((n) => n.id === ownerParents.motherId);
-        if (mNode) {
-          parentSlots.push({
-            gender: 'male',
-            x: mNode.left * (NODE_W / 2) - NODE_W / 2,
-            y: mNode.top * (NODE_H / 2) + TOP_PAD,
-          });
-        }
+        ownerSpouseExistingId = ownerParents.fatherId;
+      }
+    } else if (missingFather && ownerParents.motherId) {
+      const mNode = layout.nodes.find((n) => n.id === ownerParents.motherId);
+      if (mNode) {
+        ownerSpouseSlot = {
+          gender: 'male',
+          x: mNode.left * (NODE_W / 2) - NODE_W / 2,
+          y: mNode.top * (NODE_H / 2) + TOP_PAD,
+        };
+        ownerSpouseExistingId = ownerParents.motherId;
       }
     }
   }
@@ -402,68 +433,83 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           );
         })}
 
-        {/* Dashed connectors that hint at the future relationship the user
-            will create when they tap a placeholder. Two cases:
-              - Both parents missing → full T-junction down to the owner.
-              - One parent exists → couple-line between the existing parent
-                and the placeholder (their future spouse position), so the
-                user can see they'll be paired up. */}
-        {ownerId && (connectorAnchor || parentSlots.length === 1) && (() => {
-          const ownerNode = layout.nodes.find((n) => n.id === ownerId);
-          if (!ownerNode) return null;
+        {/* Dashed connectors. Each topRowSlots entry → T-junction down to its
+            child. ownerSpouseSlot (when present) → short couple line between
+            the existing parent and the placeholder. */}
+        {(topRowSlots.length > 0 || ownerSpouseSlot) && (() => {
           const stroke = { stroke: 'rgba(255,255,255,0.3)', strokeWidth: '1.4', strokeDasharray: '3 3' };
           const PLACEHOLDER_H = 82;
           const PERSON_H = 92;
-
-          if (connectorAnchor) {
-            const cardWrapperX = ownerNode.left * (NODE_W / 2);
-            const cardWrapperY = ownerNode.top * (NODE_H / 2) + TOP_PAD;
-            const childCenterX = cardWrapperX + NODE_W / 2;
-            const fatherCenterX = connectorAnchor.fatherSlotX + NODE_W / 4;
-            const motherCenterX = connectorAnchor.motherSlotX + NODE_W / 4;
-            const parentBottomY = connectorAnchor.parentY + (NODE_H + PLACEHOLDER_H) / 2;
-            const childTopY = cardWrapperY + (NODE_H - PERSON_H) / 2;
-            const stubY = parentBottomY + (childTopY - parentBottomY) / 2;
-            return (
-              <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
-                <line x1={fatherCenterX} y1={parentBottomY} x2={fatherCenterX} y2={stubY} {...stroke} />
-                <line x1={motherCenterX} y1={parentBottomY} x2={motherCenterX} y2={stubY} {...stroke} />
-                <line x1={fatherCenterX} y1={stubY} x2={motherCenterX} y2={stubY} {...stroke} />
-                <line x1={childCenterX} y1={stubY} x2={childCenterX} y2={childTopY} {...stroke} />
-              </svg>
-            );
-          }
-
-          // Half-missing case: dashed couple line between the existing parent
-          // and the placeholder, drawn at card-vertical-centre Y.
-          const slot = parentSlots[0];
-          const existingId = slot.gender === 'male' ? ownerParents?.motherId : ownerParents?.fatherId;
-          if (!existingId) return null;
-          const exNode = layout.nodes.find((n) => n.id === existingId);
-          if (!exNode) return null;
-          const exWrapperX = exNode.left * (NODE_W / 2);
-          const exWrapperY = exNode.top * (NODE_H / 2) + TOP_PAD;
-          const exCardLeftX  = exWrapperX + (NODE_W - 72) / 2;       // 36
-          const exCardRightX = exWrapperX + (NODE_W + 72) / 2;       // 108
-          const phCardLeftX  = slot.x + (NODE_W / 2 - 60) / 2;       // 6
-          const phCardRightX = slot.x + (NODE_W / 2 + 60) / 2;       // 66
-          const coupleY = exWrapperY + NODE_H / 2;
-          const placeholderToRight = slot.x > exWrapperX;
-          const x1 = placeholderToRight ? exCardRightX : phCardRightX;
-          const x2 = placeholderToRight ? phCardLeftX  : exCardLeftX;
           return (
             <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
-              <line x1={x1} y1={coupleY} x2={x2} y2={coupleY} {...stroke} />
+              {topRowSlots.map((entry) => {
+                const childCenterX = entry.childWrapperX + NODE_W / 2;
+                const fatherCenterX = entry.fatherSlot.x + NODE_W / 4;
+                const motherCenterX = entry.motherSlot.x + NODE_W / 4;
+                const parentBottomY = entry.fatherSlot.y + (NODE_H + PLACEHOLDER_H) / 2;
+                const childTopY = entry.childWrapperY + (NODE_H - PERSON_H) / 2;
+                const stubY = parentBottomY + (childTopY - parentBottomY) / 2;
+                return (
+                  <g key={`top-conn-${entry.childId}`}>
+                    <line x1={fatherCenterX} y1={parentBottomY} x2={fatherCenterX} y2={stubY} {...stroke} />
+                    <line x1={motherCenterX} y1={parentBottomY} x2={motherCenterX} y2={stubY} {...stroke} />
+                    <line x1={fatherCenterX} y1={stubY} x2={motherCenterX} y2={stubY} {...stroke} />
+                    <line x1={childCenterX} y1={stubY} x2={childCenterX} y2={childTopY} {...stroke} />
+                  </g>
+                );
+              })}
+              {ownerSpouseSlot && ownerSpouseExistingId && (() => {
+                const exNode = layout.nodes.find((n) => n.id === ownerSpouseExistingId);
+                if (!exNode) return null;
+                const exWrapperX = exNode.left * (NODE_W / 2);
+                const exWrapperY = exNode.top * (NODE_H / 2) + TOP_PAD;
+                const exCardLeftX  = exWrapperX + (NODE_W - 72) / 2;
+                const exCardRightX = exWrapperX + (NODE_W + 72) / 2;
+                const phCardLeftX  = ownerSpouseSlot.x + (NODE_W / 2 - 60) / 2;
+                const phCardRightX = ownerSpouseSlot.x + (NODE_W / 2 + 60) / 2;
+                const coupleY = exWrapperY + NODE_H / 2;
+                const placeholderToRight = ownerSpouseSlot.x > exWrapperX;
+                const x1 = placeholderToRight ? exCardRightX : phCardRightX;
+                const x2 = placeholderToRight ? phCardLeftX  : exCardLeftX;
+                return <line key="spouse-conn" x1={x1} y1={coupleY} x2={x2} y2={coupleY} {...stroke} />;
+              })()}
             </svg>
           );
         })()}
 
-        {parentSlots.map((slot) => (
+        {/* Placeholder cards from topRowSlots and ownerSpouseSlot. */}
+        {topRowSlots.flatMap((entry) =>
+          [entry.fatherSlot, entry.motherSlot].map((slot) => (
+            <div
+              key={`top-${entry.childId}-${slot.gender}`}
+              style={{
+                position: 'absolute',
+                transform: `translate(${slot.x}px, ${slot.y}px)`,
+                width: NODE_W / 2,
+                height: NODE_H,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <div
+                className="pcard-placeholder"
+                role="button"
+                tabIndex={0}
+                onClick={(e) => { e.stopPropagation(); onAddParent?.(entry.childId, slot.gender); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAddParent?.(entry.childId, slot.gender); } }}
+              >
+                <span className="pcard-placeholder-plus" aria-hidden="true">+</span>
+                <span className="pcard-placeholder-label">Добавить<br />{slot.gender === 'male' ? 'отца' : 'мать'}</span>
+              </div>
+            </div>
+          ))
+        )}
+        {ownerSpouseSlot && (
           <div
-            key={slot.gender}
             style={{
               position: 'absolute',
-              transform: `translate(${slot.x}px, ${slot.y}px)`,
+              transform: `translate(${ownerSpouseSlot.x}px, ${ownerSpouseSlot.y}px)`,
               width: NODE_W / 2,
               height: NODE_H,
               display: 'flex',
@@ -475,19 +521,21 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               className="pcard-placeholder"
               role="button"
               tabIndex={0}
-              onClick={(e) => { e.stopPropagation(); if (ownerId) onAddParent?.(ownerId, slot.gender); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (ownerId) onAddParent?.(ownerId, slot.gender); } }}
+              onClick={(e) => { e.stopPropagation(); if (ownerId) onAddParent?.(ownerId, ownerSpouseSlot.gender); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (ownerId) onAddParent?.(ownerId, ownerSpouseSlot.gender); } }}
             >
               <span className="pcard-placeholder-plus" aria-hidden="true">+</span>
-              <span className="pcard-placeholder-label">Добавить<br />{slot.gender === 'male' ? 'отца' : 'мать'}</span>
+              <span className="pcard-placeholder-label">Добавить<br />{ownerSpouseSlot.gender === 'male' ? 'отца' : 'мать'}</span>
             </div>
           </div>
-        ))}
+        )}
 
-        {/* "Start here" hint over the mother slot — only on a brand-new tree
-            (just the Click-seeded owner with both parents missing). */}
-        {persons.length === 1 && parentSlots.find((s) => s.gender === 'female') && (() => {
-          const motherSlot = parentSlots.find((s) => s.gender === 'female')!;
+        {/* "Start here" hint — only on a brand-new tree (just the Click-seeded
+            owner with both parents missing on the topmost row). */}
+        {persons.length === 1 && (() => {
+          const ownerEntry = topRowSlots.find((s) => s.childId === ownerId);
+          if (!ownerEntry) return null;
+          const motherSlot = ownerEntry.motherSlot;
           return (
             <div
               aria-hidden="true"
