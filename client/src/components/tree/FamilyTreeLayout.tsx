@@ -360,14 +360,23 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             const childCenterX = cardWrapperX + NODE_W / 2;
             const fatherCenterX = cardWrapperX + NODE_W / 4;
             const motherCenterX = cardWrapperX + (3 * NODE_W) / 4;
-            // Visible card sits centred in its NODE_H wrapper at ≈92px tall.
-            const cardH = 92;
-            const parentBottomY = (cardWrapperY - NODE_H) + (NODE_H + cardH) / 2;
-            const childTopY = cardWrapperY + (NODE_H - cardH) / 2;
+            // Placeholder visible card is 82px tall (CSS min-height); person
+            // card is ≈92. Each is centered in its NODE_H wrapper.
+            const PLACEHOLDER_H = 82;
+            const PERSON_H = 92;
+            const parentBottomY = (cardWrapperY - NODE_H) + (NODE_H + PLACEHOLDER_H) / 2;
+            const childTopY = cardWrapperY + (NODE_H - PERSON_H) / 2;
+            // Classic T-junction: short V-stubs from each parent's bottom
+            // down, a thin H-bar joining them halfway between parents and
+            // child, and the long V drop from the bar's centre to the child.
+            const stubY = parentBottomY + (childTopY - parentBottomY) / 2;
+            const stroke = { stroke: 'rgba(255,255,255,0.3)', strokeWidth: '1.4', strokeDasharray: '3 3' };
             return (
               <g key={`ph-conn-${n.id}`}>
-                <line x1={fatherCenterX} y1={parentBottomY} x2={motherCenterX} y2={parentBottomY} stroke="rgba(255,255,255,0.3)" strokeWidth="1.4" strokeDasharray="3 3" />
-                <line x1={childCenterX} y1={parentBottomY} x2={childCenterX} y2={childTopY} stroke="rgba(255,255,255,0.3)" strokeWidth="1.4" strokeDasharray="3 3" />
+                <line x1={fatherCenterX} y1={parentBottomY} x2={fatherCenterX} y2={stubY} {...stroke} />
+                <line x1={motherCenterX} y1={parentBottomY} x2={motherCenterX} y2={stubY} {...stroke} />
+                <line x1={fatherCenterX} y1={stubY} x2={motherCenterX} y2={stubY} {...stroke} />
+                <line x1={childCenterX} y1={stubY} x2={childCenterX} y2={childTopY} {...stroke} />
               </g>
             );
           })}
@@ -381,6 +390,10 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           const fatherX = cardWrapperX;
           const motherX = cardWrapperX + NODE_W / 2;
           const parentY = cardWrapperY - NODE_H;
+          // Show the "start here" hint only on the very first person — once
+          // they've added anyone the tree is no longer brand-new and the hint
+          // becomes noise.
+          const showStartHint = persons.length === 1 && n.id === ownerId;
           return (
             <Fragment key={`ph-${n.id}`}>
               {(['male', 'female'] as const).map((g) => (
@@ -408,6 +421,33 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                   </div>
                 </div>
               ))}
+              {showStartHint && (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    transform: `translate(${motherX + NODE_W / 4}px, ${parentY + 6}px) translate(-50%, 0)`,
+                    pointerEvents: 'none',
+                    zIndex: 2,
+                  }}
+                >
+                  <div
+                    style={{
+                      background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))',
+                      color: '#0a0a0d',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      padding: '4px 9px 4px 8px',
+                      borderRadius: 999,
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 10px rgba(251,191,36,0.45)',
+                      animation: 'cf-hint-bob 1.6s ease-in-out infinite',
+                    }}
+                  >
+                    начни отсюда ↓
+                  </div>
+                </div>
+              )}
             </Fragment>
           );
         })}

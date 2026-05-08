@@ -27,6 +27,14 @@
 .pcard-placeholder:hover, .pcard-placeholder:active { border-color: rgba(251,191,36,0.55); background: rgba(251,191,36,0.05); }
 .pcard-placeholder-plus { font-size: 18px; font-weight: 800; color: rgba(255,255,255,0.55); line-height: 1; }
 .pcard-placeholder-label { font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.7); line-height: 1.2; text-align: center; letter-spacing: -0.005em; }
+
+/* Onboarding hint that bobs above the "Add mother" placeholder until the
+   user has added their first relative. The wrapping div handles positioning
+   so the keyframe only animates translateY. */
+@keyframes cf-hint-bob {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50%      { transform: translateY(-3px); opacity: 0.85; }
+}
 /* "+" sits inside the bottom half of a horizontal ellipse — flat top edge
    tucks 4px into the card so the top stroke is hidden, the arc forms the
    visible bowl below. */
