@@ -22,4 +22,7 @@ export const env = {
   OTP_DEV_CODE: process.env.OTP_DEV_CODE ?? '0000',
   OTP_TTL_SECONDS: Number(process.env.OTP_TTL_SECONDS ?? 300),
   CLICK_INTEGRATION_MODE: (process.env.CLICK_INTEGRATION_MODE ?? 'mock') as 'mock' | 'real',
+  CLICK_INTEGRATION_API_URL: process.env.CLICK_INTEGRATION_API_URL ?? 'https://api.click.uz/integration',
+  /** Bearer token issued to this mini-app on registration. */
+  CLICK_INTEGRATION_API_KEY: process.env.CLICK_INTEGRATION_API_KEY ?? '',
 };

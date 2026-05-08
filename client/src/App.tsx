@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { TreesListPage } from './pages/TreesListPage';
+import { LoginPage } from './pages/LoginPage';
 import { TreeViewPage } from './pages/TreeViewPage';
 import { FullTreePage } from './pages/FullTreePage';
 import { CalendarPage } from './pages/CalendarPage';
@@ -13,6 +14,7 @@ export const App = () => (
     <AuthProvider>
       <Routes>
         <Route path="/share/:token" element={<SharedTreePage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<ProtectedRoute><TreesListPage /></ProtectedRoute>} />
         <Route path="/trees/:treeId" element={<ProtectedRoute><TreeViewPage /></ProtectedRoute>} />
         <Route path="/trees/:treeId/full" element={<ProtectedRoute><FullTreePage /></ProtectedRoute>} />
