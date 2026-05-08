@@ -195,32 +195,33 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
   // to start (top-left), so we scroll explicitly to bring the owner to viewport
   // centre. We run inside a double rAF so layout is committed and clientWidth /
   // clientHeight are non-zero before we read them.
-  // Owner card always at viewport centre on entry. The padding wrapper adds
-  // vpSize.w/2 + vpSize.h/2 of slack on each side so scrollLeft/scrollTop can
-  // reach any node regardless of where it sits in the layout. Re-runs once
-  // viewport size becomes known (vpSize.w > 0) so this works even when the
-  // first paint happens before clientWidth is settled (Click WebView mini-app).
+  // Auto-scroll so the owner card is at viewport centre on entry. We try
+  // multiple times because Click's WebView occasionally has layout settle a
+  // few frames after first render — once the viewport actually has a non-zero
+  // size, AND once more on the next rAF for safety.
   useEffect(() => {
     if (!layout || !ownerId || !vpSize.w || !vpSize.h) return;
     const ownerNode = layout.nodes.find((n) => n.id === ownerId);
     if (!ownerNode) return;
-    const vp = viewport.current;
-    if (!vp) return;
-    // Owner centre in content coords. Wrapper adds (vpSize.w/2, vpSize.h/2)
-    // of padding, so to place owner at the visible viewport centre,
-    // scrollLeft = ownerCenterX (and same for Y).
+    // Owner centre in content (scroll) coords.
     const ownerCenterX = ownerNode.left * (NODE_W / 2) + NODE_W / 2;
     const ownerCenterY = ownerNode.top * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
-    const raf = requestAnimationFrame(() => {
+    let raf: number | null = null;
+    const center = () => {
       const v = viewport.current;
       if (!v) return;
+      const targetX = ownerCenterX - v.clientWidth / 2;
+      const targetY = ownerCenterY - v.clientHeight / 2;
+      const maxX = Math.max(0, v.scrollWidth - v.clientWidth);
+      const maxY = Math.max(0, v.scrollHeight - v.clientHeight);
       v.scrollTo({
-        left: Math.max(0, Math.min(ownerCenterX, v.scrollWidth - v.clientWidth)),
-        top: Math.max(0, Math.min(ownerCenterY, v.scrollHeight - v.clientHeight)),
+        left: Math.max(0, Math.min(targetX, maxX)),
+        top: Math.max(0, Math.min(targetY, maxY)),
         behavior: 'auto',
       });
-    });
-    return () => cancelAnimationFrame(raf);
+    };
+    raf = requestAnimationFrame(() => { center(); raf = requestAnimationFrame(center); });
+    return () => { if (raf != null) cancelAnimationFrame(raf); };
   }, [layout, ownerId, vpSize.w, vpSize.h]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
@@ -243,12 +244,6 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
         cursor: 'grab',
       }}
     >
-      {/* Half-of-actual-viewport padding around the content so scrollLeft/
-          scrollTop can place any node at the visible viewport centre — even
-          nodes near the edges of the layout. We compute padding from the real
-          tree-stage size (via ResizeObserver) instead of CSS `vh`/`vw`, which
-          are window-relative and break inside Click's WebView. */}
-      <div style={{ padding: `${vpSize.h / 2}px ${vpSize.w / 2}px`, display: 'inline-block' }}>
       <div ref={content} style={{ position: 'relative', width: W, height: H, willChange: 'transform' }}>
         <svg width={W} height={H} style={{ position: 'absolute', top: TOP_PAD, left: 0, pointerEvents: 'none' }}>
           {/* strokeLinecap="butt" — at junctions the segment's shortened end and
@@ -294,7 +289,6 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
             </div>
           );
         })}
-      </div>
       </div>
     </div>
   );
