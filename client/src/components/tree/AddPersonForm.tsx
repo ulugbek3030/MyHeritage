@@ -190,10 +190,16 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         note: note.trim() || undefined,
         relationships: rels,
       });
+      // Photo upload is best-effort — see EditPersonForm for the why.
       if (photo) {
-        const { processAvatar, uploadPhoto } = await import('../../utils/imageProcessor');
-        const blob = await processAvatar(photo);
-        await uploadPhoto(treeId, newPerson.id, blob);
+        try {
+          const { processAvatar, uploadPhoto } = await import('../../utils/imageProcessor');
+          const blob = await processAvatar(photo);
+          await uploadPhoto(treeId, newPerson.id, blob);
+        } catch (photoErr) {
+          console.error('[AddPerson] photo upload failed', photoErr);
+          alert('Человек добавлен, но фото загрузить не удалось. Попробуйте JPG/PNG/WEBP до 5 МБ.');
+        }
       }
       onCreated();
       handleClose();

@@ -72,10 +72,19 @@ export const EditPersonForm = ({ open, onClose, treeId, person, onSaved }: Props
         deathDateKnown: !isAlive && fullDeathDate,
         note: note.trim() || undefined,
       });
+      // Photo upload is best-effort and isolated from the main save: if the
+      // user picks a HEIC the browser can't decode, or the server rejects the
+      // mime type, we still want the rest of their edits to land. Without
+      // this split the whole sheet hung on "Сохранение…" and looked broken.
       if (photo) {
-        const { processAvatar, uploadPhoto } = await import('../../utils/imageProcessor');
-        const blob = await processAvatar(photo);
-        await uploadPhoto(treeId, person.id, blob);
+        try {
+          const { processAvatar, uploadPhoto } = await import('../../utils/imageProcessor');
+          const blob = await processAvatar(photo);
+          await uploadPhoto(treeId, person.id, blob);
+        } catch (photoErr) {
+          console.error('[EditPerson] photo upload failed', photoErr);
+          alert('Данные сохранены, но фото загрузить не удалось. Попробуйте JPG/PNG/WEBP до 5 МБ.');
+        }
       }
       onSaved();
       onClose();

@@ -1,24 +1,30 @@
 import smartcrop from 'smartcrop';
 
+/**
+ * Best-effort smart-crop + JPEG encode. Any failure (HEIC from iOS Photos,
+ * canvas encode returning null, smartcrop blowing up on weird aspect ratios)
+ * falls through to the original file so the upload can still try; the server
+ * is the final gatekeeper on mime + size.
+ */
 export const processAvatar = async (file: File, size = 256): Promise<Blob> => {
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const i = new Image();
-    i.onload = () => resolve(i);
-    i.onerror = reject;
-    i.src = URL.createObjectURL(file);
-  });
-  let blob: Blob;
   try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('image decode failed'));
+      i.src = URL.createObjectURL(file);
+    });
     const r = await smartcrop.crop(img, { width: size, height: size });
     const c = document.createElement('canvas');
     c.width = size; c.height = size;
     const ctx = c.getContext('2d')!;
     ctx.drawImage(img, r.topCrop.x, r.topCrop.y, r.topCrop.width, r.topCrop.height, 0, 0, size, size);
-    blob = await new Promise<Blob>((resolve) => c.toBlob((b) => resolve(b!), 'image/jpeg', 0.85));
-  } catch {
-    blob = file;
+    const blob = await new Promise<Blob | null>((resolve) => c.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
+    return blob ?? file;
+  } catch (e) {
+    console.warn('[processAvatar] falling back to original file', e);
+    return file;
   }
-  return blob;
 };
 
 export const uploadPhoto = async (treeId: string, personId: string, blob: Blob): Promise<string> => {

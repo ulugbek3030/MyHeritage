@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import calcTree from 'relatives-tree';
 import type { ExtNode } from 'relatives-tree/lib/types';
 import type { Person, Relationship } from '../../types';
@@ -18,9 +18,9 @@ const NODE_H = 184;   // spacing between generations ≈ 92 px
 // that more parents/grandparents can be added there.
 const TOP_PAD = 100;
 // Extra room below the bottom generation — same intent as TOP_PAD but for kids
-// being added below. 40% of the laid-out canvas height (the user asked for
-// another +20% on top of the original 20%).
-const BOTTOM_PAD_RATIO = 0.4;
+// being added below. 60% of the laid-out canvas height (the user asked for
+// repeated +20% bumps).
+const BOTTOM_PAD_RATIO = 0.6;
 
 interface Props {
   persons: Person[];
@@ -34,7 +34,11 @@ interface Props {
 
 export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
+  // Track real viewport size — re-runs the auto-centre when WebView orientation
+  // or chrome height changes.
+  const [vpSize, setVpSize] = useState({ w: 0, h: 0 });
   const content = useRef<HTMLDivElement>(null);
+  const fittedRef = useRef(false);
 
   const nodes = useMemo(() => transformToTreeNodes(persons, relationships, ownerId), [persons, relationships, ownerId]);
 
@@ -178,11 +182,67 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
     return paths;
   }, [layout]);
 
-  // Pinch/scroll-to-zoom + pan. No auto-fit / auto-centre on entry — the user
-  // found that disorienting; the page opens at the canvas's natural top-left
-  // and they pan/zoom themselves.
-  useZoom(content as React.RefObject<HTMLElement>);
+  const zoom = useZoom(content as React.RefObject<HTMLElement>);
   useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
+
+  // Observe the viewport so the auto-centre re-runs when chrome/orientation
+  // changes (Click WebView occasionally reflows on first paint).
+  useEffect(() => {
+    const vp = viewport.current;
+    if (!vp) return;
+    const update = () => setVpSize({ w: vp.clientWidth, h: vp.clientHeight });
+    update();
+    if (typeof ResizeObserver === 'undefined') return;
+    const obs = new ResizeObserver(update);
+    obs.observe(vp);
+    return () => obs.disconnect();
+  }, []);
+
+  // Auto-fit (zoom out to fit the whole tree) + centre owner card. Runs once
+  // per mount (fittedRef gates the fit so subsequent re-renders don't snap
+  // the user back). We retry across rAFs because Click's WebView sometimes
+  // reports clientWidth/Height as 0 on the first paint.
+  // Uses a manual scrollLeft/scrollTop delta on the .tree-stage container
+  // instead of card.scrollIntoView — the native call walks the scroll chain
+  // and was yanking the page header out of view.
+  useEffect(() => {
+    if (!layout || !ownerId) return;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let raf: number | null = null;
+    const tryCentre = () => {
+      attempts += 1;
+      const vp = viewport.current;
+      if (!vp) return;
+      const card = vp.querySelector<HTMLElement>(`[data-person-id="${ownerId}"]`);
+      if (card && vp.clientWidth && vp.clientHeight) {
+        if (!fittedRef.current) {
+          const W = layout.canvas.width * (NODE_W / 2);
+          const H = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
+          const fit = Math.min(vp.clientWidth / W, vp.clientHeight / H, 1);
+          if (fit < 1) zoom.setTo(fit);
+          fittedRef.current = true;
+        }
+        const centreOwner = () => {
+          const vpRect = vp.getBoundingClientRect();
+          const cardRect = card.getBoundingClientRect();
+          vp.scrollLeft += (cardRect.left + cardRect.width / 2) - (vpRect.left + vpRect.width / 2);
+          vp.scrollTop  += (cardRect.top  + cardRect.height / 2) - (vpRect.top  + vpRect.height / 2);
+        };
+        centreOwner();
+        raf = requestAnimationFrame(centreOwner);
+        return;
+      }
+      if (attempts < 20) {
+        timer = setTimeout(() => { raf = requestAnimationFrame(tryCentre); }, 50);
+      }
+    };
+    raf = requestAnimationFrame(tryCentre);
+    return () => {
+      if (raf != null) cancelAnimationFrame(raf);
+      if (timer != null) clearTimeout(timer);
+    };
+  }, [layout, ownerId, vpSize.w, vpSize.h, zoom]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 
