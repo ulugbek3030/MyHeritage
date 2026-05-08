@@ -10,9 +10,10 @@ interface Props {
   onEdit: () => void;
   onAdd: () => void;
   onDelete: () => void;
+  onEditBio?: () => void;
 }
 
-export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onEdit, onAdd, onDelete }: Props) => {
+export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onEdit, onAdd, onDelete, onEditBio }: Props) => {
   if (!person) return null;
   const fullName = [person.firstName, person.lastName, person.middleName].filter(Boolean).join(' ');
   const lifespan = person.isAlive ? formatBirthFull(person) : `${formatBirthFull(person)} – ${formatDeathFull(person)}`;
@@ -90,6 +91,9 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onE
         <button onClick={onEdit} style={{padding:16,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:14,color:'var(--text)',fontWeight:700,fontSize:16}}>Редактировать</button>
         <button onClick={onAdd} style={{padding:16,background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:'#0a0a0d',border:'none',borderRadius:14,fontWeight:800,fontSize:16}}>+ Родственник</button>
       </div>
+      {onEditBio && (
+        <button onClick={onEditBio} style={{width:'100%',padding:14,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:14,color:'var(--text)',fontSize:15,fontWeight:700,marginBottom:10}}>📝 Биография</button>
+      )}
       <button onClick={onDelete} style={{width:'100%',padding:14,background:'transparent',border:'1px solid rgba(248,113,113,0.3)',borderRadius:14,color:'#f87171',fontSize:15}}>Удалить</button>
     </BottomSheet>
   );

@@ -18,6 +18,13 @@ interface Props {
   persons: Person[];
   relationships: Relationship[];
   onCreated: () => void;
+  /**
+   * If set, the form skips the role-picker step and opens directly on the
+   * "fill details" step with the chosen mode + gender. Used when the user
+   * clicks an "Add father" / "Add mother" placeholder above an existing
+   * card — they've already chosen what they want to add.
+   */
+  presetRole?: { mode: Mode; gender: 'male' | 'female' };
 }
 
 interface RoleOption {

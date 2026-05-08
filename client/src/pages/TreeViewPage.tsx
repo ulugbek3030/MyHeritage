@@ -8,6 +8,7 @@ import { FamilyTreeLayout } from '../components/tree/FamilyTreeLayout';
 import { PersonSheet } from '../components/tree/PersonSheet';
 import { AddPersonForm } from '../components/tree/AddPersonForm';
 import { EditPersonForm } from '../components/tree/EditPersonForm';
+import { BiographyEditor } from '../components/tree/BiographyEditor';
 import { ShareModal } from '../components/share/ShareModal';
 import { Hero } from '../components/home/Hero';
 import { QuickActions } from '../components/home/QuickActions';
@@ -21,6 +22,7 @@ export const TreeViewPage = () => {
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [addOpen, setAddOpen] = useState<Person | null>(null);
   const [editOpen, setEditOpen] = useState<Person | null>(null);
+  const [bioOpen, setBioOpen] = useState<Person | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -52,7 +54,6 @@ export const TreeViewPage = () => {
       <header style={{padding:'16px 18px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid var(--border)'}}>
         <button onClick={() => nav('/')} style={{width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)'}}>←</button>
         <div style={{flex:1,fontSize:17,fontWeight:800}}>{data.tree.name}</div>
-        <button onClick={() => nav(`/trees/${treeId}/full`)} style={{fontSize:12,color:'var(--accent)',background:'transparent',border:'none'}}>Полное →</button>
         <button onClick={() => setSearchOpen(true)} aria-label="Поиск" style={{width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)',marginLeft:6,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
@@ -86,6 +87,7 @@ export const TreeViewPage = () => {
         onClose={() => setSelectedPerson(null)}
         person={selectedPerson}
         onEdit={() => { if (selectedPerson) { setEditOpen(selectedPerson); setSelectedPerson(null); } }}
+        onEditBio={() => { if (selectedPerson) { setBioOpen(selectedPerson); setSelectedPerson(null); } }}
         onAdd={() => { if (selectedPerson) { setAddOpen(selectedPerson); setSelectedPerson(null); } }}
         onDelete={async () => {
           if (!selectedPerson || !treeId) return;
@@ -113,6 +115,15 @@ export const TreeViewPage = () => {
           onClose={() => setEditOpen(null)}
           treeId={treeId!}
           person={editOpen}
+          onSaved={reload}
+        />
+      )}
+      {bioOpen && (
+        <BiographyEditor
+          open
+          onClose={() => setBioOpen(null)}
+          treeId={treeId!}
+          person={bioOpen}
           onSaved={reload}
         />
       )}

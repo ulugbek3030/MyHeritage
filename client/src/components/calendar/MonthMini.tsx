@@ -32,18 +32,18 @@ export const MonthMini = ({ events, monthOffset = 0, onMonthChange }: { events: 
   return (
     <div style={{margin:'0 18px 16px',padding:14,background:'linear-gradient(180deg,#16161a,#0c0c0e)',border:'1px solid var(--border)',borderRadius:18}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-        <div style={{fontSize:13,fontWeight:800,letterSpacing:'-0.01em'}}>{MONTHS[month]} {year}</div>
-        <div style={{display:'flex',gap:6}}>
-          <button onClick={() => onMonthChange?.(-1)} style={{width:24,height:24,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text-muted)',cursor:'pointer'}}>‹</button>
-          <button onClick={() => onMonthChange?.(1)} style={{width:24,height:24,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text-muted)',cursor:'pointer'}}>›</button>
+        <div style={{fontSize:18,fontWeight:800,letterSpacing:'-0.01em'}}>{MONTHS[month]} {year}</div>
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={() => onMonthChange?.(-1)} style={{width:32,height:32,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text-muted)',cursor:'pointer',fontSize:18}}>‹</button>
+          <button onClick={() => onMonthChange?.(1)} style={{width:32,height:32,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text-muted)',cursor:'pointer',fontSize:18}}>›</button>
         </div>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,fontSize:9,color:'var(--text-dim)',textTransform:'uppercase',letterSpacing:0.6,fontWeight:700,textAlign:'center',marginBottom:6}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:6,fontSize:11,color:'var(--text-dim)',textTransform:'uppercase',letterSpacing:0.6,fontWeight:700,textAlign:'center',marginBottom:8}}>
         {WEEKDAYS.map((w) => <span key={w}>{w}</span>)}
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:6}}>
         {cells.map((c, i) => c === null ? <div key={i} /> : (
-          <div key={i} style={{position:'relative',aspectRatio:'1',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:isToday(c.day)?800:600,color:isToday(c.day)?'#0a0a0d':'var(--text)',borderRadius:8,background:isToday(c.day)?'linear-gradient(135deg,var(--accent),var(--accent-hover))':'transparent'}}>
+          <div key={i} style={{position:'relative',aspectRatio:'1',display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:isToday(c.day)?800:600,color:isToday(c.day)?'#0a0a0d':'var(--text)',borderRadius:10,background:isToday(c.day)?'linear-gradient(135deg,var(--accent),var(--accent-hover))':'transparent'}}>
             {c.day}
             {c.events.length > 0 && (
               <div style={{position:'absolute',bottom:3,left:'50%',transform:'translateX(-50%)',display:'flex',gap:2}}>
