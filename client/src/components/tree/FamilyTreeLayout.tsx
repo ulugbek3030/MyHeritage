@@ -17,6 +17,9 @@ const NODE_H = 184;   // spacing between generations ≈ 92 px
 // Empty buffer above the top generation so the user can scroll up and intuit
 // that more parents/grandparents can be added there.
 const TOP_PAD = 100;
+// Extra room below the bottom generation — same intent as TOP_PAD but for kids
+// being added below. ~20% of the laid-out canvas height.
+const BOTTOM_PAD_RATIO = 0.2;
 
 interface Props {
   persons: Person[];
@@ -223,12 +226,18 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           if (fit < 1) zoom.setTo(fit);
           fittedRef.current = true;
         }
-        // Two passes: now (transform may have just been applied) and again on
-        // the next animation frame so the browser sees the scaled rect.
-        card.scrollIntoView({ block: 'center', inline: 'center' });
-        raf = requestAnimationFrame(() => {
-          card.scrollIntoView({ block: 'center', inline: 'center' });
-        });
+        // Centre the owner in the viewport WITHOUT touching ancestor scrolls —
+        // `scrollIntoView` walks up the scroll chain and was yanking the
+        // surrounding page (header, quick actions) out of view. Compute the
+        // delta in viewport coords and apply it to .tree-stage only.
+        const centreOwner = () => {
+          const vpRect = vp.getBoundingClientRect();
+          const cardRect = card.getBoundingClientRect();
+          vp.scrollLeft += (cardRect.left + cardRect.width / 2) - (vpRect.left + vpRect.width / 2);
+          vp.scrollTop  += (cardRect.top  + cardRect.height / 2) - (vpRect.top  + vpRect.height / 2);
+        };
+        centreOwner();
+        raf = requestAnimationFrame(centreOwner);
         return;
       }
       if (attempts < 20) {
@@ -247,8 +256,11 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   // canvas.width/height come back in HALF-units (same scale as node.left/top),
   // so the rendered box must be NODE_W/2 × NODE_H/2 per half-unit. Spacing
   // and canvas size are now both driven by NODE_W/NODE_H — no extra fudge.
+  // We pad the rendered canvas an extra 20% below the bottom generation so
+  // there's room to scroll past the lowest cards (helps when adding children).
   const W = layout.canvas.width * (NODE_W / 2);
-  const H = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
+  const layoutH = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
+  const H = Math.round(layoutH * (1 + BOTTOM_PAD_RATIO));
 
   const personById = new Map(persons.map((p) => [p.id, p]));
 

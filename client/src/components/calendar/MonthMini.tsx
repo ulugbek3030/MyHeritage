@@ -45,7 +45,7 @@ export const MonthMini = ({ events, monthOffset = 0, onMonthChange }: { events: 
           <div key={i} style={{position:'relative',aspectRatio:'1',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontSize:18,fontWeight:isToday(c.day)?800:600,color:isToday(c.day)?'#0a0a0d':'var(--text)',borderRadius:10,background:isToday(c.day)?'linear-gradient(135deg,var(--accent),var(--accent-hover))':'transparent',gap:1,paddingTop:c.events.length>0?2:0}}>
             <span style={{lineHeight:1}}>{c.day}</span>
             {c.events.length > 0 && (
-              <div style={{display:'flex',gap:1,fontSize:11,lineHeight:1}}>
+              <div style={{display:'flex',gap:1,fontSize:15,lineHeight:1}}>
                 {/* Distinct event types only — no dupes when multiple kids share a birthday in the same family on the same day. */}
                 {distinctEventIcons(c.events).slice(0, 3).map((icon, j) => (
                   <span key={j} aria-hidden="true" style={{filter:isToday(c.day)?'grayscale(0.5) brightness(0.6)':'none'}}>{icon}</span>

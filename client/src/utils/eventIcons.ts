@@ -3,14 +3,15 @@ import type { EventType, FamilyEvent } from '../types';
 /**
  * Single source of truth for event icons. Used by the calendar (month grid +
  * events list) and by the tree (per-person badges for the current month).
- * Memorial uses a rose, not a candle — feels closer to remembrance than mourning.
+ * Birthdays and memorials all use the same gift icon — it kept getting hard
+ * to read four distinct emoji at the small sizes we render at.
  */
 export const eventIcon = (type: EventType): string => {
   switch (type) {
-    case 'birthday': return '🎂';
-    case 'child_birthday': return '🎈';
+    case 'birthday': return '🎁';
+    case 'child_birthday': return '🎁';
     case 'anniversary': return '💍';
-    case 'memorial': return '🌹';
+    case 'memorial': return '🎁';
   }
 };
 
