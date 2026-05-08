@@ -195,33 +195,35 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, upcomingBirt
   // to start (top-left), so we scroll explicitly to bring the owner to viewport
   // centre. We run inside a double rAF so layout is committed and clientWidth /
   // clientHeight are non-zero before we read them.
-  // Auto-scroll so the owner card is at viewport centre on entry. We try
-  // multiple times because Click's WebView occasionally has layout settle a
-  // few frames after first render — once the viewport actually has a non-zero
-  // size, AND once more on the next rAF for safety.
+  // Auto-scroll so the owner card is at viewport centre on entry. Uses the
+  // native scrollIntoView({block:'center',inline:'center'}) — the browser
+  // handles all the edge cases (clientHeight=0, scroll bounds, etc.) and
+  // simply does nothing if it can't centre yet, so we retry across a few
+  // animation frames until layout settles inside Click's WebView.
   useEffect(() => {
-    if (!layout || !ownerId || !vpSize.w || !vpSize.h) return;
-    const ownerNode = layout.nodes.find((n) => n.id === ownerId);
-    if (!ownerNode) return;
-    // Owner centre in content (scroll) coords.
-    const ownerCenterX = ownerNode.left * (NODE_W / 2) + NODE_W / 2;
-    const ownerCenterY = ownerNode.top * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
+    if (!layout || !ownerId) return;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     let raf: number | null = null;
-    const center = () => {
-      const v = viewport.current;
-      if (!v) return;
-      const targetX = ownerCenterX - v.clientWidth / 2;
-      const targetY = ownerCenterY - v.clientHeight / 2;
-      const maxX = Math.max(0, v.scrollWidth - v.clientWidth);
-      const maxY = Math.max(0, v.scrollHeight - v.clientHeight);
-      v.scrollTo({
-        left: Math.max(0, Math.min(targetX, maxX)),
-        top: Math.max(0, Math.min(targetY, maxY)),
-        behavior: 'auto',
-      });
+    const tryCentre = () => {
+      attempts += 1;
+      const vp = viewport.current;
+      if (!vp) return;
+      const card = vp.querySelector<HTMLElement>(`[data-person-id="${ownerId}"]`);
+      if (card && vp.clientWidth && vp.clientHeight) {
+        card.scrollIntoView({ block: 'center', inline: 'center' });
+        return;
+      }
+      // Layout not ready yet — try again.
+      if (attempts < 20) {
+        timer = setTimeout(() => { raf = requestAnimationFrame(tryCentre); }, 50);
+      }
     };
-    raf = requestAnimationFrame(() => { center(); raf = requestAnimationFrame(center); });
-    return () => { if (raf != null) cancelAnimationFrame(raf); };
+    raf = requestAnimationFrame(tryCentre);
+    return () => {
+      if (raf != null) cancelAnimationFrame(raf);
+      if (timer != null) clearTimeout(timer);
+    };
   }, [layout, ownerId, vpSize.w, vpSize.h]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
