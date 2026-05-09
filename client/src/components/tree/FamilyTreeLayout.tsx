@@ -635,6 +635,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       if (!node || node.parents.length < 2) continue;
       const isPoly = node.parents.some((par) => (cc.get(par.id) ?? 0) > 1);
       if (!isPoly) continue;
+      // Skip retarget if the kid is already in a couple of their own —
+      // moving them to the anchor parent's column would tear them away
+      // from their own partner (relatives-tree positions partners
+      // adjacent). Let the library lay this branch out, my custom T-line
+      // and suppression will still add the missing parent connector.
+      if (node.spouses.length > 0) continue;
       const parentIds = node.parents.map((par) => par.id).sort();
       const key = parentIds.join('|');
       if (!groups.has(key)) groups.set(key, { parentIds, kids: [] });
