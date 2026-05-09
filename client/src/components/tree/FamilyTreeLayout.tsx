@@ -351,22 +351,14 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   }, [layout, visiblePersons]);
 
   // The frame is a box that physically grows/shrinks with the user's zoom so
-  // that overflow-auto on .tree-stage gives correct scroll bounds. The
-  // `content` ref inside has visual `transform: scale(s)` (origin top-left),
-  // so its visual extent is W*s × H*s — the frame's CSS size matches that.
+  // that overflow-auto on .tree-stage gives correct scroll bounds. We avoid
+  // imperative width/height writes that React would clobber on the next
+  // render — instead the JSX uses `calc(W * var(--cf-zoom))` and onScale
+  // updates ONLY the CSS variable. React never sets that variable, so the
+  // value survives re-renders cleanly.
   const frame = useRef<HTMLDivElement>(null);
   const zoom = useZoom(content as React.RefObject<HTMLElement>, (s: number) => {
-    const f = frame.current;
-    if (!f) return;
-    // canvasW/canvasH are computed below so we can't reach them yet here;
-    // the viewport useEffect re-applies frame size every time scale changes
-    // through this callback by reading the current data-* attributes.
-    const w = Number(f.dataset.baseW || '0');
-    const h = Number(f.dataset.baseH || '0');
-    if (w && h) {
-      f.style.width = `${Math.round(w * s)}px`;
-      f.style.height = `${Math.round(h * s)}px`;
-    }
+    frame.current?.style.setProperty('--cf-zoom', String(s));
   });
   useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
 
@@ -647,9 +639,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       })()}
       <div
         ref={frame}
-        data-base-w={W}
-        data-base-h={H}
-        style={{ position: 'relative', width: W, height: H, flexShrink: 0 }}
+        style={{
+          position: 'relative',
+          width: `calc(${W}px * var(--cf-zoom, 1))`,
+          height: `calc(${H}px * var(--cf-zoom, 1))`,
+          flexShrink: 0,
+        }}
       >
       <div ref={content} style={{ position: 'absolute', top: 0, left: 0, width: W, height: H, willChange: 'transform' }}>
         <svg width={W} height={H} style={{ position: 'absolute', top: TOP_PAD, left: 0, pointerEvents: 'none' }}>
