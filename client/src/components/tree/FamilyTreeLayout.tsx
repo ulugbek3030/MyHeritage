@@ -573,6 +573,46 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
     }
   }
 
+  // Polygamy children: kids whose parents include someone with 2+ couples.
+  // We re-position their cards so the card's centre lands at the parents'
+  // couple-mid X — that turns the T-junction into a clean straight drop and
+  // visually anchors the kid between both parents instead of under one.
+  const polygamyTargets = new Map<string, { x: number; y: number }>();
+  {
+    const cc = new Map<string, number>();
+    for (const r of relationships) {
+      if (r.category !== 'couple') continue;
+      cc.set(r.person1Id, (cc.get(r.person1Id) ?? 0) + 1);
+      cc.set(r.person2Id, (cc.get(r.person2Id) ?? 0) + 1);
+    }
+    const layoutNodeMap = new Map(layout.nodes.map((n) => [n.id, n]));
+    const extrasMap = new Map(extras.map((e) => [e.id, e]));
+    const lookupPos = (id: string): { left: number; top: number } | null => {
+      const lp = layoutNodeMap.get(id);
+      if (lp) return { left: lp.left, top: lp.top };
+      const ex = extrasMap.get(id);
+      return ex ? { left: ex.left, top: ex.top } : null;
+    };
+    for (const p of visiblePersons) {
+      const node = nodes.find((n) => n.id === p.id);
+      if (!node || node.parents.length < 2) continue;
+      const isPoly = node.parents.some((par) => (cc.get(par.id) ?? 0) > 1);
+      if (!isPoly) continue;
+      const parentPositions = node.parents
+        .map((par) => lookupPos(par.id))
+        .filter(Boolean) as Array<{ left: number; top: number }>;
+      if (parentPositions.length < 2) continue;
+      const parentCenterCols = parentPositions.map((pos) => pos.left + 1);
+      const midCol = (Math.min(...parentCenterCols) + Math.max(...parentCenterCols)) / 2;
+      const newLeft = midCol - 1;
+      const newRow = Math.max(...parentPositions.map((pos) => pos.top)) + 2;
+      polygamyTargets.set(p.id, {
+        x: newLeft * (NODE_W / 2),
+        y: newRow * (NODE_H / 2) + TOP_PAD,
+      });
+    }
+  }
+
   let topMostParentlessRow = Infinity;
   for (const n of layout.nodes) {
     if (parentlessIds.has(n.id) && personById.get(n.id) && n.top < topMostParentlessRow) {
@@ -708,13 +748,16 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           // Skip placeholder nodes (relatives-tree's spouse/parent anchors with no real Person).
           if (!person) return null;
           const isSecondary = secondaryEntries.has(person.id);
+          const polyT = polygamyTargets.get(n.id);
+          const wrapX = polyT ? polyT.x : n.left * (NODE_W / 2);
+          const wrapY = polyT ? polyT.y : n.top * (NODE_H / 2) + TOP_PAD;
           return (
             <div
               key={n.id}
               data-person-id={n.id}
               style={{
                 position: 'absolute',
-                transform: `translate(${n.left * (NODE_W / 2)}px, ${n.top * (NODE_H / 2) + TOP_PAD}px)`,
+                transform: `translate(${wrapX}px, ${wrapY}px)`,
                 width: NODE_W,
                 height: NODE_H,
                 display: 'flex',
@@ -799,8 +842,14 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             // card bottom — otherwise there's a ~46px gap where the line
             // visually disconnects from the couple-line above.
             const parentBottomY = lowestParentTop * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
-            const childCenterX = childPos.left * (NODE_W / 2) + NODE_W / 2;
-            const childTopY = childPos.top * (NODE_H / 2) + TOP_PAD + (NODE_H - 92) / 2;
+            // The card may be re-anchored to the couple-mid via
+            // polygamyTargets — use that visual position so the line lands
+            // exactly on the card top.
+            const polyT = polygamyTargets.get(p.id);
+            const childWrapX = polyT ? polyT.x : childPos.left * (NODE_W / 2);
+            const childWrapY = polyT ? polyT.y : childPos.top * (NODE_H / 2) + TOP_PAD;
+            const childCenterX = childWrapX + NODE_W / 2;
+            const childTopY = childWrapY + (NODE_H - 92) / 2;
             const barY = parentBottomY + (childTopY - parentBottomY) / 2;
             // T-junction with rounded corners on both bends:
             //   1. drop from couple-mid down to (barY - arcR)
@@ -810,15 +859,22 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             //   5. drop to child top
             const horizSpan = Math.abs(childCenterX - couplemidX);
             const vertSpan = Math.abs(barY - parentBottomY);
-            const arcR = Math.min(14, horizSpan / 2, vertSpan / 2);
-            const direction = childCenterX >= couplemidX ? 1 : -1;
-            const d =
-              `M ${couplemidX} ${parentBottomY} ` +
-              `L ${couplemidX} ${barY - arcR} ` +
-              `Q ${couplemidX} ${barY} ${couplemidX + direction * arcR} ${barY} ` +
-              `L ${childCenterX - direction * arcR} ${barY} ` +
-              `Q ${childCenterX} ${barY} ${childCenterX} ${barY + arcR} ` +
-              `L ${childCenterX} ${childTopY}`;
+            let d: string;
+            if (horizSpan < 0.5) {
+              // Card already centred under couple-mid (polygamy retarget) —
+              // no bar needed, just a clean vertical drop.
+              d = `M ${couplemidX} ${parentBottomY} L ${couplemidX} ${childTopY}`;
+            } else {
+              const arcR = Math.min(14, horizSpan / 2, vertSpan / 2);
+              const direction = childCenterX >= couplemidX ? 1 : -1;
+              d =
+                `M ${couplemidX} ${parentBottomY} ` +
+                `L ${couplemidX} ${barY - arcR} ` +
+                `Q ${couplemidX} ${barY} ${couplemidX + direction * arcR} ${barY} ` +
+                `L ${childCenterX - direction * arcR} ${barY} ` +
+                `Q ${childCenterX} ${barY} ${childCenterX} ${barY + arcR} ` +
+                `L ${childCenterX} ${childTopY}`;
+            }
             segs.push({ d, key: `mp-${p.id}` });
           }
           if (!segs.length) return null;
@@ -906,13 +962,16 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           const person = personById.get(e.id);
           if (!person) return null;
           const isSecondary = secondaryEntries.has(person.id);
+          const polyT = polygamyTargets.get(e.id);
+          const wrapX = polyT ? polyT.x : e.left * (NODE_W / 2);
+          const wrapY = polyT ? polyT.y : e.top * (NODE_H / 2) + TOP_PAD;
           return (
             <div
               key={`extra-${e.id}`}
               data-person-id={e.id}
               style={{
                 position: 'absolute',
-                transform: `translate(${e.left * (NODE_W / 2)}px, ${e.top * (NODE_H / 2) + TOP_PAD}px)`,
+                transform: `translate(${wrapX}px, ${wrapY}px)`,
                 width: NODE_W,
                 height: NODE_H,
                 display: 'flex',
