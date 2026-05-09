@@ -37,19 +37,22 @@ const Column = ({ items, selectedIndex, onChange, ariaLabel }: ColumnProps) => {
 
   const onScroll = () => {
     if (programmatic.current) return;
+    // Emit the currently-aligned row IMMEDIATELY (no debounce) so that
+    // pressing Save right after a scroll always commits the visible value.
+    // The earlier 110ms debounce lost user input on rapid save-after-scroll.
+    const el = ref.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollTop / ITEM_HEIGHT);
+    const clamped = Math.max(0, Math.min(items.length - 1, idx));
+    if (clamped !== selectedIndex) onChange(clamped);
+    // Settle exact snap after the user has stopped (debounced — visual only).
     if (debounce.current) clearTimeout(debounce.current);
     debounce.current = setTimeout(() => {
-      const el = ref.current;
-      if (!el) return;
-      const idx = Math.round(el.scrollTop / ITEM_HEIGHT);
-      const clamped = Math.max(0, Math.min(items.length - 1, idx));
-      // Snap precisely to the row.
       if (Math.abs(el.scrollTop - clamped * ITEM_HEIGHT) > 0.5) {
         programmatic.current = true;
         el.scrollTo({ top: clamped * ITEM_HEIGHT, behavior: 'smooth' });
         setTimeout(() => { programmatic.current = false; }, 200);
       }
-      if (clamped !== selectedIndex) onChange(clamped);
     }, 110);
   };
 
