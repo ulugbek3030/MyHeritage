@@ -751,7 +751,10 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             const maxX = Math.max(...parentCentersX);
             const couplemidX = (minX + maxX) / 2;
             const lowestParentTop = Math.max(...parentPositions.map((pos) => pos.top));
-            const parentBottomY = lowestParentTop * (NODE_H / 2) + TOP_PAD + (NODE_H + 92) / 2;
+            // Start the drop at the couple-line height (mid of card), not at
+            // card bottom — otherwise there's a ~46px gap where the line
+            // visually disconnects from the couple-line above.
+            const parentBottomY = lowestParentTop * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
             const childCenterX = childPos.left * (NODE_W / 2) + NODE_W / 2;
             const childTopY = childPos.top * (NODE_H / 2) + TOP_PAD + (NODE_H - 92) / 2;
             const barY = parentBottomY + (childTopY - parentBottomY) / 2;
