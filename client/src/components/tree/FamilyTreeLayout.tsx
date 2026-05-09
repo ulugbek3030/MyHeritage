@@ -720,6 +720,67 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           );
         })}
 
+        {/* Polygamy second-parent line. relatives-tree draws the drop to a
+            polygamy kid from only ONE parent's column. This adds a second
+            line from the OTHER parent (the lineage one) so the kid reads
+            visually as a child of both. Same style as the extras
+            sibling-bar logic — just from the lineage-parent column with a
+            rounded corner into the kid's drop. */}
+        {(() => {
+          type Seg = { d: string; key: string };
+          const segs: Seg[] = [];
+          const cc = new Map<string, number>();
+          for (const r of relationships) {
+            if (r.category !== 'couple') continue;
+            cc.set(r.person1Id, (cc.get(r.person1Id) ?? 0) + 1);
+            cc.set(r.person2Id, (cc.get(r.person2Id) ?? 0) + 1);
+          }
+          const layoutNodeMap = new Map(layout.nodes.map((n) => [n.id, n]));
+          const extrasMap = new Map(extras.map((e) => [e.id, e]));
+          const lookup = (id: string) => layoutNodeMap.get(id) ?? extrasMap.get(id) ?? null;
+          for (const p of visiblePersons) {
+            const node = nodes.find((n) => n.id === p.id);
+            if (!node || node.parents.length < 2) continue;
+            const isPoly = node.parents.some((par) => (cc.get(par.id) ?? 0) > 1);
+            if (!isPoly) continue;
+            const childPos = lookup(p.id);
+            if (!childPos) continue;
+            const lineageParent = node.parents.find((par) => !secondaryEntries.has(par.id));
+            if (!lineageParent) continue;
+            const parentPos = lookup(lineageParent.id);
+            if (!parentPos) continue;
+            const parentCardBottomY = parentPos.top * (NODE_H / 2) + TOP_PAD + (NODE_H + 92) / 2;
+            const parentCenterX = (parentPos.left + 1) * (NODE_W / 2);
+            const childTopY = childPos.top * (NODE_H / 2) + TOP_PAD + (NODE_H - 92) / 2;
+            const childCenterX = (childPos.left + 1) * (NODE_W / 2);
+            const barY = parentCardBottomY + (childTopY - parentCardBottomY) / 2;
+            const horizSpan = Math.abs(childCenterX - parentCenterX);
+            let d: string;
+            if (horizSpan < 0.5) {
+              d = `M ${parentCenterX} ${parentCardBottomY} L ${parentCenterX} ${childTopY}`;
+            } else {
+              const arcR = Math.min(14, horizSpan / 2, Math.abs(barY - parentCardBottomY) / 2);
+              const dir = childCenterX >= parentCenterX ? 1 : -1;
+              d =
+                `M ${parentCenterX} ${parentCardBottomY} ` +
+                `L ${parentCenterX} ${barY - arcR} ` +
+                `Q ${parentCenterX} ${barY} ${parentCenterX + dir * arcR} ${barY} ` +
+                `L ${childCenterX - dir * arcR} ${barY} ` +
+                `Q ${childCenterX} ${barY} ${childCenterX} ${barY + arcR} ` +
+                `L ${childCenterX} ${childTopY}`;
+            }
+            segs.push({ d, key: `pp-${p.id}` });
+          }
+          if (!segs.length) return null;
+          return (
+            <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
+              {segs.map((s) => (
+                <path key={s.key} d={s.d} stroke="rgba(255,255,255,0.4)" strokeWidth="1.4" fill="none" strokeLinecap="butt" />
+              ))}
+            </svg>
+          );
+        })()}
+
         {/* Extras: persons relatives-tree dropped from the layout. The
             connector shape depends on which relation the extra was
             anchored to:
