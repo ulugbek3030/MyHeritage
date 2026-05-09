@@ -22,6 +22,10 @@ const TOP_PAD = 200;
 // kids being added below. 25% is enough breathing room; the canvas grows
 // naturally as descendants get added.
 const BOTTOM_PAD_RATIO = 0.25;
+// Mirror that on the X axis so the user can pan past the rightmost card
+// when adding new branches (otherwise overflow:auto stops at the last
+// laid-out column and the right side is unreachable).
+const SIDE_PAD_RATIO = 0.3;
 
 interface Props {
   persons: Person[];
@@ -395,9 +399,11 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   // canvas.width/height come back in HALF-units (same scale as node.left/top),
   // so the rendered box must be NODE_W/2 × NODE_H/2 per half-unit. Spacing
   // and canvas size are now both driven by NODE_W/NODE_H — no extra fudge.
-  // We pad the rendered canvas an extra 20% below the bottom generation so
-  // there's room to scroll past the lowest cards (helps when adding children).
-  const W = canvasW * (NODE_W / 2);
+  // We pad the rendered canvas an extra 25% below the bottom generation and
+  // 30% past the rightmost column so the user can pan past the tree edges
+  // when adding new branches.
+  const layoutW = canvasW * (NODE_W / 2);
+  const W = Math.round(layoutW * (1 + SIDE_PAD_RATIO));
   const layoutH = canvasH * (NODE_H / 2) + TOP_PAD;
   const H = Math.round(layoutH * (1 + BOTTOM_PAD_RATIO));
 
