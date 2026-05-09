@@ -19,10 +19,17 @@ photosRoutes.use(authenticate, authorizeTree);
 
 photosRoutes.post('/:personId/photo', upload.single('photo'), async (req, res, next) => {
   try {
+    // TEMPORARY: trace photo uploads — debugging "photo not added on create".
+    // eslint-disable-next-line no-console
+    console.log('[photo POST] tree=%s person=%s file=%s mime=%s size=%s', req.tree!.id, req.params.personId, req.file?.originalname ?? 'none', req.file?.mimetype ?? '-', req.file?.size ?? 0);
     if (!req.file) throw new ValidationError({}, 'photo file required');
     await setPhoto(req.params.personId, req.file.buffer, req.file.mimetype);
     res.json({ ok: true, photoUrl: `/api/trees/${req.tree!.id}/persons/${req.params.personId}/photo` });
-  } catch (e) { next(e); }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.log('[photo POST] failed:', (e as Error).message);
+    next(e);
+  }
 });
 
 photosRoutes.delete('/:personId/photo', async (req, res, next) => {
