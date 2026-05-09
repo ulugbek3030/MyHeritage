@@ -1,4 +1,4 @@
-.tree-stage { background: radial-gradient(80% 60% at 50% 0%, rgba(251,191,36,0.04), transparent 70%), #050507; border: 1px solid var(--border); border-radius: 22px; }
+.tree-stage { background: radial-gradient(80% 60% at 50% 0%, rgba(251,191,36,0.04), transparent 70%), #050507; border: 1px solid var(--border); border-radius: 22px; min-height: 75dvh; }
 .pcard { width: 72px; background: linear-gradient(180deg, var(--surface-2), #0f0f12); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 10px 6px 12px; text-align: center; font-size: 10px; position: relative; }
 .pcard.male::before, .pcard.female::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
 .pcard.male::before { background: linear-gradient(180deg, rgba(96,165,250,0.55), transparent 60%); }
@@ -104,9 +104,8 @@
 .tree-collapsed-pill {
   position: absolute;
   /* Card top edge is at ~46px inside the wrapper. Pill height is ~19px,
-     so top:24 leaves a ~3px gap — visually pill sits above the card,
-     just outside its border, almost touching. */
-  top: 24px;
+     so top:18 leaves a ~9px gap — pill sits clearly above the card. */
+  top: 18px;
   left: 50%;
   transform: translateX(-50%);
   display: inline-flex;
