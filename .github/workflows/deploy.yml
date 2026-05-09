@@ -33,8 +33,12 @@ jobs:
              sudo -u clickfamily -H pnpm --filter client run build 2>&1 | tail -5 && \
              sudo -u clickfamily -H pnpm --filter server run migrate 2>&1 | tail -3 && \
              systemctl restart clickfamily && \
-             sleep 2 && systemctl is-active clickfamily && \
-             curl -fsS http://127.0.0.1:3001/api/health'
+             systemctl is-active clickfamily && \
+             for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do \
+               sleep 1; \
+               if curl -fsS http://127.0.0.1:3001/api/health 2>/dev/null; then break; fi; \
+               if [ $i = 15 ]; then echo "[deploy] health check timed out after 15s" >&2; exit 1; fi; \
+             done'
         env:
           GITHUB_REF_NAME: ${{ github.ref_name }}
 
