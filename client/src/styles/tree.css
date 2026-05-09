@@ -103,9 +103,10 @@
    the card so it doesn't collide with .pcard-events (which lives top-right). */
 .tree-collapsed-pill {
   position: absolute;
-  /* Card top edge is at ~46px inside the wrapper. Pill height is ~19px,
-     so top:18 leaves a ~9px gap — pill sits clearly above the card. */
-  top: 18px;
+  /* Lifted above the card. Cards vary in height by content (single vs
+     multi-line names), so top:10 keeps a comfortable gap even for the
+     tallest card variant. */
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   display: inline-flex;
