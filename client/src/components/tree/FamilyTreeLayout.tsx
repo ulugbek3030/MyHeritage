@@ -606,78 +606,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
     }
   }
 
-  // Polygamy children: kids whose parents include someone with 2+ couples.
-  // Anchor them under the SECONDARY (married-in) parent's column, not the
-  // lineage parent's. So if Nodira (lineage) is married to both Olim and
-  // Alisher, her kids by Olim sit under Olim, her kids by Alisher under
-  // Alisher — visually each "branch" of children belongs to the partner
-  // who's unique for that branch. The T-line (drawn separately) still runs
-  // from the couple-mid down so both parents read as the kid's parents.
+  // (Polygamy retargeting was removed — too many edge-case conflicts when
+  // multiple polygamy branches coexist. Cards sit wherever relatives-tree
+  // places them, and the manual T-line below draws from couple-mid down to
+  // the child's natural position to make the second-parent connection
+  // visible.)
   const polygamyTargets = new Map<string, { x: number; y: number }>();
-  {
-    const cc = new Map<string, number>();
-    for (const r of relationships) {
-      if (r.category !== 'couple') continue;
-      cc.set(r.person1Id, (cc.get(r.person1Id) ?? 0) + 1);
-      cc.set(r.person2Id, (cc.get(r.person2Id) ?? 0) + 1);
-    }
-    const layoutNodeMap = new Map(layout.nodes.map((n) => [n.id, n]));
-    const extrasMap = new Map(extras.map((e) => [e.id, e]));
-    const lookupPos = (id: string): { left: number; top: number } | null => {
-      const lp = layoutNodeMap.get(id);
-      if (lp) return { left: lp.left, top: lp.top };
-      const ex = extrasMap.get(id);
-      return ex ? { left: ex.left, top: ex.top } : null;
-    };
-    const groups = new Map<string, { parentIds: string[]; kids: string[] }>();
-    for (const p of visiblePersons) {
-      const node = nodes.find((n) => n.id === p.id);
-      if (!node || node.parents.length < 2) continue;
-      const isPoly = node.parents.some((par) => (cc.get(par.id) ?? 0) > 1);
-      if (!isPoly) continue;
-      const parentIds = node.parents.map((par) => par.id).sort();
-      const key = parentIds.join('|');
-      if (!groups.has(key)) groups.set(key, { parentIds, kids: [] });
-      groups.get(key)!.kids.push(p.id);
-    }
-    for (const { parentIds, kids } of groups.values()) {
-      const parentPositions = parentIds.map((id) => ({ id, pos: lookupPos(id) }));
-      const validParents = parentPositions.filter((p) => p.pos) as Array<{ id: string; pos: { left: number; top: number } }>;
-      if (validParents.length < 2) continue;
-      // Pick the parent that is a "secondaryEntry" (married-in, ancestors
-      // folded into a pill). Falls back to the right-most parent if none of
-      // the listed parents is secondary.
-      const secondary = validParents.find((p) => secondaryEntries.has(p.id));
-      const anchor = secondary ?? validParents.reduce((acc, p) => (p.pos.left > acc.pos.left ? p : acc));
-      const baseCol = anchor.pos.left + 1; // centre column of anchor card
-      const newRow = Math.max(...validParents.map((p) => p.pos.top)) + 2;
-      // Spread multiple siblings horizontally around baseCol so cards don't
-      // stack on top of one another.
-      const N = kids.length;
-      const SPAN = 4; // half-units between adjacent kids — leaves room for kid's own partner
-      for (let i = 0; i < N; i++) {
-        const offset = (i - (N - 1) / 2) * SPAN;
-        const newLeft = baseCol - 1 + offset;
-        polygamyTargets.set(kids[i], {
-          x: newLeft * (NODE_W / 2),
-          y: newRow * (NODE_H / 2) + TOP_PAD,
-        });
-        // Pull the kid's first couple-partner (if any) right next to them
-        // so the couple stays visually together. relatives-tree would
-        // otherwise leave the partner at its own column far from the kid.
-        const kidNode = nodes.find((n) => n.id === kids[i]);
-        if (kidNode && kidNode.spouses.length > 0) {
-          const partnerId = kidNode.spouses[0].id;
-          if (!polygamyTargets.has(partnerId)) {
-            polygamyTargets.set(partnerId, {
-              x: (newLeft + 2) * (NODE_W / 2),
-              y: newRow * (NODE_H / 2) + TOP_PAD,
-            });
-          }
-        }
-      }
-    }
-  }
 
   let topMostParentlessRow = Infinity;
   for (const n of layout.nodes) {
