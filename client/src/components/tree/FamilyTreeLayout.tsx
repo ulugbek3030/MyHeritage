@@ -478,7 +478,9 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       }}
     >
       {(() => {
-        // TEMP: always on while we diagnose the missing-cards issue.
+        try {
+          if (!new URL(window.location.href).searchParams.has('debug')) return null;
+        } catch { return null; }
         return (
           <div style={{ position: 'fixed', top: 8, right: 8, zIndex: 100, padding: 8, background: 'rgba(0,0,0,0.85)', border: '1px solid var(--accent)', borderRadius: 8, fontSize: 9, fontFamily: 'ui-monospace, Menlo, monospace', color: 'var(--text)', maxWidth: 240, maxHeight: '60vh', overflow: 'auto' }}>
             <div style={{ color: 'var(--accent)', fontWeight: 800, marginBottom: 4 }}>tree debug</div>
