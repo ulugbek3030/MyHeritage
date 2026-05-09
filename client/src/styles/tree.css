@@ -23,7 +23,7 @@
    sits cleanly in the same NODE_W × NODE_H grid wrapper. */
 /* Notched-card placeholder: SVG body with a U-cutout at top, '+' button
    sits half above / half in the notch, label tucks under. */
-.pcard-placeholder { position: relative; width: 60px; height: 82px; padding-top: 18px; cursor: pointer; }
+.pcard-placeholder { position: relative; width: 60px; height: 82px; padding-top: 18px; cursor: pointer; text-align: center; }
 .pcard-placeholder-notch { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transition: filter 0.15s; }
 .pcard-placeholder-notch path { transition: stroke 0.15s, fill 0.15s; }
 .pcard-placeholder:hover .pcard-placeholder-notch path,
@@ -40,7 +40,7 @@
 }
 .pcard-placeholder:hover .pcard-placeholder-plus,
 .pcard-placeholder:active .pcard-placeholder-plus { border-color: rgba(251,191,36,0.55); color: rgba(251,191,36,1); background: #050507; }
-.pcard-placeholder-label { position: relative; padding: 18px 4px 8px; font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.7); line-height: 1.2; text-align: center; letter-spacing: -0.005em; }
+.pcard-placeholder-label { display: block; position: relative; padding: 18px 4px 8px; font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.7); line-height: 1.2; text-align: center; letter-spacing: -0.005em; }
 
 /* Onboarding hint that bobs above the "Add mother" placeholder until the
    user has added their first relative. The wrapping div handles positioning
