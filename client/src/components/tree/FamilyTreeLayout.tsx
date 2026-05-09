@@ -717,6 +717,51 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           );
         })}
 
+        {/* Multi-parent fix: when a child has 2+ parents both visible in the
+            layout on the same row (typical polygamy / blended-family case
+            where relatives-tree only draws a connector from one parent to
+            the child), draw the missing T-junction from couple-midpoint
+            down to the child. This makes the child read visually as a child
+            of BOTH parents, not just one. */}
+        {(() => {
+          type Seg = { d: string; key: string };
+          const segs: Seg[] = [];
+          for (const p of visiblePersons) {
+            const node = nodes.find((n) => n.id === p.id);
+            if (!node || node.parents.length < 2) continue;
+            const childPos = layoutById.get(p.id);
+            if (!childPos) continue;
+            const parentPositions = node.parents
+              .map((par) => layoutById.get(par.id))
+              .filter(Boolean) as Array<{ left: number; top: number }>;
+            if (parentPositions.length < 2) continue;
+            const sameRow = parentPositions.every((pos) => pos.top === parentPositions[0].top);
+            if (!sameRow) continue;
+            const parentCentersX = parentPositions.map((pos) => (pos.left + 1) * (NODE_W / 2));
+            const minX = Math.min(...parentCentersX);
+            const maxX = Math.max(...parentCentersX);
+            const couplemidX = (minX + maxX) / 2;
+            const parentBottomY = parentPositions[0].top * (NODE_H / 2) + TOP_PAD + (NODE_H + 92) / 2;
+            const childCenterX = childPos.left * (NODE_W / 2) + NODE_W / 2;
+            const childTopY = childPos.top * (NODE_H / 2) + TOP_PAD + (NODE_H - 92) / 2;
+            const barY = parentBottomY + (childTopY - parentBottomY) / 2;
+            // T-junction: drop from couple-mid → bar at sibling-bar Y → over
+            // to child column (rounded corner) → drop into child top.
+            const arcR = Math.min(14, Math.abs(childCenterX - couplemidX) / 2);
+            const direction = childCenterX >= couplemidX ? 1 : -1;
+            const d = `M ${couplemidX} ${parentBottomY} L ${couplemidX} ${barY} L ${childCenterX - direction * arcR} ${barY} Q ${childCenterX} ${barY} ${childCenterX} ${barY + arcR} L ${childCenterX} ${childTopY}`;
+            segs.push({ d, key: `mp-${p.id}` });
+          }
+          if (!segs.length) return null;
+          return (
+            <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
+              {segs.map((s) => (
+                <path key={s.key} d={s.d} stroke="rgba(255,255,255,0.4)" strokeWidth="1.4" fill="none" strokeLinecap="butt" />
+              ))}
+            </svg>
+          );
+        })()}
+
         {/* Extras: persons relatives-tree dropped from the layout. The
             connector shape depends on which relation the extra was
             anchored to:
