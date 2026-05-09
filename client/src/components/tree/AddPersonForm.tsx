@@ -189,6 +189,12 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
       setMaidenName(adjustSurnameForGender(tLast, 'female'));
       setLastName('');
     }
+    // Brother/sister: pre-fill the year input with the target's birthYear
+    // as a sensible default — siblings' DOBs typically cluster within a
+    // few years. User can still type a different year or pick a full date.
+    if (m === 'sibling' && targetPerson.birthYear) {
+      setYear(String(targetPerson.birthYear));
+    }
     setStep('form');
   };
 

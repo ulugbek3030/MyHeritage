@@ -75,12 +75,6 @@ export const createPerson = async (treeId: string, input: CreatePersonInput) => 
 };
 
 export const updatePerson = async (id: string, fields: Partial<CreatePersonInput>) => {
-  // TEMPORARY DEBUG: log incoming birthDate so we can confirm what the
-  // client actually sends on save (was suspected of being shifted -1 day).
-  if (fields.birthDate !== undefined) {
-    // eslint-disable-next-line no-console
-    console.log('[updatePerson] id=%s birthDate=%j birthYear=%j', id, fields.birthDate, fields.birthYear);
-  }
   const map: Record<string, string> = { firstName: 'first_name', lastName: 'last_name', middleName: 'middle_name', maidenName: 'maiden_name', gender: 'gender', birthDate: 'birth_date', birthYear: 'birth_year', birthDateKnown: 'birth_date_known', isAlive: 'is_alive', deathDate: 'death_date', deathYear: 'death_year', deathDateKnown: 'death_date_known', note: 'note', phone: 'phone', address: 'address' };
   const sets: string[] = []; const params: unknown[] = []; let i = 1;
   for (const [k, v] of Object.entries(fields)) {
