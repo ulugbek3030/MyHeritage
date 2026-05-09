@@ -726,13 +726,20 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         {(() => {
           type Seg = { d: string; key: string };
           const segs: Seg[] = [];
+          // Combine layout positions with extras (relatives-tree drops some
+          // nodes; our extras logic places them manually). For multi-parent
+          // children we want positions regardless of which path the parent
+          // came through.
+          const posMap = new Map<string, { left: number; top: number }>();
+          for (const n of layout.nodes) posMap.set(n.id, { left: n.left, top: n.top });
+          for (const e of extras) posMap.set(e.id, { left: e.left, top: e.top });
           for (const p of visiblePersons) {
             const node = nodes.find((n) => n.id === p.id);
             if (!node || node.parents.length < 2) continue;
-            const childPos = layoutById.get(p.id);
+            const childPos = posMap.get(p.id);
             if (!childPos) continue;
             const parentPositions = node.parents
-              .map((par) => layoutById.get(par.id))
+              .map((par) => posMap.get(par.id))
               .filter(Boolean) as Array<{ left: number; top: number }>;
             if (parentPositions.length < 2) continue;
             const sameRow = parentPositions.every((pos) => pos.top === parentPositions[0].top);
