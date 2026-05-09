@@ -267,12 +267,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       const parentTop = parentTops.length ? Math.max(...parentTops) : childPos.top - 2;
       suppressDropCols.push({
         col: childPos.left + 1,
-        // Strictly BELOW the parent row — otherwise this filter eats the
-        // couple-line whose endpoint sits at (parent_col, parent_row),
-        // since when the polygamy child happens to land in the same column
-        // as one of the parents, parent_col == child_col and the couple
-        // endpoint matches.
-        yMin: parentTop + 0.5,
+        // Suppress only segments BELOW the parent's card. Each card spans
+        // 2 half-units (top..top+2), and relatives-tree puts the couple-line
+        // at the card's mid-Y (parent.top + 1). Setting yMin to
+        // parent.top + 2 (just below card bottom) keeps the couple-line
+        // visible while still removing the wrong drop to the polygamy kid.
+        yMin: parentTop + 2,
         yMax: childPos.top + 0.5,
       });
     }
