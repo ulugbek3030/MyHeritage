@@ -16,7 +16,7 @@ export const useZoom = (containerRef: React.RefObject<HTMLElement>, onScale?: (s
     const apply = () => {
       const s = scale.current;
       el.style.transform = `scale(${s})`;
-      el.style.transformOrigin = 'top center';
+      el.style.transformOrigin = 'top left';
       onScaleRef.current?.(s);
     };
     const tick = () => {
@@ -95,8 +95,9 @@ export const useZoom = (containerRef: React.RefObject<HTMLElement>, onScale?: (s
       const el = containerRef.current;
       if (el) {
         el.style.transform = `scale(${clamped})`;
-        el.style.transformOrigin = 'top center';
+        el.style.transformOrigin = 'top left';
       }
+      onScaleRef.current?.(clamped);
     },
   };
 };
