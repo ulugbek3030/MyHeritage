@@ -200,16 +200,24 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         if (spouse) rels.push({ category: 'parent_child', otherPersonId: spouse.id, role: 'child', childRelation: 'biological' });
       } else if (mode === 'spouse') {
         rels.push({ category: 'couple', otherPersonId: targetPerson.id, role: 'spouse', coupleStatus: 'married' });
-        // If the target already has children, treat the new spouse as their
-        // co-parent. That's the typical case (you're filling in your real
-        // parents, not modelling step-families), and without this link the
-        // childless spouse ends up dangling outside the layout because
-        // relatives-tree has nothing to anchor her to.
-        const targetChildren = relationships
-          .filter((r) => r.category === 'parent_child' && r.person1Id === targetPerson.id)
-          .map((r) => r.person2Id);
-        for (const childId of targetChildren) {
-          rels.push({ category: 'parent_child', otherPersonId: childId, role: 'parent', childRelation: 'biological' });
+        // Only auto-link to existing children if the target has NO current
+        // spouse. In that case the new partner is plausibly the kids'
+        // co-parent (you're filling in real parents, not modelling
+        // step-families). When a spouse already exists, the new partner is
+        // a second one (polygamy / re-marriage) and the existing children
+        // most likely belong to the FIRST partner — auto-linking would
+        // wrongly reparent them. The user can attach children explicitly
+        // to the new partnership afterwards.
+        const targetHasSpouse = relationships.some(
+          (r) => r.category === 'couple' && (r.person1Id === targetPerson.id || r.person2Id === targetPerson.id)
+        );
+        if (!targetHasSpouse) {
+          const targetChildren = relationships
+            .filter((r) => r.category === 'parent_child' && r.person1Id === targetPerson.id)
+            .map((r) => r.person2Id);
+          for (const childId of targetChildren) {
+            rels.push({ category: 'parent_child', otherPersonId: childId, role: 'parent', childRelation: 'biological' });
+          }
         }
       }
 
