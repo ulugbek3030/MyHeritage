@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import type { Person } from '../../types';
+import { useState, useEffect, useMemo } from 'react';
+import type { Person, Relationship } from '../../types';
 import { updatePerson } from '../../api/persons';
+import { createRelationship, deleteRelationship } from '../../api/relationships';
 import { BottomSheet } from '../ui/BottomSheet';
 import { DateWheelPicker } from '../ui/DateWheelPicker';
 import '../../styles/form.css';
@@ -10,10 +11,13 @@ interface Props {
   onClose: () => void;
   treeId: string;
   person: Person;
+  /** Full tree person + relationship lists. Used to show / edit parents. */
+  persons?: Person[];
+  relationships?: Relationship[];
   onSaved: () => void;
 }
 
-export const EditPersonForm = ({ open, onClose, treeId, person, onSaved }: Props) => {
+export const EditPersonForm = ({ open, onClose, treeId, person, persons, relationships, onSaved }: Props) => {
   const [gender, setGender] = useState<'male' | 'female'>(person.gender);
   const [firstName, setFirstName] = useState(person.firstName);
   const [lastName, setLastName] = useState(person.lastName ?? '');
@@ -27,6 +31,27 @@ export const EditPersonForm = ({ open, onClose, treeId, person, onSaved }: Props
   const [photo, setPhoto] = useState<File | null>(null);
   const [note, setNote] = useState<string>(person.note ?? '');
   const [busy, setBusy] = useState(false);
+
+  // Existing parent links + candidate list for "attach another parent".
+  const parentLinks = useMemo(() =>
+    (relationships ?? []).filter((r) => r.category === 'parent_child' && r.person2Id === person.id),
+    [relationships, person.id]
+  );
+  const currentParents = useMemo(
+    () => parentLinks.map((r) => (persons ?? []).find((p) => p.id === r.person1Id)).filter(Boolean) as Person[],
+    [parentLinks, persons]
+  );
+  const hasFather = currentParents.some((p) => p.gender === 'male');
+  const hasMother = currentParents.some((p) => p.gender === 'female');
+  // Candidates = persons not already a parent and not the person themselves.
+  const parentCandidates = useMemo(() => {
+    if (!persons) return [];
+    const currentIds = new Set(currentParents.map((p) => p.id));
+    return persons.filter((p) => p.id !== person.id && !currentIds.has(p.id));
+  }, [persons, currentParents, person.id]);
+  const [parentBusy, setParentBusy] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerGender, setPickerGender] = useState<'male' | 'female' | null>(null);
 
   // Re-sync state if the prop person flips while the sheet is open.
   useEffect(() => {
@@ -43,6 +68,43 @@ export const EditPersonForm = ({ open, onClose, treeId, person, onSaved }: Props
     setPhoto(null);
     setNote(person.note ?? '');
   }, [person.id]);
+
+  const attachParent = async (parentId: string) => {
+    setParentBusy(true);
+    try {
+      await createRelationship(treeId, {
+        category: 'parent_child',
+        person1Id: parentId,
+        person2Id: person.id,
+        childRelation: 'biological',
+      });
+      onSaved();
+      setPickerOpen(false);
+      setPickerGender(null);
+    } catch (err) {
+      console.error('[EditPerson] attach parent failed', err);
+      const msg = err instanceof Error ? err.message : 'неизвестная ошибка';
+      alert(`Не удалось прикрепить родителя: ${msg}`);
+    } finally {
+      setParentBusy(false);
+    }
+  };
+
+  const detachParent = async (parentPersonId: string) => {
+    const link = parentLinks.find((r) => r.person1Id === parentPersonId);
+    if (!link) return;
+    setParentBusy(true);
+    try {
+      await deleteRelationship(treeId, link.id);
+      onSaved();
+    } catch (err) {
+      console.error('[EditPerson] detach parent failed', err);
+      const msg = err instanceof Error ? err.message : 'неизвестная ошибка';
+      alert(`Не удалось отвязать родителя: ${msg}`);
+    } finally {
+      setParentBusy(false);
+    }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,6 +249,79 @@ export const EditPersonForm = ({ open, onClose, treeId, person, onSaved }: Props
           onChange={(e) => setNote(e.target.value)}
           style={{ resize: 'vertical', minHeight: 70, fontFamily: 'inherit', lineHeight: 1.4 }}
         />
+
+        {persons && relationships && (
+          <>
+            <div style={dateLabel}>Родители</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+              {currentParents.length === 0 && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Не указаны</div>
+              )}
+              {currentParents.map((p) => (
+                <span key={p.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', fontSize: 12, fontWeight: 700 }}>
+                  {p.gender === 'female' ? '♀' : '♂'} {p.firstName}{p.lastName ? ' ' + p.lastName : ''}
+                  <button
+                    type="button"
+                    onClick={() => detachParent(p.id)}
+                    disabled={parentBusy}
+                    aria-label={`Отвязать ${p.firstName}`}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: parentBusy ? 'not-allowed' : 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              {!hasFather && (
+                <button
+                  type="button"
+                  onClick={() => { setPickerGender('male'); setPickerOpen(true); }}
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px dashed rgba(96,165,250,0.45)', background: 'rgba(96,165,250,0.06)', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  + прикрепить отца
+                </button>
+              )}
+              {!hasMother && (
+                <button
+                  type="button"
+                  onClick={() => { setPickerGender('female'); setPickerOpen(true); }}
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px dashed rgba(244,114,182,0.45)', background: 'rgba(244,114,182,0.06)', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  + прикрепить мать
+                </button>
+              )}
+            </div>
+            {pickerOpen && (
+              <div style={{ marginBottom: 14, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                    Выберите {pickerGender === 'male' ? 'отца' : 'мать'}
+                  </div>
+                  <button type="button" onClick={() => setPickerOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>×</button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
+                  {parentCandidates.filter((c) => !pickerGender || c.gender === pickerGender).map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => attachParent(c.id)}
+                      disabled={parentBusy}
+                      style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)', color: 'var(--text)', fontSize: 13, cursor: parentBusy ? 'not-allowed' : 'pointer' }}
+                    >
+                      {c.gender === 'female' ? '♀' : '♂'} {c.firstName}{c.lastName ? ' ' + c.lastName : ''}{c.birthYear ? ` · ${c.birthYear}` : ''}
+                    </button>
+                  ))}
+                  {parentCandidates.filter((c) => !pickerGender || c.gender === pickerGender).length === 0 && (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 4px' }}>
+                      Нет подходящих людей в дереве. Сначала добавьте {pickerGender === 'male' ? 'мужчину' : 'женщину'}.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
 
         <div style={dateLabel}>Фото</div>
         <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} className="auth-input" />

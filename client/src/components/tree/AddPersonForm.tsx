@@ -81,14 +81,27 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
   const father = existingParents.find((p) => p.gender === 'male');
   const mother = existingParents.find((p) => p.gender === 'female');
 
-  const spouse: Person | undefined = useMemo(() => {
-    const r = relationships.find(
-      (rr) => rr.category === 'couple' && (rr.person1Id === targetPerson.id || rr.person2Id === targetPerson.id)
-    );
-    if (!r) return undefined;
-    const otherId = r.person1Id === targetPerson.id ? r.person2Id : r.person1Id;
-    return persons.find((p) => p.id === otherId);
+  const spouses: Person[] = useMemo(() => {
+    return relationships
+      .filter((rr) => rr.category === 'couple' && (rr.person1Id === targetPerson.id || rr.person2Id === targetPerson.id))
+      .map((rr) => {
+        const otherId = rr.person1Id === targetPerson.id ? rr.person2Id : rr.person1Id;
+        return persons.find((p) => p.id === otherId);
+      })
+      .filter(Boolean) as Person[];
   }, [relationships, persons, targetPerson.id]);
+  // The first partner is treated as the canonical "spouse" for the auto-fill
+  // hints (middle name from spouse's father, etc). When the user is adding
+  // a child, the actual second-parent link is chosen via secondParentId
+  // below — defaults to the first partner but can be re-selected when
+  // target has multiple.
+  const spouse: Person | undefined = spouses[0];
+
+  const [secondParentId, setSecondParentId] = useState<string | null>(spouses[0]?.id ?? null);
+  // Re-derive when target changes (different person → different spouse list).
+  useEffect(() => {
+    setSecondParentId(spouses[0]?.id ?? null);
+  }, [targetPerson.id, spouses]);
 
   const otherParent = existingParents.find((p) => p.gender !== gender);
 
@@ -197,7 +210,12 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         }
       } else if (mode === 'child') {
         rels.push({ category: 'parent_child', otherPersonId: targetPerson.id, role: 'child', childRelation: 'biological' });
-        if (spouse) rels.push({ category: 'parent_child', otherPersonId: spouse.id, role: 'child', childRelation: 'biological' });
+        // secondParentId is chosen explicitly in the form when target has
+        // multiple partners. Default = first partner; user can switch or
+        // clear.
+        if (secondParentId && secondParentId !== targetPerson.id) {
+          rels.push({ category: 'parent_child', otherPersonId: secondParentId, role: 'child', childRelation: 'biological' });
+        }
       } else if (mode === 'spouse') {
         rels.push({ category: 'couple', otherPersonId: targetPerson.id, role: 'spouse', coupleStatus: 'married' });
         // Only auto-link to existing children if the target has NO current
@@ -414,10 +432,49 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
               {existingParents.map((p) => p.firstName).join(' + ')}
             </div>
           )}
-          {mode === 'child' && spouse && (
+          {mode === 'child' && spouses.length > 0 && (
             <div style={{ padding: '10px 12px', marginBottom: 14, borderRadius: 12, background: 'linear-gradient(180deg,#1c1409,#0e0a04)', border: '1px solid rgba(251,191,36,0.25)', fontSize: 11, color: 'var(--text)' }}>
-              <span style={{ color: 'var(--accent)', fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: 1.2 }}>2-й родитель</span>{' '}
-              <b>{spouse.firstName}</b>
+              <div style={{ color: 'var(--accent)', fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6 }}>2-й родитель</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {spouses.map((sp) => {
+                  const active = secondParentId === sp.id;
+                  return (
+                    <button
+                      key={sp.id}
+                      type="button"
+                      onClick={() => setSecondParentId(active ? null : sp.id)}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: 8,
+                        border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+                        background: active ? 'rgba(251,191,36,0.16)' : 'rgba(255,255,255,0.04)',
+                        color: active ? 'var(--accent)' : 'var(--text)',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {active ? '✓ ' : ''}{sp.firstName}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => setSecondParentId(null)}
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    border: secondParentId === null ? '1px solid var(--text-muted)' : '1px solid var(--border)',
+                    background: secondParentId === null ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)',
+                    color: 'var(--text-muted)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  без 2-го
+                </button>
+              </div>
             </div>
           )}
 

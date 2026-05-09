@@ -104,6 +104,8 @@ export const SubfamilyPage = () => {
           onClose={() => setEditOpen(null)}
           treeId={treeId!}
           person={editOpen}
+          persons={data.persons}
+          relationships={data.relationships}
           onSaved={reload}
         />
       )}
