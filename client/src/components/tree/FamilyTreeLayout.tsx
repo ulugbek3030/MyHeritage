@@ -267,7 +267,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       const parentTop = parentTops.length ? Math.max(...parentTops) : childPos.top - 2;
       suppressDropCols.push({
         col: childPos.left + 1,
-        yMin: parentTop - 0.5,
+        // Strictly BELOW the parent row — otherwise this filter eats the
+        // couple-line whose endpoint sits at (parent_col, parent_row),
+        // since when the polygamy child happens to land in the same column
+        // as one of the parents, parent_col == child_col and the couple
+        // endpoint matches.
+        yMin: parentTop + 0.5,
         yMax: childPos.top + 0.5,
       });
     }
