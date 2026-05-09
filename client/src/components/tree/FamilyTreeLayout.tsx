@@ -261,6 +261,17 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       // Range strictly below the parent's card so the couple-line itself
       // (which sits at parent.top + 1) survives.
       suppressBoxes.push({ col: childPos.left + 1, yMin: parentTop + 2, yMax: childPos.top + 0.5 });
+      // Also kill the couple-mid stub (relatives-tree's drop from
+      // couple-mid X down to the sibling-bar) — without this it dangles
+      // in mid-air after the rest of the path is removed.
+      const parentLefts = parents
+        .map((id) => layout.nodes.find((n) => n.id === id))
+        .filter(Boolean) as Array<{ left: number; top: number }>;
+      if (parentLefts.length >= 2) {
+        const cols = parentLefts.map((n) => n.left + 1);
+        const coupleMidCol = (Math.min(...cols) + Math.max(...cols)) / 2;
+        suppressBoxes.push({ col: coupleMidCol, yMin: parentTop + 2, yMax: childPos.top + 0.5 });
+      }
     }
     const matchesSuppress = (x: number, y: number) =>
       suppressBoxes.some((b) => Math.abs(b.col - x) < 0.5 && y >= b.yMin && y <= b.yMax);
