@@ -23,10 +23,14 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
   const [lastName, setLastName] = useState(person.lastName ?? '');
   const [middleName, setMiddleName] = useState(person.middleName ?? '');
   const [maidenName, setMaidenName] = useState(person.maidenName ?? '');
-  const [birthDate, setBirthDate] = useState(person.birthDate ?? '');
+  // Server may serialise PG DATE columns as a full ISO timestamp
+  // ("YYYY-MM-DDT00:00:00.000Z"); the wheel-picker / save path want only
+  // the YYYY-MM-DD prefix.
+  const isoDate = (v?: string | null) => (v ? v.slice(0, 10) : '');
+  const [birthDate, setBirthDate] = useState(isoDate(person.birthDate));
   const [year, setYear] = useState(person.birthDate ? '' : (person.birthYear ? String(person.birthYear) : ''));
   const [isAlive, setIsAlive] = useState(person.isAlive);
-  const [deathDate, setDeathDate] = useState(person.deathDate ?? '');
+  const [deathDate, setDeathDate] = useState(isoDate(person.deathDate));
   const [deathYear, setDeathYear] = useState(person.deathDate ? '' : (person.deathYear ? String(person.deathYear) : ''));
   const [photo, setPhoto] = useState<File | null>(null);
   const [note, setNote] = useState<string>(person.note ?? '');
@@ -60,10 +64,10 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
     setLastName(person.lastName ?? '');
     setMiddleName(person.middleName ?? '');
     setMaidenName(person.maidenName ?? '');
-    setBirthDate(person.birthDate ?? '');
+    setBirthDate(isoDate(person.birthDate));
     setYear(person.birthDate ? '' : (person.birthYear ? String(person.birthYear) : ''));
     setIsAlive(person.isAlive);
-    setDeathDate(person.deathDate ?? '');
+    setDeathDate(isoDate(person.deathDate));
     setDeathYear(person.deathDate ? '' : (person.deathYear ? String(person.deathYear) : ''));
     setPhoto(null);
     setNote(person.note ?? '');

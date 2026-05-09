@@ -106,7 +106,11 @@ interface Props {
 
 export const DateWheelPicker = ({ value, onChange, minYear = 1900, maxYear = new Date().getFullYear() }: Props) => {
   const today = new Date();
-  const [yStr, mStr, dStr] = value ? value.split('-') : [];
+  // Server may serialise PG DATE as a full ISO timestamp
+  // ("1987-05-18T00:00:00.000Z"). Take only the YYYY-MM-DD prefix so split
+  // doesn't produce a junky dStr like "18T00:00:00.000Z".
+  const safe = value ? value.slice(0, 10) : '';
+  const [yStr, mStr, dStr] = safe ? safe.split('-') : [];
   const year = yStr ? Number(yStr) : today.getFullYear();
   const month = mStr ? Number(mStr) : today.getMonth() + 1;
   const day = dStr ? Number(dStr) : today.getDate();
