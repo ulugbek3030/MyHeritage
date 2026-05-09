@@ -635,12 +635,6 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       if (!node || node.parents.length < 2) continue;
       const isPoly = node.parents.some((par) => (cc.get(par.id) ?? 0) > 1);
       if (!isPoly) continue;
-      // Skip retarget if the kid is already in a couple of their own —
-      // moving them to the anchor parent's column would tear them away
-      // from their own partner (relatives-tree positions partners
-      // adjacent). Let the library lay this branch out, my custom T-line
-      // and suppression will still add the missing parent connector.
-      if (node.spouses.length > 0) continue;
       const parentIds = node.parents.map((par) => par.id).sort();
       const key = parentIds.join('|');
       if (!groups.has(key)) groups.set(key, { parentIds, kids: [] });
@@ -660,7 +654,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       // Spread multiple siblings horizontally around baseCol so cards don't
       // stack on top of one another.
       const N = kids.length;
-      const SPAN = 2; // half-units between adjacent kids
+      const SPAN = 4; // half-units between adjacent kids — leaves room for kid's own partner
       for (let i = 0; i < N; i++) {
         const offset = (i - (N - 1) / 2) * SPAN;
         const newLeft = baseCol - 1 + offset;
@@ -668,6 +662,19 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           x: newLeft * (NODE_W / 2),
           y: newRow * (NODE_H / 2) + TOP_PAD,
         });
+        // Pull the kid's first couple-partner (if any) right next to them
+        // so the couple stays visually together. relatives-tree would
+        // otherwise leave the partner at its own column far from the kid.
+        const kidNode = nodes.find((n) => n.id === kids[i]);
+        if (kidNode && kidNode.spouses.length > 0) {
+          const partnerId = kidNode.spouses[0].id;
+          if (!polygamyTargets.has(partnerId)) {
+            polygamyTargets.set(partnerId, {
+              x: (newLeft + 2) * (NODE_W / 2),
+              y: newRow * (NODE_H / 2) + TOP_PAD,
+            });
+          }
+        }
       }
     }
   }
