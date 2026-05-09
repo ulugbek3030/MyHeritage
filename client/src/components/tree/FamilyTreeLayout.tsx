@@ -602,13 +602,10 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         height: '100%',
         minHeight: 360,
         cursor: 'grab',
-        // Centre the content box when it's smaller than the viewport (e.g. a
-        // 1-person tree). `safe` keyword falls back to start-alignment when
-        // content overflows, so larger trees stay scrollable instead of
-        // getting clipped at top/left.
-        display: 'flex',
-        justifyContent: 'safe center',
-        alignItems: 'safe center',
+        // No flex-centering here: the auto-fit useEffect explicitly scrolls
+        // the owner card into view, and flex-centering would visibly snap
+        // the frame's anchor when it crosses the viewport-fits-or-not
+        // boundary mid-zoom. Keeping the frame at top-left avoids that.
       }}
     >
       {(() => {
