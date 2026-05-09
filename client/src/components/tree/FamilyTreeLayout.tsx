@@ -574,9 +574,9 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   }
 
   // Polygamy children: kids whose parents include someone with 2+ couples.
-  // We re-position their cards so the card's centre lands at the parents'
-  // couple-mid X — that turns the T-junction into a clean straight drop and
-  // visually anchors the kid between both parents instead of under one.
+  // Group siblings by their parent-pair and spread them horizontally around
+  // the couple-mid X (otherwise N kids of the same polygamous pair stack on
+  // top of each other at the same coordinates and only the last one renders).
   const polygamyTargets = new Map<string, { x: number; y: number }>();
   {
     const cc = new Map<string, number>();
@@ -593,23 +593,38 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       const ex = extrasMap.get(id);
       return ex ? { left: ex.left, top: ex.top } : null;
     };
+    // Group kids by parent-pair.
+    const groups = new Map<string, { parentIds: string[]; kids: string[] }>();
     for (const p of visiblePersons) {
       const node = nodes.find((n) => n.id === p.id);
       if (!node || node.parents.length < 2) continue;
       const isPoly = node.parents.some((par) => (cc.get(par.id) ?? 0) > 1);
       if (!isPoly) continue;
-      const parentPositions = node.parents
-        .map((par) => lookupPos(par.id))
+      const parentIds = node.parents.map((par) => par.id).sort();
+      const key = parentIds.join('|');
+      if (!groups.has(key)) groups.set(key, { parentIds, kids: [] });
+      groups.get(key)!.kids.push(p.id);
+    }
+    for (const { parentIds, kids } of groups.values()) {
+      const parentPositions = parentIds
+        .map((id) => lookupPos(id))
         .filter(Boolean) as Array<{ left: number; top: number }>;
       if (parentPositions.length < 2) continue;
       const parentCenterCols = parentPositions.map((pos) => pos.left + 1);
       const midCol = (Math.min(...parentCenterCols) + Math.max(...parentCenterCols)) / 2;
-      const newLeft = midCol - 1;
       const newRow = Math.max(...parentPositions.map((pos) => pos.top)) + 2;
-      polygamyTargets.set(p.id, {
-        x: newLeft * (NODE_W / 2),
-        y: newRow * (NODE_H / 2) + TOP_PAD,
-      });
+      // Spread N kids across columns centred on midCol with spacing of 2
+      // half-units (= NODE_W) so adjacent kids don't overlap.
+      const N = kids.length;
+      const SPAN = 2; // half-units between adjacent kids
+      for (let i = 0; i < N; i++) {
+        const offset = (i - (N - 1) / 2) * SPAN;
+        const newLeft = midCol - 1 + offset;
+        polygamyTargets.set(kids[i], {
+          x: newLeft * (NODE_W / 2),
+          y: newRow * (NODE_H / 2) + TOP_PAD,
+        });
+      }
     }
   }
 
