@@ -49,10 +49,32 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onE
 
       {/* Other details — centered values, no labels. */}
       {(() => {
-        const yr = new Date().getUTCFullYear();
-        const age = person.isAlive && person.birthYear ? yr - person.birthYear
-          : !person.isAlive && person.birthYear && person.deathYear ? person.deathYear - person.birthYear
-          : null;
+        // Compute age, accounting for whether the birthday has happened this
+        // year. With only year available, fall back to year-diff (rough).
+        const today = new Date();
+        const computeAge = (refY: number, refM: number, refD: number): number | null => {
+          if (person.birthDateKnown && person.birthDate) {
+            const iso = person.birthDate.slice(0, 10);
+            const [byStr, bmStr, bdStr] = iso.split('-');
+            const by = Number(byStr); const bm = Number(bmStr); const bd = Number(bdStr);
+            if (!by || !bm || !bd) return null;
+            let age = refY - by;
+            if (refM < bm || (refM === bm && refD < bd)) age--;
+            return age;
+          }
+          if (person.birthYear) return refY - person.birthYear;
+          return null;
+        };
+        const age = person.isAlive
+          ? computeAge(today.getFullYear(), today.getMonth() + 1, today.getDate())
+          : (person.deathDate
+              ? (() => {
+                  const [dyStr, dmStr, ddStr] = person.deathDate!.slice(0, 10).split('-');
+                  return computeAge(Number(dyStr), Number(dmStr), Number(ddStr));
+                })()
+              : person.deathYear
+                ? (person.birthYear ? person.deathYear - person.birthYear : null)
+                : null);
         const items: Array<string | null> = [
           age !== null ? `${age} ${age % 10 === 1 && age % 100 !== 11 ? 'год' : age % 10 >= 2 && age % 10 <= 4 && (age % 100 < 10 || age % 100 >= 20) ? 'года' : 'лет'}${person.isAlive ? '' : ' (на момент смерти)'}` : null,
           person.gender === 'male' ? 'Мужской' : 'Женский',
