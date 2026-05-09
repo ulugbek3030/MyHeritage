@@ -356,8 +356,15 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   // render — instead the JSX uses `calc(W * var(--cf-zoom))` and onScale
   // updates ONLY the CSS variable. React never sets that variable, so the
   // value survives re-renders cleanly.
+  // IMPORTANT: skip the frame-size update WHILE the user is pinching. The
+  // browser reflow caused by changing frame width/height in-gesture fights
+  // with the active pinch and makes the canvas tremble. The tick keeps
+  // running after fingers lift (LERP settle) and the final apply commits
+  // the new size in one go — by then the gesture is done and there's no
+  // more conflict.
   const frame = useRef<HTMLDivElement>(null);
   const zoom = useZoom(content as React.RefObject<HTMLElement>, (s: number) => {
+    if (content.current?.dataset.pinching === '1') return;
     frame.current?.style.setProperty('--cf-zoom', String(s));
   });
   useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
