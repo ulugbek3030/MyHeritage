@@ -37,6 +37,8 @@ interface Props {
   onPlusClick?: (id: string) => void;
   /** Click on an empty parent slot above a person without parents. */
   onAddParent?: (personId: string, gender: 'male' | 'female') => void;
+  /** Click on the collapsed-ancestors pills above a married-in spouse. */
+  onDiveSubfamily?: (personId: string) => void;
 }
 
 // Dashed-card placeholder with a U-shaped notch at the top so the '+' button
@@ -64,7 +66,7 @@ const NotchedPlaceholder = ({ gender, onActivate }: { gender: 'male' | 'female';
   </div>
 );
 
-export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick, onAddParent }: Props) => {
+export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick, onAddParent, onDiveSubfamily }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
   // Track real viewport size — re-runs the auto-centre when WebView orientation
   // or chrome height changes.
@@ -75,7 +77,88 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   // changes and we re-run fit. Manual zooms between additions stay intact.
   const lastFitDimsRef = useRef<string>('');
 
-  const nodes = useMemo(() => transformToTreeNodes(persons, relationships, ownerId), [persons, relationships, ownerId]);
+  // Subfamily collapse: ancestors of married-in spouses are hidden from the
+  // owner's tree. Each such spouse gets a small pill above their card; tap on
+  // the pill dives into that spouse's parental subfamily on a separate page.
+  // mainLineage = owner + ancestors + descendants of those ancestors (i.e.
+  // everyone connected to the owner through blood). Couple-partners of
+  // lineage who themselves are NOT lineage are "secondaryEntries" — they
+  // stay in the layout, but their ancestors fold away.
+  const { hidden, secondaryEntries } = useMemo(() => {
+    const hide = new Set<string>();
+    const secondary = new Set<string>();
+    if (!ownerId) return { hidden: hide, secondaryEntries: secondary };
+
+    const lineage = new Set<string>([ownerId]);
+    // Ancestors of owner (BFS up via parent_child).
+    const upQ: string[] = [ownerId];
+    while (upQ.length) {
+      const id = upQ.shift()!;
+      for (const r of relationships) {
+        if (r.category === 'parent_child' && r.person2Id === id && !lineage.has(r.person1Id)) {
+          lineage.add(r.person1Id);
+          upQ.push(r.person1Id);
+        }
+      }
+    }
+    // Descendants of every lineage node — captures siblings of the owner and
+    // their children too.
+    const downQ: string[] = Array.from(lineage);
+    while (downQ.length) {
+      const id = downQ.shift()!;
+      for (const r of relationships) {
+        if (r.category === 'parent_child' && r.person1Id === id && !lineage.has(r.person2Id)) {
+          lineage.add(r.person2Id);
+          downQ.push(r.person2Id);
+        }
+      }
+    }
+    // Couple-partners of lineage who themselves are NOT lineage.
+    for (const r of relationships) {
+      if (r.category !== 'couple') continue;
+      if (lineage.has(r.person1Id) && !lineage.has(r.person2Id)) secondary.add(r.person2Id);
+      if (lineage.has(r.person2Id) && !lineage.has(r.person1Id)) secondary.add(r.person1Id);
+    }
+    // Hidden = ancestors of every secondary entry, plus their other
+    // descendants (so siblings of secondaryEntries also fold away).
+    const hideAnc = new Set<string>();
+    const upHide: string[] = Array.from(secondary);
+    while (upHide.length) {
+      const id = upHide.shift()!;
+      for (const r of relationships) {
+        if (r.category === 'parent_child' && r.person2Id === id) {
+          const parent = r.person1Id;
+          if (!lineage.has(parent) && !secondary.has(parent) && !hideAnc.has(parent)) {
+            hideAnc.add(parent);
+            upHide.push(parent);
+          }
+        }
+      }
+    }
+    const downHide: string[] = Array.from(hideAnc);
+    while (downHide.length) {
+      const id = downHide.shift()!;
+      for (const r of relationships) {
+        if (r.category === 'parent_child' && r.person1Id === id) {
+          const child = r.person2Id;
+          if (!lineage.has(child) && !secondary.has(child) && !hideAnc.has(child) && !hide.has(child)) {
+            hide.add(child);
+            downHide.push(child);
+          }
+        }
+      }
+    }
+    for (const id of hideAnc) hide.add(id);
+    return { hidden: hide, secondaryEntries: secondary };
+  }, [ownerId, relationships]);
+
+  const visiblePersons = useMemo(() => persons.filter((p) => !hidden.has(p.id)), [persons, hidden]);
+  const visibleRelationships = useMemo(
+    () => relationships.filter((r) => !hidden.has(r.person1Id) && !hidden.has(r.person2Id)),
+    [relationships, hidden]
+  );
+
+  const nodes = useMemo(() => transformToTreeNodes(visiblePersons, visibleRelationships, ownerId), [visiblePersons, visibleRelationships, ownerId]);
 
   // Owner's existing father/mother. Used to decide which "Add father / Add
   // mother" placeholders to render and where to put them (above the owner
@@ -106,7 +189,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       // Fast path: if total persons is small enough, this is cheap.
       let best: ReturnType<typeof calcTree> | null = null;
       let bestCount = -1;
-      const personIdSet = new Set(persons.map((p) => p.id));
+      const personIdSet = new Set(visiblePersons.map((p) => p.id));
       const candidates: string[] = [];
       if (ownerId && nodes.some((n) => n.id === ownerId)) candidates.push(ownerId);
       for (const n of nodes) if (n.id !== ownerId) candidates.push(n.id);
@@ -117,7 +200,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           if (realCount > bestCount) {
             best = l;
             bestCount = realCount;
-            if (realCount >= persons.length) break;
+            if (realCount >= visiblePersons.length) break;
           }
         } catch { /* root incompatible with calcTree, skip */ }
       }
@@ -126,7 +209,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       console.warn('[tree] layout fallback', e);
       return null;
     }
-  }, [nodes, ownerId, persons]);
+  }, [nodes, ownerId, visiblePersons]);
 
   // Build SVG <path d=...> strings for connectors with rounded corners.
   // Two-pass approach:
@@ -144,7 +227,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
     // and parent anchors (placeholders=true is required for multi-branch
     // layout but we don't render those nodes), and otherwise they show up
     // as floating dashes around our own "Add father / Add mother" cards.
-    const personIdSet = new Set(persons.map((p) => p.id));
+    const personIdSet = new Set(visiblePersons.map((p) => p.id));
     const phantomBoxes = layout.nodes
       .filter((n) => !personIdSet.has(n.id))
       .map((n) => ({ left: n.left, top: n.top }));
@@ -265,7 +348,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       }
     });
     return paths;
-  }, [layout, persons]);
+  }, [layout, visiblePersons]);
 
   const zoom = useZoom(content as React.RefObject<HTMLElement>);
   useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
@@ -336,7 +419,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 
-  const personById = new Map(persons.map((p) => [p.id, p]));
+  const personById = new Map(visiblePersons.map((p) => [p.id, p]));
 
   // Cover the calcTree gap: relatives-tree drops nodes that don't reach
   // through siblings/spouse-parent paths. For each missing real person we
@@ -352,7 +435,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
     return left;
   };
   const extras: ExtraNode[] = [];
-  for (const p of persons) {
+  for (const p of visiblePersons) {
     if (layoutById.has(p.id)) continue;
     const node = nodes.find((n) => n.id === p.id);
     if (!node) continue;
@@ -429,8 +512,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   const parentlessIds = new Set<string>();
   {
     const hasParent = new Set<string>();
-    for (const r of relationships) if (r.category === 'parent_child') hasParent.add(r.person2Id);
-    for (const p of persons) if (!hasParent.has(p.id)) parentlessIds.add(p.id);
+    for (const r of visibleRelationships) if (r.category === 'parent_child') hasParent.add(r.person2Id);
+    // Married-in spouses (secondaryEntries) deliberately have NO parent slots
+    // here — their parents are folded into the pill above their card.
+    for (const p of visiblePersons) {
+      if (!hasParent.has(p.id) && !secondaryEntries.has(p.id)) parentlessIds.add(p.id);
+    }
   }
 
   let topMostParentlessRow = Infinity;
@@ -555,6 +642,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           const person = personById.get(n.id);
           // Skip placeholder nodes (relatives-tree's spouse/parent anchors with no real Person).
           if (!person) return null;
+          const isSecondary = secondaryEntries.has(person.id);
           return (
             <div
               key={n.id}
@@ -577,6 +665,17 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                 onPlusClick={onPlusClick}
                 showPlus={true}
               />
+              {isSecondary && (
+                <button
+                  className="tree-collapsed-pill"
+                  aria-label="Открыть семью этого человека"
+                  onClick={(e) => { e.stopPropagation(); onDiveSubfamily?.(person.id); }}
+                >
+                  <span className="tree-collapsed-pill-rect" />
+                  <span className="tree-collapsed-pill-bar" />
+                  <span className="tree-collapsed-pill-rect" />
+                </button>
+              )}
             </div>
           );
         })}
@@ -650,6 +749,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         {extras.map((e) => {
           const person = personById.get(e.id);
           if (!person) return null;
+          const isSecondary = secondaryEntries.has(person.id);
           return (
             <div
               key={`extra-${e.id}`}
@@ -672,6 +772,17 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                 onPlusClick={onPlusClick}
                 showPlus={true}
               />
+              {isSecondary && (
+                <button
+                  className="tree-collapsed-pill"
+                  aria-label="Открыть семью этого человека"
+                  onClick={(ev) => { ev.stopPropagation(); onDiveSubfamily?.(person.id); }}
+                >
+                  <span className="tree-collapsed-pill-rect" />
+                  <span className="tree-collapsed-pill-bar" />
+                  <span className="tree-collapsed-pill-rect" />
+                </button>
+              )}
             </div>
           );
         })}

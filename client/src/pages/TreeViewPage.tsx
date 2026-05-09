@@ -106,6 +106,7 @@ export const TreeViewPage = () => {
             setAddPreset({ mode: 'parent', gender });
             setAddOpen(p);
           }}
+          onDiveSubfamily={(id) => nav(`/trees/${treeId}/dive/${id}`)}
         />
       </div>
       <PersonSheet

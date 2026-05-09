@@ -96,3 +96,44 @@
 .pcard-plus:hover .pcard-plus-shape .pcard-plus-fill { fill: rgba(255,255,255,0.04); }
 .pcard-plus:hover .pcard-plus-shape .pcard-plus-arc { stroke: rgba(255,255,255,0.45); }
 .pcard-plus:hover .pcard-plus-icon { color: var(--text); }
+
+/* Collapsed-parents pill — sits above a married-in spouse's card. Two grey
+   slabs with a short bar between them, no labels. Tap dives into that
+   spouse's parental subfamily on a separate page. Positioned top-centre over
+   the card so it doesn't collide with .pcard-events (which lives top-right). */
+.tree-collapsed-pill {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  z-index: 5;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+.tree-collapsed-pill:hover { background: rgba(251,191,36,0.08); }
+.tree-collapsed-pill:active { background: rgba(251,191,36,0.14); }
+.tree-collapsed-pill-rect {
+  width: 18px;
+  height: 11px;
+  background: #5b6373;
+  border-radius: 1.5px;
+  transition: background 0.15s ease;
+}
+.tree-collapsed-pill-bar {
+  width: 5px;
+  height: 1.6px;
+  background: #5b6373;
+  border-radius: 1.6px;
+  margin: 0 1.5px;
+  transition: background 0.15s ease;
+}
+.tree-collapsed-pill:hover .tree-collapsed-pill-rect,
+.tree-collapsed-pill:hover .tree-collapsed-pill-bar,
+.tree-collapsed-pill:active .tree-collapsed-pill-rect,
+.tree-collapsed-pill:active .tree-collapsed-pill-bar { background: var(--accent); }
