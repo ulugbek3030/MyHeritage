@@ -233,71 +233,9 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       .map((n) => ({ left: n.left, top: n.top }));
     const inPhantom = (x: number, y: number) =>
       phantomBoxes.some((b) => x >= b.left && x <= b.left + 2 && y >= b.top && y <= b.top + 2);
-    // Polygamy children: any visible kid whose parents include someone with
-    // 2+ couple partners. relatives-tree's connectors for these are drawn
-    // from a single "primary" parent and look wrong; our manual rounded
-    // T-junction below replaces them, so we filter the library's segments
-    // that terminate at these kids' card-tops.
-    const polyCoupleCount = new Map<string, number>();
-    for (const r of relationships) {
-      if (r.category !== 'couple') continue;
-      polyCoupleCount.set(r.person1Id, (polyCoupleCount.get(r.person1Id) ?? 0) + 1);
-      polyCoupleCount.set(r.person2Id, (polyCoupleCount.get(r.person2Id) ?? 0) + 1);
-    }
-    // For each polygamy kid, suppress every relatives-tree segment whose
-    // endpoint lands in the kid's OLD drop column anywhere between the
-    // parents' row and the kid's row. Just filtering at the exact card-top
-    // endpoint left short stubs visible (the bar above + the partial drop
-    // below the couple-line). This range filter wipes the whole wrong path.
-    const suppressDropCols: Array<{ col: number; yMin: number; yMax: number }> = [];
-    for (const p of visiblePersons) {
-      const parents = relationships
-        .filter((r) => r.category === 'parent_child' && r.person2Id === p.id)
-        .map((r) => r.person1Id);
-      if (parents.length < 2) continue;
-      const isPoly = parents.some((id) => (polyCoupleCount.get(id) ?? 0) > 1);
-      if (!isPoly) continue;
-      const childPos = layout.nodes.find((n) => n.id === p.id);
-      if (!childPos) continue;
-      // Earliest parent top in layout (for yMin).
-      const parentTops = parents
-        .map((id) => layout.nodes.find((n) => n.id === id))
-        .filter(Boolean)
-        .map((n) => n!.top);
-      const parentTop = parentTops.length ? Math.max(...parentTops) : childPos.top - 2;
-      suppressDropCols.push({
-        col: childPos.left + 1,
-        // Suppress only segments BELOW the parent's card. Each card spans
-        // 2 half-units (top..top+2), and relatives-tree puts the couple-line
-        // at the card's mid-Y (parent.top + 1). Setting yMin to
-        // parent.top + 2 (just below card bottom) keeps the couple-line
-        // visible while still removing the wrong drop to the polygamy kid.
-        yMin: parentTop + 2,
-        yMax: childPos.top + 0.5,
-      });
-      // Also suppress relatives-tree's drop from the couple-mid X — its
-      // continuation (sibling-bar + drop to child) is already filtered out
-      // by the entry above, leaving the couple-mid stub dangling otherwise.
-      const validParentTops = parents
-        .map((id) => layout.nodes.find((n) => n.id === id))
-        .filter(Boolean) as Array<{ left: number; top: number }>;
-      if (validParentTops.length >= 2) {
-        const cols = validParentTops.map((n) => n.left + 1);
-        const couplemidCol = (Math.min(...cols) + Math.max(...cols)) / 2;
-        suppressDropCols.push({
-          col: couplemidCol,
-          yMin: parentTop + 2,
-          yMax: childPos.top + 0.5,
-        });
-      }
-    }
-    const matchesSuppress = (x: number, y: number) =>
-      suppressDropCols.some((c) => Math.abs(c.col - x) < 0.5 && y >= c.yMin && y <= c.yMax);
-    const segs = layout.connectors.filter((s) => {
-      if (inPhantom(s[0], s[1]) || inPhantom(s[2], s[3])) return false;
-      if (matchesSuppress(s[0], s[1]) || matchesSuppress(s[2], s[3])) return false;
-      return true;
-    });
+    const segs = layout.connectors.filter(
+      (s) => !(inPhantom(s[0], s[1]) || inPhantom(s[2], s[3]))
+    );
     const sX = NODE_W / 2;
     const sY = NODE_H / 2;
     const ARC_R = 14;
@@ -606,12 +544,6 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
     }
   }
 
-  // (Polygamy retargeting was removed — too many edge-case conflicts when
-  // multiple polygamy branches coexist. Cards sit wherever relatives-tree
-  // places them, and the manual T-line below draws from couple-mid down to
-  // the child's natural position to make the second-parent connection
-  // visible.)
-  const polygamyTargets = new Map<string, { x: number; y: number }>();
 
   let topMostParentlessRow = Infinity;
   for (const n of layout.nodes) {
@@ -748,9 +680,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           // Skip placeholder nodes (relatives-tree's spouse/parent anchors with no real Person).
           if (!person) return null;
           const isSecondary = secondaryEntries.has(person.id);
-          const polyT = polygamyTargets.get(n.id);
-          const wrapX = polyT ? polyT.x : n.left * (NODE_W / 2);
-          const wrapY = polyT ? polyT.y : n.top * (NODE_H / 2) + TOP_PAD;
+          const wrapX = n.left * (NODE_W / 2);
+          const wrapY = n.top * (NODE_H / 2) + TOP_PAD;
           return (
             <div
               key={n.id}
@@ -788,104 +719,6 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             </div>
           );
         })}
-
-        {/* Multi-parent fix: when a child has 2+ parents both visible in the
-            layout on the same row (typical polygamy / blended-family case
-            where relatives-tree only draws a connector from one parent to
-            the child), draw the missing T-junction from couple-midpoint
-            down to the child. This makes the child read visually as a child
-            of BOTH parents, not just one. */}
-        {(() => {
-          type Seg = { d: string; key: string };
-          const segs: Seg[] = [];
-          // Combine layout positions with extras (relatives-tree drops some
-          // nodes; our extras logic places them manually). For multi-parent
-          // children we want positions regardless of which path the parent
-          // came through.
-          const posMap = new Map<string, { left: number; top: number }>();
-          for (const n of layout.nodes) posMap.set(n.id, { left: n.left, top: n.top });
-          for (const e of extras) posMap.set(e.id, { left: e.left, top: e.top });
-          // Polygamy gate: only fire when at least one parent has 2+ couple
-          // partners. relatives-tree draws couple→child correctly when each
-          // parent has a single spouse, but for polygamy it picks ONE
-          // "primary" couple per parent and leaves the other partner's
-          // children dangling from a single column. Our T-junction draws
-          // the missing couple-mid → child path. Limiting to polygamy avoids
-          // duplicating the connector for ordinary single-couple kids.
-          const coupleCount = new Map<string, number>();
-          for (const r of visibleRelationships) {
-            if (r.category !== 'couple') continue;
-            coupleCount.set(r.person1Id, (coupleCount.get(r.person1Id) ?? 0) + 1);
-            coupleCount.set(r.person2Id, (coupleCount.get(r.person2Id) ?? 0) + 1);
-          }
-          for (const p of visiblePersons) {
-            const node = nodes.find((n) => n.id === p.id);
-            if (!node || node.parents.length < 2) continue;
-            const childPos = posMap.get(p.id);
-            if (!childPos) continue;
-            const parentPositions = node.parents
-              .map((par) => posMap.get(par.id))
-              .filter(Boolean) as Array<{ left: number; top: number }>;
-            if (parentPositions.length < 2) continue;
-            const polygamy = node.parents.some((par) => (coupleCount.get(par.id) ?? 0) > 1);
-            if (!polygamy) continue;
-            // Don't require same row: relatives-tree sometimes shifts a
-            // partner into the layout's "extras" lane, where its `top` may
-            // differ from the other parent's by a row. Just use the LOWEST
-            // parent row as the start so the bar lands above the child.
-            const parentCentersX = parentPositions.map((pos) => (pos.left + 1) * (NODE_W / 2));
-            const minX = Math.min(...parentCentersX);
-            const maxX = Math.max(...parentCentersX);
-            const couplemidX = (minX + maxX) / 2;
-            const lowestParentTop = Math.max(...parentPositions.map((pos) => pos.top));
-            // Start the drop at the couple-line height (mid of card), not at
-            // card bottom — otherwise there's a ~46px gap where the line
-            // visually disconnects from the couple-line above.
-            const parentBottomY = lowestParentTop * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
-            // The card may be re-anchored to the couple-mid via
-            // polygamyTargets — use that visual position so the line lands
-            // exactly on the card top.
-            const polyT = polygamyTargets.get(p.id);
-            const childWrapX = polyT ? polyT.x : childPos.left * (NODE_W / 2);
-            const childWrapY = polyT ? polyT.y : childPos.top * (NODE_H / 2) + TOP_PAD;
-            const childCenterX = childWrapX + NODE_W / 2;
-            const childTopY = childWrapY + (NODE_H - 92) / 2;
-            const barY = parentBottomY + (childTopY - parentBottomY) / 2;
-            // T-junction with rounded corners on both bends:
-            //   1. drop from couple-mid down to (barY - arcR)
-            //   2. quarter arc into the bar
-            //   3. bar across to (childCenterX - dir*arcR)
-            //   4. quarter arc into the child column
-            //   5. drop to child top
-            const horizSpan = Math.abs(childCenterX - couplemidX);
-            const vertSpan = Math.abs(barY - parentBottomY);
-            let d: string;
-            if (horizSpan < 0.5) {
-              // Card already centred under couple-mid (polygamy retarget) —
-              // no bar needed, just a clean vertical drop.
-              d = `M ${couplemidX} ${parentBottomY} L ${couplemidX} ${childTopY}`;
-            } else {
-              const arcR = Math.min(14, horizSpan / 2, vertSpan / 2);
-              const direction = childCenterX >= couplemidX ? 1 : -1;
-              d =
-                `M ${couplemidX} ${parentBottomY} ` +
-                `L ${couplemidX} ${barY - arcR} ` +
-                `Q ${couplemidX} ${barY} ${couplemidX + direction * arcR} ${barY} ` +
-                `L ${childCenterX - direction * arcR} ${barY} ` +
-                `Q ${childCenterX} ${barY} ${childCenterX} ${barY + arcR} ` +
-                `L ${childCenterX} ${childTopY}`;
-            }
-            segs.push({ d, key: `mp-${p.id}` });
-          }
-          if (!segs.length) return null;
-          return (
-            <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
-              {segs.map((s) => (
-                <path key={s.key} d={s.d} stroke="rgba(255,255,255,0.4)" strokeWidth="1.4" fill="none" strokeLinecap="butt" />
-              ))}
-            </svg>
-          );
-        })()}
 
         {/* Extras: persons relatives-tree dropped from the layout. The
             connector shape depends on which relation the extra was
@@ -962,9 +795,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           const person = personById.get(e.id);
           if (!person) return null;
           const isSecondary = secondaryEntries.has(person.id);
-          const polyT = polygamyTargets.get(e.id);
-          const wrapX = polyT ? polyT.x : e.left * (NODE_W / 2);
-          const wrapY = polyT ? polyT.y : e.top * (NODE_H / 2) + TOP_PAD;
+          const wrapX = e.left * (NODE_W / 2);
+          const wrapY = e.top * (NODE_H / 2) + TOP_PAD;
           return (
             <div
               key={`extra-${e.id}`}
