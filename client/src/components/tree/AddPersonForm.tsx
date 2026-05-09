@@ -62,6 +62,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
   const [deathYear, setDeathYear] = useState<string>('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [note, setNote] = useState<string>('');
+  const [address, setAddress] = useState<string>('');
   const [busy, setBusy] = useState(false);
 
   const hasParents = useMemo(
@@ -161,6 +162,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
     setDeathYear('');
     setPhoto(null);
     setNote('');
+    setAddress('');
     // When opened with a presetRole the role-picker step is bypassed entirely;
     // skipping back to it would land the user on a meaningless screen.
     setStep(presetRole ? 'form' : 'select');
@@ -268,6 +270,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         deathDate: !isAlive && fullDeathDate ? deathDate : undefined,
         deathDateKnown: !isAlive && fullDeathDate,
         note: note.trim() || undefined,
+        address: address.trim() || undefined,
         relationships: rels,
       });
       // Photo upload is best-effort — see EditPersonForm for the why.
@@ -564,6 +567,14 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
               value={note}
               onChange={(e) => setNote(e.target.value)}
               style={{ resize: 'vertical', minHeight: 70, fontFamily: 'inherit', lineHeight: 1.4 }}
+            />
+
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Домашний адрес</div>
+            <input
+              className="auth-input"
+              placeholder="Город, улица, дом, квартира…"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
             />
 
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Фото</div>

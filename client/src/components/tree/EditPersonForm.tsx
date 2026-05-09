@@ -34,6 +34,7 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
   const [deathYear, setDeathYear] = useState(person.deathDate ? '' : (person.deathYear ? String(person.deathYear) : ''));
   const [photo, setPhoto] = useState<File | null>(null);
   const [note, setNote] = useState<string>(person.note ?? '');
+  const [address, setAddress] = useState<string>(person.address ?? '');
   const [busy, setBusy] = useState(false);
 
   // Existing parent links + candidate list for "attach another parent".
@@ -71,6 +72,7 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
     setDeathYear(person.deathDate ? '' : (person.deathYear ? String(person.deathYear) : ''));
     setPhoto(null);
     setNote(person.note ?? '');
+    setAddress(person.address ?? '');
   }, [person.id]);
 
   const attachParent = async (parentId: string) => {
@@ -137,6 +139,7 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
         deathDate: !isAlive && fullDeathDate ? deathDate : undefined,
         deathDateKnown: !isAlive && fullDeathDate,
         note: note.trim() || undefined,
+        address: address.trim() || undefined,
       });
       // Photo upload is best-effort and isolated from the main save: if the
       // user picks a HEIC the browser can't decode, or the server rejects the
@@ -252,6 +255,14 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
           value={note}
           onChange={(e) => setNote(e.target.value)}
           style={{ resize: 'vertical', minHeight: 70, fontFamily: 'inherit', lineHeight: 1.4 }}
+        />
+
+        <div style={dateLabel}>Домашний адрес</div>
+        <input
+          className="auth-input"
+          placeholder="Город, улица, дом, квартира…"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
         />
 
         {persons && relationships && (

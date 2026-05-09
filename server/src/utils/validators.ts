@@ -40,6 +40,7 @@ export const createPersonSchema = z.object({
   deathDateKnown: z.boolean().default(false),
   note: z.string().optional(),
   phone: z.string().regex(/^\+?\d{9,15}$/).optional(),
+  address: z.string().max(500).optional(),
   relationships: z
     .array(
       z.object({
