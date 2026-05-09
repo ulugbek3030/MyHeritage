@@ -766,31 +766,6 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             <div style={{ color: '#f472b6' }}>
               hidden ({hidden.size}): {Array.from(hidden).map((id) => persons.find((p) => p.id === id)?.firstName ?? id.slice(0,4)).join(', ') || '∅'}
             </div>
-            <div style={{ color: '#22d3ee', marginTop: 4 }}>
-              poly ({polygamyTargets.size}):
-              {Array.from(polygamyTargets.entries()).map(([id, t]) => {
-                const p = persons.find((pp) => pp.id === id);
-                return ` ${p?.firstName ?? id.slice(0,4)}@(${Math.round(t.x)},${Math.round(t.y)})`;
-              }).join(' ') || ' ∅'}
-            </div>
-            <div style={{ color: '#a78bfa', marginTop: 4 }}>
-              parent positions:
-              {(() => {
-                const out: string[] = [];
-                for (const id of polygamyTargets.keys()) {
-                  const node = nodes.find((n) => n.id === id);
-                  if (!node) continue;
-                  for (const par of node.parents) {
-                    const lp = layout.nodes.find((n) => n.id === par.id);
-                    const ex = extras.find((e) => e.id === par.id);
-                    const p = persons.find((pp) => pp.id === par.id);
-                    const where = lp ? `L(${lp.left},${lp.top})` : ex ? `E(${ex.left},${ex.top})` : '?';
-                    out.push(`${p?.firstName ?? '?'}=${where}`);
-                  }
-                }
-                return ' ' + (out.join(' ') || '∅');
-              })()}
-            </div>
             <div style={{ marginTop: 4 }}>
               {layout.nodes.map((n) => {
                 const p = personById.get(n.id);
