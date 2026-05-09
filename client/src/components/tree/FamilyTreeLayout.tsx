@@ -733,12 +733,19 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           const posMap = new Map<string, { left: number; top: number }>();
           for (const n of layout.nodes) posMap.set(n.id, { left: n.left, top: n.top });
           for (const e of extras) posMap.set(e.id, { left: e.left, top: e.top });
-          // Only fire when relatives-tree mis-handled the case — i.e. either
-          // the child or one of the parents ended up in `extras` (our manual
-          // re-anchor lane). When all three are inside the main layout
-          // relatives-tree already drew the proper couple→child connector
-          // and ours would just stack a duplicate on top.
-          const inExtras = (id: string) => extras.some((e) => e.id === id);
+          // Polygamy gate: only fire when at least one parent has 2+ couple
+          // partners. relatives-tree draws couple→child correctly when each
+          // parent has a single spouse, but for polygamy it picks ONE
+          // "primary" couple per parent and leaves the other partner's
+          // children dangling from a single column. Our T-junction draws
+          // the missing couple-mid → child path. Limiting to polygamy avoids
+          // duplicating the connector for ordinary single-couple kids.
+          const coupleCount = new Map<string, number>();
+          for (const r of visibleRelationships) {
+            if (r.category !== 'couple') continue;
+            coupleCount.set(r.person1Id, (coupleCount.get(r.person1Id) ?? 0) + 1);
+            coupleCount.set(r.person2Id, (coupleCount.get(r.person2Id) ?? 0) + 1);
+          }
           for (const p of visiblePersons) {
             const node = nodes.find((n) => n.id === p.id);
             if (!node || node.parents.length < 2) continue;
@@ -748,9 +755,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               .map((par) => posMap.get(par.id))
               .filter(Boolean) as Array<{ left: number; top: number }>;
             if (parentPositions.length < 2) continue;
-            const childOrParentInExtras =
-              inExtras(p.id) || node.parents.some((par) => inExtras(par.id));
-            if (!childOrParentInExtras) continue;
+            const polygamy = node.parents.some((par) => (coupleCount.get(par.id) ?? 0) > 1);
+            if (!polygamy) continue;
             // Don't require same row: relatives-tree sometimes shifts a
             // partner into the layout's "extras" lane, where its `top` may
             // differ from the other parent's by a row. Just use the LOWEST
