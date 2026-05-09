@@ -550,27 +550,54 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           );
         })}
 
-        {/* Extras: persons relatives-tree dropped from the layout. We
-            position them by their best-known relation and draw a small V
-            connector from their parents' couple-line down to them. */}
+        {/* Extras: persons relatives-tree dropped from the layout. The
+            connector shape depends on which relation the extra was
+            anchored to:
+              - Sibling in same row → extend the sibling-bar from that
+                sibling over to the extra, then drop V to the extra.
+                Reads as 'they're hanging from the same parent couple'.
+              - Otherwise → simple V from a parent's bottom down. */}
         {extras.length > 0 && (
           <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
             {extras.map((e) => {
-              if (!e.sourceParents || e.sourceParents.length === 0) return null;
-              // Find any layout-positioned parent to anchor the connector to.
-              const parentPos = e.sourceParents.map((id) => layoutById.get(id)).filter(Boolean) as Array<{ left: number; top: number }>;
-              if (parentPos.length === 0) return null;
-              const parentBottomY = parentPos[0].top * (NODE_H / 2) + TOP_PAD + (NODE_H + 92) / 2;
+              const node = nodes.find((n) => n.id === e.id);
+              if (!node) return null;
               const childTopY = e.top * (NODE_H / 2) + TOP_PAD + (NODE_H - 92) / 2;
               const childCenterX = e.left * (NODE_W / 2) + NODE_W / 2;
-              return (
-                <line
-                  key={`extra-conn-${e.id}`}
-                  x1={childCenterX} y1={parentBottomY}
-                  x2={childCenterX} y2={childTopY}
-                  stroke="rgba(255,255,255,0.4)" strokeWidth="1.4"
-                />
-              );
+
+              const sibInLayout = node.siblings
+                .map((s) => layoutById.get(s.id))
+                .filter(Boolean) as Array<{ left: number; top: number }>;
+              const sameRowSib = sibInLayout.find((s) => s.top === e.top);
+              const parentInLayout = node.parents
+                .map((p) => layoutById.get(p.id))
+                .filter(Boolean) as Array<{ left: number; top: number }>;
+
+              if (sameRowSib && parentInLayout.length > 0) {
+                // Halfway between parents' bottom and child's top — same
+                // sibling-bar Y relatives-tree uses internally.
+                const parentBottomY = parentInLayout[0].top * (NODE_H / 2) + TOP_PAD + (NODE_H + 92) / 2;
+                const barY = parentBottomY + (childTopY - parentBottomY) / 2;
+                const sibCenterX = sameRowSib.left * (NODE_W / 2) + NODE_W / 2;
+                return (
+                  <g key={`extra-conn-${e.id}`}>
+                    <line x1={sibCenterX} y1={barY} x2={childCenterX} y2={barY} stroke="rgba(255,255,255,0.4)" strokeWidth="1.4" />
+                    <line x1={childCenterX} y1={barY} x2={childCenterX} y2={childTopY} stroke="rgba(255,255,255,0.4)" strokeWidth="1.4" />
+                  </g>
+                );
+              }
+
+              if (parentInLayout.length > 0) {
+                const parentBottomY = parentInLayout[0].top * (NODE_H / 2) + TOP_PAD + (NODE_H + 92) / 2;
+                return (
+                  <line key={`extra-conn-${e.id}`}
+                    x1={childCenterX} y1={parentBottomY}
+                    x2={childCenterX} y2={childTopY}
+                    stroke="rgba(255,255,255,0.4)" strokeWidth="1.4"
+                  />
+                );
+              }
+              return null;
             })}
           </svg>
         )}
