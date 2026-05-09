@@ -30,7 +30,13 @@ export const SubfamilyPage = () => {
   return (
     <div style={{minHeight:'calc(100dvh - var(--safe-top, 0px))',display:'flex',flexDirection:'column'}}>
       <header style={{padding:'10px 18px',display:'flex',alignItems:'center',gap:10,borderBottom:'1px solid var(--border)'}}>
-        <button onClick={() => nav(`/trees/${treeId}`)} style={{width:34,height:34,borderRadius:'50%',background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:'#0a0a0d',border:'none',fontSize:15,fontWeight:800,boxShadow:'0 0 14px rgba(251,191,36,0.4)'}}>←</button>
+        <button
+          onClick={() => nav(-1)}
+          aria-label="Назад"
+          style={{display:'flex',alignItems:'center',gap:6,height:34,padding:'0 14px 0 10px',borderRadius:18,background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:'#0a0a0d',border:'none',fontSize:13,fontWeight:800,boxShadow:'0 0 14px rgba(251,191,36,0.4)',cursor:'pointer'}}
+        >
+          <span style={{fontSize:16,lineHeight:1}}>←</span>Назад
+        </button>
         <div style={{flex:1}}>
           <div style={{fontSize:15,fontWeight:800}}>Семья: {root.firstName}</div>
           <Breadcrumbs items={[{ label: 'Моё дерево', onClick: () => nav(`/trees/${treeId}`) }, { label: root.firstName }]} />
@@ -42,6 +48,7 @@ export const SubfamilyPage = () => {
           persons={filteredPersons}
           relationships={filteredRels}
           ownerId={root.id}
+          onDiveSubfamily={(id) => nav(`/trees/${treeId}/dive/${id}`)}
         />
       </div>
 
