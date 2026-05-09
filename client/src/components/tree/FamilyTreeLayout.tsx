@@ -592,9 +592,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   }
 
   // Polygamy children: kids whose parents include someone with 2+ couples.
-  // Group siblings by their parent-pair and spread them horizontally around
-  // the couple-mid X (otherwise N kids of the same polygamous pair stack on
-  // top of each other at the same coordinates and only the last one renders).
+  // Anchor them under the SECONDARY (married-in) parent's column, not the
+  // lineage parent's. So if Nodira (lineage) is married to both Olim and
+  // Alisher, her kids by Olim sit under Olim, her kids by Alisher under
+  // Alisher — visually each "branch" of children belongs to the partner
+  // who's unique for that branch. The T-line (drawn separately) still runs
+  // from the couple-mid down so both parents read as the kid's parents.
   const polygamyTargets = new Map<string, { x: number; y: number }>();
   {
     const cc = new Map<string, number>();
@@ -611,7 +614,6 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       const ex = extrasMap.get(id);
       return ex ? { left: ex.left, top: ex.top } : null;
     };
-    // Group kids by parent-pair.
     const groups = new Map<string, { parentIds: string[]; kids: string[] }>();
     for (const p of visiblePersons) {
       const node = nodes.find((n) => n.id === p.id);
@@ -624,20 +626,23 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       groups.get(key)!.kids.push(p.id);
     }
     for (const { parentIds, kids } of groups.values()) {
-      const parentPositions = parentIds
-        .map((id) => lookupPos(id))
-        .filter(Boolean) as Array<{ left: number; top: number }>;
-      if (parentPositions.length < 2) continue;
-      const parentCenterCols = parentPositions.map((pos) => pos.left + 1);
-      const midCol = (Math.min(...parentCenterCols) + Math.max(...parentCenterCols)) / 2;
-      const newRow = Math.max(...parentPositions.map((pos) => pos.top)) + 2;
-      // Spread N kids across columns centred on midCol with spacing of 2
-      // half-units (= NODE_W) so adjacent kids don't overlap.
+      const parentPositions = parentIds.map((id) => ({ id, pos: lookupPos(id) }));
+      const validParents = parentPositions.filter((p) => p.pos) as Array<{ id: string; pos: { left: number; top: number } }>;
+      if (validParents.length < 2) continue;
+      // Pick the parent that is a "secondaryEntry" (married-in, ancestors
+      // folded into a pill). Falls back to the right-most parent if none of
+      // the listed parents is secondary.
+      const secondary = validParents.find((p) => secondaryEntries.has(p.id));
+      const anchor = secondary ?? validParents.reduce((acc, p) => (p.pos.left > acc.pos.left ? p : acc));
+      const baseCol = anchor.pos.left + 1; // centre column of anchor card
+      const newRow = Math.max(...validParents.map((p) => p.pos.top)) + 2;
+      // Spread multiple siblings horizontally around baseCol so cards don't
+      // stack on top of one another.
       const N = kids.length;
       const SPAN = 2; // half-units between adjacent kids
       for (let i = 0; i < N; i++) {
         const offset = (i - (N - 1) / 2) * SPAN;
-        const newLeft = midCol - 1 + offset;
+        const newLeft = baseCol - 1 + offset;
         polygamyTargets.set(kids[i], {
           x: newLeft * (NODE_W / 2),
           y: newRow * (NODE_H / 2) + TOP_PAD,
