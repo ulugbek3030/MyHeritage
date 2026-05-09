@@ -742,13 +742,16 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               .map((par) => posMap.get(par.id))
               .filter(Boolean) as Array<{ left: number; top: number }>;
             if (parentPositions.length < 2) continue;
-            const sameRow = parentPositions.every((pos) => pos.top === parentPositions[0].top);
-            if (!sameRow) continue;
+            // Don't require same row: relatives-tree sometimes shifts a
+            // partner into the layout's "extras" lane, where its `top` may
+            // differ from the other parent's by a row. Just use the LOWEST
+            // parent row as the start so the bar lands above the child.
             const parentCentersX = parentPositions.map((pos) => (pos.left + 1) * (NODE_W / 2));
             const minX = Math.min(...parentCentersX);
             const maxX = Math.max(...parentCentersX);
             const couplemidX = (minX + maxX) / 2;
-            const parentBottomY = parentPositions[0].top * (NODE_H / 2) + TOP_PAD + (NODE_H + 92) / 2;
+            const lowestParentTop = Math.max(...parentPositions.map((pos) => pos.top));
+            const parentBottomY = lowestParentTop * (NODE_H / 2) + TOP_PAD + (NODE_H + 92) / 2;
             const childCenterX = childPos.left * (NODE_W / 2) + NODE_W / 2;
             const childTopY = childPos.top * (NODE_H / 2) + TOP_PAD + (NODE_H - 92) / 2;
             const barY = parentBottomY + (childTopY - parentBottomY) / 2;
