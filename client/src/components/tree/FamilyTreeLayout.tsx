@@ -244,7 +244,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       polyCoupleCount.set(r.person1Id, (polyCoupleCount.get(r.person1Id) ?? 0) + 1);
       polyCoupleCount.set(r.person2Id, (polyCoupleCount.get(r.person2Id) ?? 0) + 1);
     }
-    const suppressEndpoints: Array<{ x: number; y: number }> = [];
+    // For each polygamy kid, suppress every relatives-tree segment whose
+    // endpoint lands in the kid's OLD drop column anywhere between the
+    // parents' row and the kid's row. Just filtering at the exact card-top
+    // endpoint left short stubs visible (the bar above + the partial drop
+    // below the couple-line). This range filter wipes the whole wrong path.
+    const suppressDropCols: Array<{ col: number; yMin: number; yMax: number }> = [];
     for (const p of visiblePersons) {
       const parents = relationships
         .filter((r) => r.category === 'parent_child' && r.person2Id === p.id)
@@ -252,14 +257,22 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       if (parents.length < 2) continue;
       const isPoly = parents.some((id) => (polyCoupleCount.get(id) ?? 0) > 1);
       if (!isPoly) continue;
-      const pos = layout.nodes.find((n) => n.id === p.id);
-      if (!pos) continue;
-      // Endpoint relatives-tree uses for the drop into a card top:
-      // (col=left+1, row=top) in half-units.
-      suppressEndpoints.push({ x: pos.left + 1, y: pos.top });
+      const childPos = layout.nodes.find((n) => n.id === p.id);
+      if (!childPos) continue;
+      // Earliest parent top in layout (for yMin).
+      const parentTops = parents
+        .map((id) => layout.nodes.find((n) => n.id === id))
+        .filter(Boolean)
+        .map((n) => n!.top);
+      const parentTop = parentTops.length ? Math.max(...parentTops) : childPos.top - 2;
+      suppressDropCols.push({
+        col: childPos.left + 1,
+        yMin: parentTop - 0.5,
+        yMax: childPos.top + 0.5,
+      });
     }
     const matchesSuppress = (x: number, y: number) =>
-      suppressEndpoints.some((e) => Math.abs(e.x - x) < 0.5 && Math.abs(e.y - y) < 0.5);
+      suppressDropCols.some((c) => Math.abs(c.col - x) < 0.5 && y >= c.yMin && y <= c.yMax);
     const segs = layout.connectors.filter((s) => {
       if (inPhantom(s[0], s[1]) || inPhantom(s[2], s[3])) return false;
       if (matchesSuppress(s[0], s[1]) || matchesSuppress(s[2], s[3])) return false;
