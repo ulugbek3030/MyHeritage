@@ -233,9 +233,42 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       .map((n) => ({ left: n.left, top: n.top }));
     const inPhantom = (x: number, y: number) =>
       phantomBoxes.some((b) => x >= b.left && x <= b.left + 2 && y >= b.top && y <= b.top + 2);
-    const segs = layout.connectors.filter(
-      (s) => !(inPhantom(s[0], s[1]) || inPhantom(s[2], s[3]))
-    );
+    // For polygamy kids, suppress relatives-tree's drop into the kid's
+    // card-top column (the wrong "from one parent" connector). Our second
+    // SVG layer below draws a custom line that joins the couple-line of the
+    // kid's parents instead.
+    const cc = new Map<string, number>();
+    for (const r of relationships) {
+      if (r.category !== 'couple') continue;
+      cc.set(r.person1Id, (cc.get(r.person1Id) ?? 0) + 1);
+      cc.set(r.person2Id, (cc.get(r.person2Id) ?? 0) + 1);
+    }
+    const suppressBoxes: Array<{ col: number; yMin: number; yMax: number }> = [];
+    for (const p of visiblePersons) {
+      const parents = relationships
+        .filter((r) => r.category === 'parent_child' && r.person2Id === p.id)
+        .map((r) => r.person1Id);
+      if (parents.length < 2) continue;
+      const isPoly = parents.some((id) => (cc.get(id) ?? 0) > 1);
+      if (!isPoly) continue;
+      const childPos = layout.nodes.find((n) => n.id === p.id);
+      if (!childPos) continue;
+      const parentTops = parents
+        .map((id) => layout.nodes.find((n) => n.id === id))
+        .filter(Boolean)
+        .map((n) => n!.top);
+      const parentTop = parentTops.length ? Math.max(...parentTops) : childPos.top - 2;
+      // Range strictly below the parent's card so the couple-line itself
+      // (which sits at parent.top + 1) survives.
+      suppressBoxes.push({ col: childPos.left + 1, yMin: parentTop + 2, yMax: childPos.top + 0.5 });
+    }
+    const matchesSuppress = (x: number, y: number) =>
+      suppressBoxes.some((b) => Math.abs(b.col - x) < 0.5 && y >= b.yMin && y <= b.yMax);
+    const segs = layout.connectors.filter((s) => {
+      if (inPhantom(s[0], s[1]) || inPhantom(s[2], s[3])) return false;
+      if (matchesSuppress(s[0], s[1]) || matchesSuppress(s[2], s[3])) return false;
+      return true;
+    });
     const sX = NODE_W / 2;
     const sY = NODE_H / 2;
     const ARC_R = 14;
@@ -719,6 +752,73 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             </div>
           );
         })}
+
+        {/* Polygamy second-parent line: from the kid's card-top straight up
+            to the couple-line that joins their two parents. Replaces the
+            relatives-tree drop (suppressed in connectorPaths above) so the
+            kid visually reads as a child of the couple, not just one
+            parent. Same visual style as the connectors relatives-tree
+            drew for monogamous siblings (Bahrom-style). */}
+        {(() => {
+          type Seg = { d: string; key: string };
+          const segs: Seg[] = [];
+          const cc2 = new Map<string, number>();
+          for (const r of relationships) {
+            if (r.category !== 'couple') continue;
+            cc2.set(r.person1Id, (cc2.get(r.person1Id) ?? 0) + 1);
+            cc2.set(r.person2Id, (cc2.get(r.person2Id) ?? 0) + 1);
+          }
+          const layoutNodeMap = new Map(layout.nodes.map((n) => [n.id, n]));
+          const extrasMap = new Map(extras.map((e) => [e.id, e]));
+          const lookup = (id: string) => layoutNodeMap.get(id) ?? extrasMap.get(id) ?? null;
+          for (const p of visiblePersons) {
+            const node = nodes.find((n) => n.id === p.id);
+            if (!node || node.parents.length < 2) continue;
+            const isPoly = node.parents.some((par) => (cc2.get(par.id) ?? 0) > 1);
+            if (!isPoly) continue;
+            const childPos = lookup(p.id);
+            if (!childPos) continue;
+            const parentPositions = node.parents
+              .map((par) => lookup(par.id))
+              .filter(Boolean) as Array<{ left: number; top: number }>;
+            if (parentPositions.length < 2) continue;
+            const parentCenters = parentPositions.map((pos) => (pos.left + 1) * (NODE_W / 2));
+            const couplemidX = (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2;
+            // couple-line sits at parent's card mid-Y.
+            const lowestParentTop = Math.max(...parentPositions.map((pos) => pos.top));
+            const coupleLineY = lowestParentTop * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
+            const childCenterX = (childPos.left + 1) * (NODE_W / 2);
+            const childTopY = childPos.top * (NODE_H / 2) + TOP_PAD + (NODE_H - 92) / 2;
+            const horizSpan = Math.abs(childCenterX - couplemidX);
+            let d: string;
+            if (horizSpan < 0.5) {
+              // Same column → straight vertical drop down to couple-line.
+              d = `M ${childCenterX} ${childTopY} L ${childCenterX} ${coupleLineY}`;
+            } else {
+              // L-shape with rounded corner: child up, then over to
+              // couple-mid, then up to couple-line.
+              const barY = coupleLineY + (childTopY - coupleLineY) / 2;
+              const arcR = Math.min(14, horizSpan / 2, Math.abs(barY - coupleLineY) / 2, Math.abs(barY - childTopY) / 2);
+              const dir = couplemidX >= childCenterX ? 1 : -1;
+              d =
+                `M ${childCenterX} ${childTopY} ` +
+                `L ${childCenterX} ${barY + arcR} ` +
+                `Q ${childCenterX} ${barY} ${childCenterX + dir * arcR} ${barY} ` +
+                `L ${couplemidX - dir * arcR} ${barY} ` +
+                `Q ${couplemidX} ${barY} ${couplemidX} ${barY - arcR} ` +
+                `L ${couplemidX} ${coupleLineY}`;
+            }
+            segs.push({ d, key: `pp-${p.id}` });
+          }
+          if (!segs.length) return null;
+          return (
+            <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
+              {segs.map((s) => (
+                <path key={s.key} d={s.d} stroke="rgba(255,255,255,0.4)" strokeWidth="1.4" fill="none" strokeLinecap="butt" />
+              ))}
+            </svg>
+          );
+        })()}
 
         {/* Extras: persons relatives-tree dropped from the layout. The
             connector shape depends on which relation the extra was
