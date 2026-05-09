@@ -35,6 +35,31 @@ interface Props {
   onAddParent?: (personId: string, gender: 'male' | 'female') => void;
 }
 
+// Dashed-card placeholder with a U-shaped notch at the top so the '+' button
+// can sit half-overlapping the card edge — matches the typical "add new"
+// affordance in family-tree apps.
+const NotchedPlaceholder = ({ gender, onActivate }: { gender: 'male' | 'female'; onActivate: () => void }) => (
+  <div
+    className="pcard-placeholder"
+    role="button"
+    tabIndex={0}
+    onClick={(e) => { e.stopPropagation(); onActivate(); }}
+    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onActivate(); } }}
+  >
+    <svg className="pcard-placeholder-notch" viewBox="0 0 60 82" preserveAspectRatio="none">
+      <path
+        d="M 8 0 L 14 0 A 16 16 0 0 0 46 0 L 52 0 A 8 8 0 0 1 60 8 L 60 74 A 8 8 0 0 1 52 82 L 8 82 A 8 8 0 0 1 0 74 L 0 8 A 8 8 0 0 1 8 0 Z"
+        fill="rgba(255,255,255,0.04)"
+        stroke="rgba(255,255,255,0.25)"
+        strokeWidth="1.5"
+        strokeDasharray="3 3"
+      />
+    </svg>
+    <span className="pcard-placeholder-plus" aria-hidden="true">+</span>
+    <span className="pcard-placeholder-label">Добавить<br />{gender === 'male' ? 'отца' : 'мать'}</span>
+  </div>
+);
+
 export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick, onAddParent }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
   // Track real viewport size — re-runs the auto-centre when WebView orientation
@@ -704,16 +729,10 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                 justifyContent: 'center',
               }}
             >
-              <div
-                className="pcard-placeholder"
-                role="button"
-                tabIndex={0}
-                onClick={(e) => { e.stopPropagation(); onAddParent?.(entry.childId, slot.gender); }}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAddParent?.(entry.childId, slot.gender); } }}
-              >
-                <span className="pcard-placeholder-plus" aria-hidden="true">+</span>
-                <span className="pcard-placeholder-label">Добавить<br />{slot.gender === 'male' ? 'отца' : 'мать'}</span>
-              </div>
+              <NotchedPlaceholder
+                gender={slot.gender}
+                onActivate={() => onAddParent?.(entry.childId, slot.gender)}
+              />
             </div>
           ))
         )}
@@ -729,16 +748,10 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               justifyContent: 'center',
             }}
           >
-            <div
-              className="pcard-placeholder"
-              role="button"
-              tabIndex={0}
-              onClick={(e) => { e.stopPropagation(); if (ownerId) onAddParent?.(ownerId, ownerSpouseSlot.gender); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (ownerId) onAddParent?.(ownerId, ownerSpouseSlot.gender); } }}
-            >
-              <span className="pcard-placeholder-plus" aria-hidden="true">+</span>
-              <span className="pcard-placeholder-label">Добавить<br />{ownerSpouseSlot.gender === 'male' ? 'отца' : 'мать'}</span>
-            </div>
+            <NotchedPlaceholder
+              gender={ownerSpouseSlot.gender}
+              onActivate={() => { if (ownerId) onAddParent?.(ownerId, ownerSpouseSlot.gender); }}
+            />
           </div>
         )}
 
