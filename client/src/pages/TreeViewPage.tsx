@@ -14,6 +14,7 @@ import { ShareModal } from '../components/share/ShareModal';
 import { QuickActions } from '../components/home/QuickActions';
 import { Skeleton } from '../components/ui/Skeleton';
 import { TreeSearch } from '../components/tree/TreeSearch';
+import { BottomSheet } from '../components/ui/BottomSheet';
 
 export const TreeViewPage = () => {
   const { treeId } = useParams<{ treeId: string }>();
@@ -26,6 +27,10 @@ export const TreeViewPage = () => {
   // parentless cards).
   const [addPreset, setAddPreset] = useState<{ mode: 'parent'; gender: 'male' | 'female' } | null>(null);
   const [editOpen, setEditOpen] = useState<Person | null>(null);
+  // window.confirm is blocked in Click's WebView, so deletion uses a custom
+  // BottomSheet confirm rendered below.
+  const [deletePending, setDeletePending] = useState<Person | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [bioOpen, setBioOpen] = useState<Person | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
@@ -110,13 +115,10 @@ export const TreeViewPage = () => {
         onEdit={() => { if (selectedPerson) { setEditOpen(selectedPerson); setSelectedPerson(null); } }}
         onEditBio={() => { if (selectedPerson) { setBioOpen(selectedPerson); setSelectedPerson(null); } }}
         onAdd={() => { if (selectedPerson) { setAddOpen(selectedPerson); setSelectedPerson(null); } }}
-        onDelete={async () => {
-          if (!selectedPerson || !treeId) return;
-          const fullName = [selectedPerson.firstName, selectedPerson.lastName].filter(Boolean).join(' ');
-          if (!window.confirm(`Удалить ${fullName}? Все связи с этим человеком тоже будут удалены. Действие необратимо.`)) return;
-          await deletePerson(treeId, selectedPerson.id);
+        onDelete={() => {
+          if (!selectedPerson) return;
+          setDeletePending(selectedPerson);
           setSelectedPerson(null);
-          reload();
         }}
       />
       {addOpen && (
@@ -151,6 +153,47 @@ export const TreeViewPage = () => {
       )}
       {shareOpen && <ShareModal open onClose={() => setShareOpen(false)} treeId={treeId!} existingToken={data.tree.shareToken} />}
       {searchOpen && <TreeSearch persons={data.persons} onSelect={(id) => { document.querySelector(`[data-person-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onClose={() => setSearchOpen(false)} />}
+      {deletePending && (() => {
+        const fullName = [deletePending.firstName, deletePending.lastName].filter(Boolean).join(' ');
+        const close = () => { if (!deleting) setDeletePending(null); };
+        const confirm = async () => {
+          if (!treeId || !deletePending) return;
+          setDeleting(true);
+          try {
+            await deletePerson(treeId, deletePending.id);
+            setDeletePending(null);
+            reload();
+          } catch (e) {
+            console.error('[delete] failed', e);
+            const msg = e instanceof Error ? e.message : 'неизвестная ошибка';
+            alert(`Не удалось удалить: ${msg}`);
+          } finally { setDeleting(false); }
+        };
+        return (
+          <BottomSheet open onClose={close}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14, padding: '24px 8px 8px' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>Удалить {fullName}?</div>
+              <div style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.5, maxWidth: 320 }}>
+                Все связи с этим человеком тоже будут удалены. Действие необратимо.
+              </div>
+              <button
+                onClick={confirm}
+                disabled={deleting}
+                style={{ width: '100%', padding: 14, marginTop: 12, background: '#f87171', color: '#0a0a0d', border: 'none', borderRadius: 14, fontWeight: 800, fontSize: 16, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
+              >
+                {deleting ? 'Удаление…' : 'Удалить'}
+              </button>
+              <button
+                onClick={close}
+                disabled={deleting}
+                style={{ width: '100%', padding: 14, background: 'rgba(255,255,255,0.04)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 14, fontWeight: 700, fontSize: 16, cursor: deleting ? 'not-allowed' : 'pointer' }}
+              >
+                Отмена
+              </button>
+            </div>
+          </BottomSheet>
+        );
+      })()}
     </div>
   );
 };

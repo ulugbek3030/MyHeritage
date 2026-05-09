@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Person, Relationship } from '../../types';
 import { createPerson, type CreatePersonInput } from '../../api/persons';
 import { generateMiddleName } from '../../utils/uzNamings';
@@ -81,8 +81,6 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
   const father = existingParents.find((p) => p.gender === 'male');
   const mother = existingParents.find((p) => p.gender === 'female');
 
-  const middleName = mode !== 'parent' ? generateMiddleName(father?.firstName ?? null, gender) : '';
-
   const spouse: Person | undefined = useMemo(() => {
     const r = relationships.find(
       (rr) => rr.category === 'couple' && (rr.person1Id === targetPerson.id || rr.person2Id === targetPerson.id)
@@ -93,6 +91,34 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
   }, [relationships, persons, targetPerson.id]);
 
   const otherParent = existingParents.find((p) => p.gender !== gender);
+
+  // The new person's middleName is built from THEIR father's first name, not
+  // targetPerson's father. Cases:
+  //   parent: new person IS a parent — no source on hand, leave blank.
+  //   sibling: shares targetPerson's father → use that father's name.
+  //   child: new person's father is targetPerson (if targetPerson is male)
+  //     or targetPerson's male spouse (if targetPerson is female).
+  //   spouse: their actual father is rarely in this tree → leave blank for
+  //     the user to type.
+  const middleNameSource: string | null =
+    mode === 'sibling' ? father?.firstName ?? null
+    : mode === 'child' ? (
+        targetPerson.gender === 'male' ? targetPerson.firstName
+        : spouse?.gender === 'male' ? spouse.firstName
+        : null
+      )
+    : null;
+  const [middleName, setMiddleName] = useState<string>(generateMiddleName(middleNameSource, gender));
+  // Re-derive when the role/gender flips so the user gets sensible defaults
+  // each time, but keeps any manual edits within a single role visit.
+  const lastAutoKey = useRef<string>(`${mode}|${gender}|${middleNameSource ?? ''}`);
+  useEffect(() => {
+    const key = `${mode}|${gender}|${middleNameSource ?? ''}`;
+    if (lastAutoKey.current !== key) {
+      lastAutoKey.current = key;
+      setMiddleName(generateMiddleName(middleNameSource, gender));
+    }
+  }, [mode, gender, middleNameSource]);
 
   const targetFullName = [targetPerson.firstName, targetPerson.lastName, targetPerson.middleName]
     .filter(Boolean)
@@ -114,6 +140,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
     // (e.g. "Add father") doesn't lose its computed surname on close+reopen.
     setLastName(presetLastName);
     setMaidenName(presetMaidenName);
+    setMiddleName(generateMiddleName(middleNameSource, gender));
     setBirthDate('');
     setYear('');
     setIsAlive(true);
@@ -410,7 +437,12 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
             />
-            {middleName && <input className="auth-input" placeholder="Отчество" value={middleName} readOnly />}
+            <input
+              className="auth-input"
+              placeholder="Отчество"
+              value={middleName}
+              onChange={(e) => setMiddleName(e.target.value)}
+            />
 
             {/* Birth date — custom wheel-picker (iPhone-style spinners). */}
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Дата рождения</div>
