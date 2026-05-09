@@ -233,9 +233,38 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       .map((n) => ({ left: n.left, top: n.top }));
     const inPhantom = (x: number, y: number) =>
       phantomBoxes.some((b) => x >= b.left && x <= b.left + 2 && y >= b.top && y <= b.top + 2);
-    const segs = layout.connectors.filter(
-      (s) => !(inPhantom(s[0], s[1]) || inPhantom(s[2], s[3]))
-    );
+    // Polygamy children: any visible kid whose parents include someone with
+    // 2+ couple partners. relatives-tree's connectors for these are drawn
+    // from a single "primary" parent and look wrong; our manual rounded
+    // T-junction below replaces them, so we filter the library's segments
+    // that terminate at these kids' card-tops.
+    const polyCoupleCount = new Map<string, number>();
+    for (const r of relationships) {
+      if (r.category !== 'couple') continue;
+      polyCoupleCount.set(r.person1Id, (polyCoupleCount.get(r.person1Id) ?? 0) + 1);
+      polyCoupleCount.set(r.person2Id, (polyCoupleCount.get(r.person2Id) ?? 0) + 1);
+    }
+    const suppressEndpoints: Array<{ x: number; y: number }> = [];
+    for (const p of visiblePersons) {
+      const parents = relationships
+        .filter((r) => r.category === 'parent_child' && r.person2Id === p.id)
+        .map((r) => r.person1Id);
+      if (parents.length < 2) continue;
+      const isPoly = parents.some((id) => (polyCoupleCount.get(id) ?? 0) > 1);
+      if (!isPoly) continue;
+      const pos = layout.nodes.find((n) => n.id === p.id);
+      if (!pos) continue;
+      // Endpoint relatives-tree uses for the drop into a card top:
+      // (col=left+1, row=top) in half-units.
+      suppressEndpoints.push({ x: pos.left + 1, y: pos.top });
+    }
+    const matchesSuppress = (x: number, y: number) =>
+      suppressEndpoints.some((e) => Math.abs(e.x - x) < 0.5 && Math.abs(e.y - y) < 0.5);
+    const segs = layout.connectors.filter((s) => {
+      if (inPhantom(s[0], s[1]) || inPhantom(s[2], s[3])) return false;
+      if (matchesSuppress(s[0], s[1]) || matchesSuppress(s[2], s[3])) return false;
+      return true;
+    });
     const sX = NODE_W / 2;
     const sY = NODE_H / 2;
     const ARC_R = 14;
@@ -348,7 +377,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       }
     });
     return paths;
-  }, [layout, visiblePersons]);
+  }, [layout, visiblePersons, relationships]);
 
   // The frame is a box that physically grows/shrinks with the user's zoom so
   // that overflow-auto on .tree-stage gives correct scroll bounds. We avoid
