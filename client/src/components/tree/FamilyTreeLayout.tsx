@@ -400,11 +400,13 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       if (!vp) return;
       const card = vp.querySelector<HTMLElement>(`[data-person-id="${ownerId}"]`);
       if (card && vp.clientWidth && vp.clientHeight) {
-        // Re-fit when the canvas changed shape (someone got added/removed).
-        // dimsKey also includes viewport size so an orientation change
-        // re-fits too. Manual user zooms between additions stay intact —
-        // the dimsKey hasn't changed.
-        const dimsKey = `${layout.canvas.width}x${layout.canvas.height}@${vp.clientWidth}x${vp.clientHeight}`;
+        // Re-fit ONLY when the canvas itself changes shape (someone got
+        // added/removed). Viewport-size changes are deliberately excluded
+        // — on iOS the address bar can show/hide mid-pinch which changes
+        // dvh, which used to trigger an auto-fit and reset the user's
+        // active zoom to 1.0. Once fitted, the user's manual zoom is
+        // preserved across viewport reflows.
+        const dimsKey = `${layout.canvas.width}x${layout.canvas.height}`;
         if (lastFitDimsRef.current !== dimsKey) {
           const W = layout.canvas.width * (NODE_W / 2);
           const H = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
