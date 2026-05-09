@@ -169,6 +169,16 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
   };
 
   const pick = (m: Mode, g: 'male' | 'female') => {
+    // Adding a child without a father: the kid would have no father field
+    // populated. Block and prompt the user to add the partner first.
+    if (m === 'child') {
+      const fatherCandidate =
+        targetPerson.gender === 'male' ? targetPerson : spouses.find((s) => s.gender === 'male');
+      if (!fatherCandidate) {
+        alert(`Сначала добавьте отца для ${targetPerson.firstName} — у ребёнка должен быть указан отец.`);
+        return;
+      }
+    }
     setMode(m);
     setGender(g);
     // Smart surname defaults per role:
