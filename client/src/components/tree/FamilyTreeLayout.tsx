@@ -275,6 +275,21 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         yMin: parentTop + 2,
         yMax: childPos.top + 0.5,
       });
+      // Also suppress relatives-tree's drop from the couple-mid X — its
+      // continuation (sibling-bar + drop to child) is already filtered out
+      // by the entry above, leaving the couple-mid stub dangling otherwise.
+      const validParentTops = parents
+        .map((id) => layout.nodes.find((n) => n.id === id))
+        .filter(Boolean) as Array<{ left: number; top: number }>;
+      if (validParentTops.length >= 2) {
+        const cols = validParentTops.map((n) => n.left + 1);
+        const couplemidCol = (Math.min(...cols) + Math.max(...cols)) / 2;
+        suppressDropCols.push({
+          col: couplemidCol,
+          yMin: parentTop + 2,
+          yMax: childPos.top + 0.5,
+        });
+      }
     }
     const matchesSuppress = (x: number, y: number) =>
       suppressDropCols.some((c) => Math.abs(c.col - x) < 0.5 && y >= c.yMin && y <= c.yMax);
