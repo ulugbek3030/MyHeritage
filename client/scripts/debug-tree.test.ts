@@ -68,23 +68,10 @@ test('debug — production tree layout', () => {
       const name = nameById.get(n.id) ?? `phantom(${n.id.slice(0, 6)})`;
       console.log(`  (${String(n.left).padStart(2)},${String(n.top).padStart(2)})  ${name}`);
     }
-    // Now compute extras
-    const layoutById = new Map(best.nodes.map((n) => [n.id, n]));
-    const occupied = new Set(best.nodes.map((n) => `${n.left},${n.top}`));
-    console.log(`\n=== extras for missing persons ===`);
-    for (const p of persons) {
-      if (layoutById.has(p.id)) continue;
-      const node = nodes.find((n) => n.id === p.id);
-      if (!node) continue;
-      const sib = node.siblings.map((s) => layoutById.get(s.id)).filter(Boolean)[0] as { left: number; top: number } | undefined;
-      const par = node.parents.map((s) => layoutById.get(s.id)).filter(Boolean)[0] as { left: number; top: number } | undefined;
-      const sp = node.spouses.map((s) => layoutById.get(s.id)).filter(Boolean)[0] as { left: number; top: number } | undefined;
-      const target = sib ?? sp ?? par;
-      let l = target ? target.left + 2 : 0;
-      const t = sib ? sib.top : sp ? sp.top : par ? par.top + 2 : 0;
-      while (occupied.has(`${l},${t}`)) l += 2;
-      occupied.add(`${l},${t}`);
-      console.log(`  +${nameById.get(p.id)} → (${l},${t}) anchored to ${sib ? 'sibling' : sp ? 'spouse' : 'parent'}`);
+    // Print all connector segments for inspection.
+    console.log(`\n=== connector segments (${best.connectors.length}) ===`);
+    for (const c of best.connectors) {
+      console.log(`  (${c[0]},${c[1]}) → (${c[2]},${c[3]})`);
     }
   }
 

@@ -578,12 +578,27 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                 // sibling-bar Y relatives-tree uses internally.
                 const parentBottomY = parentInLayout[0].top * (NODE_H / 2) + TOP_PAD + (NODE_H + 92) / 2;
                 const barY = parentBottomY + (childTopY - parentBottomY) / 2;
-                const sibCenterX = sameRowSib.left * (NODE_W / 2) + NODE_W / 2;
+                // Start the bar extension at the couple-midpoint (or single
+                // parent's centre) so we don't overlap relatives-tree's own
+                // bar segment from couple-mid back to the in-layout sibling.
+                const parentCentersX = parentInLayout.map((p) => (p.left + 1) * (NODE_W / 2));
+                const startX = parentCentersX.length >= 2
+                  ? (Math.min(...parentCentersX) + Math.max(...parentCentersX)) / 2
+                  : parentCentersX[0];
+                // Single SVG path with a rounded corner — matches the Q-bezier
+                // arcs the library draws at every other junction.
+                const arcR = Math.min(14, Math.abs(childCenterX - startX) / 2);
+                const direction = childCenterX > startX ? 1 : -1;
+                const d = `M ${startX} ${barY} L ${childCenterX - direction * arcR} ${barY} Q ${childCenterX} ${barY} ${childCenterX} ${barY + arcR} L ${childCenterX} ${childTopY}`;
                 return (
-                  <g key={`extra-conn-${e.id}`}>
-                    <line x1={sibCenterX} y1={barY} x2={childCenterX} y2={barY} stroke="rgba(255,255,255,0.4)" strokeWidth="1.4" />
-                    <line x1={childCenterX} y1={barY} x2={childCenterX} y2={childTopY} stroke="rgba(255,255,255,0.4)" strokeWidth="1.4" />
-                  </g>
+                  <path
+                    key={`extra-conn-${e.id}`}
+                    d={d}
+                    stroke="rgba(255,255,255,0.4)"
+                    strokeWidth="1.4"
+                    fill="none"
+                    strokeLinecap="butt"
+                  />
                 );
               }
 
