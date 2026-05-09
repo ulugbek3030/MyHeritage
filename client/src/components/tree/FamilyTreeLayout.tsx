@@ -673,6 +673,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               />
               {isSecondary && (
                 <button
+                  type="button"
                   className="tree-collapsed-pill"
                   aria-label="Открыть семью этого человека"
                   onClick={(e) => { e.stopPropagation(); onDiveSubfamily?.(person.id); }}
@@ -780,6 +781,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               />
               {isSecondary && (
                 <button
+                  type="button"
                   className="tree-collapsed-pill"
                   aria-label="Открыть семью этого человека"
                   onClick={(ev) => { ev.stopPropagation(); onDiveSubfamily?.(person.id); }}
