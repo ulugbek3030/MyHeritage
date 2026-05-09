@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 const LERP = 0.15, SETTLE = 0.0005, MAX_SCALE = 1.8, MIN_SCALE = 0.2;
 
@@ -78,7 +78,11 @@ export const useZoom = (containerRef: React.RefObject<HTMLElement>, onScale?: (s
     };
   }, []); // ← intentionally empty: refs only; do NOT add deps that recreate handlers
 
-  return {
+  // Memoise so the returned object identity is stable across renders.
+  // Otherwise consumers that list `zoom` in useEffect deps re-run on every
+  // render, which can fight with user gestures (e.g. an auto-centre effect
+  // resetting scroll while the user is pinching).
+  return useMemo(() => ({
     zoomIn: () => { target.current = Math.min(MAX_SCALE, target.current + 0.15); },
     zoomOut: () => { target.current = Math.max(MIN_SCALE, target.current - 0.15); },
     reset: () => { target.current = 1; },
@@ -99,5 +103,5 @@ export const useZoom = (containerRef: React.RefObject<HTMLElement>, onScale?: (s
       }
       onScaleRef.current?.(clamped);
     },
-  };
+  }), [containerRef]);
 };
