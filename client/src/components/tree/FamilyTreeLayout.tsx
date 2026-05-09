@@ -733,6 +733,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           const posMap = new Map<string, { left: number; top: number }>();
           for (const n of layout.nodes) posMap.set(n.id, { left: n.left, top: n.top });
           for (const e of extras) posMap.set(e.id, { left: e.left, top: e.top });
+          // Only fire when relatives-tree mis-handled the case — i.e. either
+          // the child or one of the parents ended up in `extras` (our manual
+          // re-anchor lane). When all three are inside the main layout
+          // relatives-tree already drew the proper couple→child connector
+          // and ours would just stack a duplicate on top.
+          const inExtras = (id: string) => extras.some((e) => e.id === id);
           for (const p of visiblePersons) {
             const node = nodes.find((n) => n.id === p.id);
             if (!node || node.parents.length < 2) continue;
@@ -742,6 +748,9 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               .map((par) => posMap.get(par.id))
               .filter(Boolean) as Array<{ left: number; top: number }>;
             if (parentPositions.length < 2) continue;
+            const childOrParentInExtras =
+              inExtras(p.id) || node.parents.some((par) => inExtras(par.id));
+            if (!childOrParentInExtras) continue;
             // Don't require same row: relatives-tree sometimes shifts a
             // partner into the layout's "extras" lane, where its `top` may
             // differ from the other parent's by a row. Just use the LOWEST
@@ -758,11 +767,23 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             const childCenterX = childPos.left * (NODE_W / 2) + NODE_W / 2;
             const childTopY = childPos.top * (NODE_H / 2) + TOP_PAD + (NODE_H - 92) / 2;
             const barY = parentBottomY + (childTopY - parentBottomY) / 2;
-            // T-junction: drop from couple-mid → bar at sibling-bar Y → over
-            // to child column (rounded corner) → drop into child top.
-            const arcR = Math.min(14, Math.abs(childCenterX - couplemidX) / 2);
+            // T-junction with rounded corners on both bends:
+            //   1. drop from couple-mid down to (barY - arcR)
+            //   2. quarter arc into the bar
+            //   3. bar across to (childCenterX - dir*arcR)
+            //   4. quarter arc into the child column
+            //   5. drop to child top
+            const horizSpan = Math.abs(childCenterX - couplemidX);
+            const vertSpan = Math.abs(barY - parentBottomY);
+            const arcR = Math.min(14, horizSpan / 2, vertSpan / 2);
             const direction = childCenterX >= couplemidX ? 1 : -1;
-            const d = `M ${couplemidX} ${parentBottomY} L ${couplemidX} ${barY} L ${childCenterX - direction * arcR} ${barY} Q ${childCenterX} ${barY} ${childCenterX} ${barY + arcR} L ${childCenterX} ${childTopY}`;
+            const d =
+              `M ${couplemidX} ${parentBottomY} ` +
+              `L ${couplemidX} ${barY - arcR} ` +
+              `Q ${couplemidX} ${barY} ${couplemidX + direction * arcR} ${barY} ` +
+              `L ${childCenterX - direction * arcR} ${barY} ` +
+              `Q ${childCenterX} ${barY} ${childCenterX} ${barY + arcR} ` +
+              `L ${childCenterX} ${childTopY}`;
             segs.push({ d, key: `mp-${p.id}` });
           }
           if (!segs.length) return null;
@@ -787,6 +808,11 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             {extras.map((e) => {
               const node = nodes.find((n) => n.id === e.id);
               if (!node) return null;
+              // Multi-parent extras are handled by the rounded T-junction
+              // block above (which uses both parents' positions). Drawing
+              // the simple single-parent connector here too would duplicate
+              // a line — skip it.
+              if (node.parents.length >= 2) return null;
               const childTopY = e.top * (NODE_H / 2) + TOP_PAD + (NODE_H - 92) / 2;
               const childCenterX = e.left * (NODE_W / 2) + NODE_W / 2;
 
