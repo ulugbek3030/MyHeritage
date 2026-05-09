@@ -604,6 +604,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             <div style={{ color: 'var(--accent)', fontWeight: 800, marginBottom: 4 }}>tree debug</div>
             <div>canvas: {canvasW}×{canvasH}</div>
             <div>layout: {layout.nodes.length} (real {layout.nodes.filter((n) => personById.get(n.id)).length}), extras: {extras.length}</div>
+            <div style={{ marginTop: 4, color: '#a78bfa' }}>
+              secondary ({secondaryEntries.size}): {Array.from(secondaryEntries).map((id) => persons.find((p) => p.id === id)?.firstName ?? id.slice(0,4)).join(', ') || '∅'}
+            </div>
+            <div style={{ color: '#f472b6' }}>
+              hidden ({hidden.size}): {Array.from(hidden).map((id) => persons.find((p) => p.id === id)?.firstName ?? id.slice(0,4)).join(', ') || '∅'}
+            </div>
             <div style={{ marginTop: 4 }}>
               {layout.nodes.map((n) => {
                 const p = personById.get(n.id);
