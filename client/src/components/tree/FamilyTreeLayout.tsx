@@ -407,21 +407,27 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         // active zoom to 1.0. Once fitted, the user's manual zoom is
         // preserved across viewport reflows.
         const dimsKey = `${layout.canvas.width}x${layout.canvas.height}`;
-        if (lastFitDimsRef.current !== dimsKey) {
+        const dimsChanged = lastFitDimsRef.current !== dimsKey;
+        if (dimsChanged) {
           const W = layout.canvas.width * (NODE_W / 2);
           const H = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
           const fit = Math.min(vp.clientWidth / W, vp.clientHeight / H, 1);
           zoom.setTo(fit < 1 ? fit : 1);
           lastFitDimsRef.current = dimsKey;
         }
-        const centreOwner = () => {
-          const vpRect = vp.getBoundingClientRect();
-          const cardRect = card.getBoundingClientRect();
-          vp.scrollLeft += (cardRect.left + cardRect.width / 2) - (vpRect.left + vpRect.width / 2);
-          vp.scrollTop  += (cardRect.top  + cardRect.height / 2) - (vpRect.top  + vpRect.height / 2);
-        };
-        centreOwner();
-        raf = requestAnimationFrame(centreOwner);
+        // Only auto-centre on initial fit or canvas-size changes. After that
+        // the user's manual scroll/zoom must not be reset by re-renders
+        // (e.g. when iOS Safari triggers a viewport reflow mid-pinch).
+        if (dimsChanged) {
+          const centreOwner = () => {
+            const vpRect = vp.getBoundingClientRect();
+            const cardRect = card.getBoundingClientRect();
+            vp.scrollLeft += (cardRect.left + cardRect.width / 2) - (vpRect.left + vpRect.width / 2);
+            vp.scrollTop  += (cardRect.top  + cardRect.height / 2) - (vpRect.top  + vpRect.height / 2);
+          };
+          centreOwner();
+          raf = requestAnimationFrame(centreOwner);
+        }
         return;
       }
       if (attempts < 20) {
