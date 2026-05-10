@@ -21,10 +21,11 @@ const CARD_H = 110;
 // placeholders for parentless persons one full generation above their card,
 // so this needs at least NODE_H of room to keep them on canvas.
 const TOP_PAD = 240;
-// TEST: drag-room без ограничений. Фрейм 4000×4000 — больше любого реального
-// дерева на этом этапе разработки, скролл во все стороны почти бесконечный.
-const LAYOUT_W_MIN = 4000;
-const LAYOUT_H_MIN = 4000;
+// Fixed minimum frame size. Owner card sits at the geometric centre of this
+// frame; tree content extends from there. Frame grows past these minimums
+// when the tree's natural extent doesn't fit.
+const LAYOUT_W_MIN = 700;
+const LAYOUT_H_MIN = 1400;
 
 interface Props {
   persons: Person[];
@@ -557,8 +558,13 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   const ownerCenterX = ownerNode ? ownerNode.left * (NODE_W / 2) + NODE_W / 2 : layoutW / 2;
   const ownerCenterY = ownerNode ? ownerNode.top * (NODE_H / 2) + TOP_PAD + NODE_H / 2 : contentH / 2;
 
-  const halfW = Math.max(LAYOUT_W_MIN / 2, ownerCenterX, layoutW - ownerCenterX);
-  const halfH = Math.max(LAYOUT_H_MIN / 2, ownerCenterY, contentH - ownerCenterY);
+  // Add one full viewport of drag-room past every content edge so the user
+  // can pull the tree completely off-screen in any direction (the user
+  // explicitly asked for unrestricted drag).
+  const padW = vpSize.w || 0;
+  const padH = vpSize.h || 0;
+  const halfW = Math.max(LAYOUT_W_MIN / 2, ownerCenterX, layoutW - ownerCenterX) + padW;
+  const halfH = Math.max(LAYOUT_H_MIN / 2, ownerCenterY, contentH - ownerCenterY) + padH;
   const W = Math.round(halfW * 2);
   const H = Math.round(halfH * 2);
   const LEFT_PAD = Math.round(halfW - ownerCenterX);
