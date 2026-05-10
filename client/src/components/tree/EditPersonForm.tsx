@@ -221,9 +221,14 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
           onChange={(e) => { setBirthDate(e.target.value); if (e.target.value) setYear(''); }}
           max={new Date().toISOString().slice(0, 10)}
         />
-        {!birthDate && (
-          <input className="auth-input" placeholder="Или только год (1985)" inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))} />
-        )}
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', margin: '-6px 4px 6px', textAlign: 'center' }}>или, если точная дата неизвестна — только год:</div>
+        <input
+          className="auth-input"
+          placeholder="Год (1985)"
+          inputMode="numeric"
+          value={year}
+          onChange={(e) => { setYear(e.target.value.replace(/\D/g, '').slice(0, 4)); if (e.target.value) setBirthDate(''); }}
+        />
 
         <div style={{ display: 'flex', gap: 18, marginBottom: 14 }}>
           <label style={radioStyle}>
@@ -246,9 +251,14 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
               onChange={(e) => { setDeathDate(e.target.value); if (e.target.value) setDeathYear(''); }}
               max={new Date().toISOString().slice(0, 10)}
             />
-            {!deathDate && (
-              <input className="auth-input" placeholder="Или только год (2010)" inputMode="numeric" value={deathYear} onChange={(e) => setDeathYear(e.target.value.replace(/\D/g, '').slice(0, 4))} />
-            )}
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', margin: '-6px 4px 6px', textAlign: 'center' }}>или только год:</div>
+            <input
+              className="auth-input"
+              placeholder="Год (2010)"
+              inputMode="numeric"
+              value={deathYear}
+              onChange={(e) => { setDeathYear(e.target.value.replace(/\D/g, '').slice(0, 4)); if (e.target.value) setDeathDate(''); }}
+            />
           </>
         )}
 

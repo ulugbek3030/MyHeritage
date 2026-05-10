@@ -532,9 +532,6 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
               onChange={(e) => setMiddleName(e.target.value)}
             />
 
-            {/* Birth date — native <input type="date">. On iOS this opens
-                the system date picker; everywhere else it's a calendar
-                popover. No timezone shift, no debounce / scroll-snap bugs. */}
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Дата рождения</div>
             <input
               type="date"
@@ -543,15 +540,14 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
               onChange={(e) => { setBirthDate(e.target.value); if (e.target.value) setYear(''); }}
               max={new Date().toISOString().slice(0, 10)}
             />
-            {!birthDate && (
-              <input
-                className="auth-input"
-                placeholder="Или только год (1985)"
-                inputMode="numeric"
-                value={year}
-                onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              />
-            )}
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', margin: '-6px 4px 6px', textAlign: 'center' }}>или, если точная дата неизвестна — только год:</div>
+            <input
+              className="auth-input"
+              placeholder="Год (1985)"
+              inputMode="numeric"
+              value={year}
+              onChange={(e) => { setYear(e.target.value.replace(/\D/g, '').slice(0, 4)); if (e.target.value) setBirthDate(''); }}
+            />
 
             {/* Alive / Deceased toggle */}
             <div style={{ display: 'flex', gap: 18, marginBottom: 14 }}>
@@ -575,15 +571,14 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
                   onChange={(e) => { setDeathDate(e.target.value); if (e.target.value) setDeathYear(''); }}
                   max={new Date().toISOString().slice(0, 10)}
                 />
-                {!deathDate && (
-                  <input
-                    className="auth-input"
-                    placeholder="Или только год (2010)"
-                    inputMode="numeric"
-                    value={deathYear}
-                    onChange={(e) => setDeathYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                  />
-                )}
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', margin: '-6px 4px 6px', textAlign: 'center' }}>или только год:</div>
+                <input
+                  className="auth-input"
+                  placeholder="Год (2010)"
+                  inputMode="numeric"
+                  value={deathYear}
+                  onChange={(e) => { setDeathYear(e.target.value.replace(/\D/g, '').slice(0, 4)); if (e.target.value) setDeathDate(''); }}
+                />
               </>
             )}
 
