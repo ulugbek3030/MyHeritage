@@ -11,12 +11,33 @@ export const devLogin = (phone = '+998900000001') =>
  * Click SuperApp SSO. Pass the web_session string the mini-app received from
  * Click; backend hits Click integration with our bearer + this session and
  * returns our JWT pair.
+ *
+ * We also forward every cookie present in document.cookie so the server can
+ * inspect anything Click set alongside web_session (e.g. an is_identified
+ * flag). Click's integration profile response sometimes omits the KYC flag;
+ * cookies are a fallback source.
  */
-export const loginWithClickSession = (webSession: string) =>
-  api.post<{ user: User; accessToken: string; refreshToken: string }>('/auth/click-session', { web_session: webSession }).then((r) => {
-    setTokens(r.data.accessToken, r.data.refreshToken, true);
-    return r.data.user;
-  });
+export const loginWithClickSession = (webSession: string) => {
+  const cookieMap: Record<string, string> = {};
+  try {
+    document.cookie.split(';').forEach((pair) => {
+      const idx = pair.indexOf('=');
+      if (idx < 0) return;
+      const k = pair.slice(0, idx).trim();
+      const v = pair.slice(idx + 1).trim();
+      if (k) cookieMap[k] = v;
+    });
+  } catch { /* ignore */ }
+  return api
+    .post<{ user: User; accessToken: string; refreshToken: string }>(
+      '/auth/click-session',
+      { web_session: webSession, cookies: cookieMap },
+    )
+    .then((r) => {
+      setTokens(r.data.accessToken, r.data.refreshToken, true);
+      return r.data.user;
+    });
+};
 
 export const requestOtp = (phone: string) =>
   api.post<{ ok: true; ttl: number }>('/auth/request-otp', { phone }).then((r) => r.data);

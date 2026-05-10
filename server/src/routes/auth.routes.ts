@@ -43,7 +43,13 @@ authRoutes.post('/click-session', async (req, res, next) => {
   try {
     const ws = String(req.body?.web_session ?? req.body?.webSession ?? '').trim();
     if (!ws) { res.status(400).json({ error: 'web_session is required' }); return; }
-    res.json(await loginWithClickSession(ws));
+    // Cookies forwarded from the browser (Click sets several alongside
+    // web_session, and some carry KYC / profile data not in the integration
+    // API response).
+    const cookies = (req.body?.cookies && typeof req.body.cookies === 'object')
+      ? (req.body.cookies as Record<string, string>)
+      : undefined;
+    res.json(await loginWithClickSession(ws, cookies));
   } catch (e) { next(e); }
 });
 

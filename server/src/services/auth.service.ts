@@ -200,7 +200,49 @@ const ensureClickUserHasOwnerPerson = async (userId: string, profile: ClickProfi
  * On every call we refresh phone, display_name (only if currently empty) and
  * the cached profile JSON so it's never more than one login stale.
  */
-export const loginWithClickSession = async (webSession: string) => {
+/**
+ * Look for the KYC flag in Click's browser cookies. Click can set a profile
+ * cookie (URL-encoded JSON) named `click-user-data`, `click-data`, or similar
+ * alongside `click-web-session`. We scan every cookie value, try to decode +
+ * parse as JSON, and pull out is_identified when we find it.
+ *
+ * Returns `true` / `false` if a value was found, `null` if no cookie had the
+ * flag (caller falls back to the integration API profile).
+ */
+const isIdentifiedFromCookies = (cookies?: Record<string, string>): boolean | null => {
+  if (!cookies) return null;
+  // Quick scan: any cookie value that, when decoded + parsed as JSON,
+  // contains an is_identified field.
+  for (const [name, raw] of Object.entries(cookies)) {
+    if (!raw) continue;
+    // Decode URL-encoded chunks first; many web apps store profile JSON in
+    // cookies as encodeURIComponent(JSON.stringify(...)).
+    let decoded = raw;
+    try { decoded = decodeURIComponent(raw); } catch { /* ignore */ }
+    if (!decoded.includes('is_identified') && !decoded.includes('isIdentified')) continue;
+    try {
+      const parsed = JSON.parse(decoded);
+      if (parsed && typeof parsed === 'object') {
+        const v = (parsed as Record<string, unknown>).is_identified
+          ?? (parsed as Record<string, unknown>).isIdentified;
+        if (v === true || v === 'true' || v === 1 || v === '1') {
+          console.log('[click sso] is_identified=true from cookie "%s"', name);
+          return true;
+        }
+        if (v === false || v === 'false' || v === 0 || v === '0') {
+          console.log('[click sso] is_identified=false from cookie "%s"', name);
+          return false;
+        }
+      }
+    } catch { /* not JSON, ignore */ }
+  }
+  return null;
+};
+
+export const loginWithClickSession = async (
+  webSession: string,
+  cookies?: Record<string, string>,
+) => {
   const profile = await fetchClickProfile(webSession);
   const clientId = Number(profile.client_id);
   if (!Number.isFinite(clientId) || clientId <= 0) {
@@ -209,14 +251,20 @@ export const loginWithClickSession = async (webSession: string) => {
   const phone = String(profile.phone_number ?? '').trim() || null;
   const display = [profile.name, profile.surname].filter(Boolean).join(' ').trim() || null;
   const profileJson = JSON.stringify(profile);
-  // Click's KYC flag. Treat missing as false so mocks / older snapshots
-  // default to "not identified".
-  const isIdentified = profile.is_identified === true;
-  // TEMP debug: dump the raw is_identified field straight from Click so
-  // we can confirm whether the integration API actually returns it.
-  // Remove once is_identified handling is verified end-to-end.
-  console.log('[click sso] click_id=%s is_identified=%o has_field=%o',
-    clientId, profile.is_identified, 'is_identified' in profile);
+  // KYC flag: prefer Click's cookie value (the integration API often omits
+  // is_identified), fall back to the profile field. Missing in both →
+  // treat as false.
+  const fromCookies = isIdentifiedFromCookies(cookies);
+  const isIdentified =
+    fromCookies !== null ? fromCookies : profile.is_identified === true;
+  // TEMP debug — keep until verified end-to-end.
+  console.log(
+    '[click sso] click_id=%s is_identified=%o (api_field=%o cookie_keys=%o)',
+    clientId,
+    isIdentified,
+    profile.is_identified,
+    cookies ? Object.keys(cookies) : null,
+  );
 
   // Try click_client_id first; if that row doesn't exist, fall back to phone.
   // We do an explicit two-step (instead of a single ON CONFLICT) because we
