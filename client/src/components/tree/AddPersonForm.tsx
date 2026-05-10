@@ -328,7 +328,10 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         deathDateKnown: !isAlive && fullDeathDate,
         note: note.trim() || undefined,
         address: address.trim() || undefined,
-        phone: phone.trim() || undefined,
+        // Force a leading "+" so all stored phones share the same format
+        // (the dropdown in «Расширить древо» and the tunnel-icon lookup
+        // both key off exact phone string match).
+        phone: phone.trim() ? (phone.trim().startsWith('+') ? phone.trim() : '+' + phone.trim().replace(/^\++/, '')) : undefined,
         maritalStatus: maritalStatus || undefined,
         relationships: rels,
       });

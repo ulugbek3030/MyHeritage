@@ -47,12 +47,26 @@ interface Props {
   relatives?: RelativeOption[];
 }
 
+/**
+ * Force a "+" prefix on the phone. Trims whitespace, strips any stray
+ * leading "+" duplicates ("++998" → "+998"). Empty stays empty.
+ */
+const withPlus = (raw: string | null | undefined): string => {
+  const t = (raw ?? '').trim();
+  if (!t) return '';
+  return t.startsWith('+') ? t : '+' + t.replace(/^\++/, '');
+};
+
 export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Props) => {
   const [loading, setLoading] = useState(true);
   const [isIdentified, setIsIdentified] = useState<boolean | null>(null);
   const [incoming, setIncoming] = useState<TreeAccessRequest[]>([]);
   const [outgoing, setOutgoing] = useState<TreeAccessRequest[]>([]);
-  const [phone, setPhone] = useState(initialPhone || '+998');
+  const [phone, setPhone] = useState(withPlus(initialPhone) || '+998');
+  // Track the dropdown selection separately from the phone input so the
+  // <select> visually shows what was picked (with value="" it was
+  // always snapping back to the placeholder).
+  const [pickedRelativeId, setPickedRelativeId] = useState<string>('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +97,8 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
       // Re-seed phone field every time the modal re-opens — if the caller
       // passes a new initialPhone (e.g. opening from a different person
       // card), prefer that over whatever the user last typed.
-      if (initialPhone) setPhone(initialPhone);
+      if (initialPhone) setPhone(withPlus(initialPhone));
+      setPickedRelativeId('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialPhone]);
@@ -94,9 +109,12 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
     setError(null);
     setSubmitNotice(null);
     try {
-      await createAccessRequest(phone.trim(), message.trim() || undefined);
+      // Always send the phone in "+XXX..." form regardless of what the
+      // user typed (they might omit the +, paste with spaces, etc.).
+      await createAccessRequest(withPlus(phone), message.trim() || undefined);
       setSubmitNotice('Запрос отправлен. Когда другой пользователь подтвердит, вы оба получите доступ к деревьям друг друга.');
       setPhone('+998');
+      setPickedRelativeId('');
       setMessage('');
       await refresh();
     } catch (e: unknown) {
@@ -256,14 +274,19 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Выбрать из родственников</div>
                 <select
                   className="auth-input"
-                  value=""
+                  value={pickedRelativeId}
                   onChange={(e) => {
-                    const picked = relatives.find((r) => r.id === e.target.value);
+                    const id = e.target.value;
+                    setPickedRelativeId(id);
+                    if (!id) return;
+                    const picked = relatives.find((r) => r.id === id);
                     if (!picked) return;
-                    // Pre-fill phone from the person's card when set; if the
-                    // card has no phone, clear the field so the user knows
-                    // they have to type one in.
-                    setPhone(picked.phone ?? '');
+                    // Prefill phone from the person's card when set. When
+                    // the card has no phone, KEEP whatever was already in
+                    // the input — don't punish the user for picking a
+                    // relative with missing data after they'd already
+                    // typed a number.
+                    if (picked.phone) setPhone(withPlus(picked.phone));
                   }}
                 >
                   <option value="">— выбрать из дерева —</option>

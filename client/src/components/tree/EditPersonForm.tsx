@@ -166,7 +166,8 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
         deathDateKnown: fullDeathDate,
         note: note.trim() || undefined,
         address: address.trim() || undefined,
-        phone: phone.trim() || undefined,
+        // Force a leading "+" so stored phones have a consistent format.
+        phone: phone.trim() ? (phone.trim().startsWith('+') ? phone.trim() : '+' + phone.trim().replace(/^\++/, '')) : undefined,
         maritalStatus: maritalStatus || undefined,
       });
       // Photo upload is best-effort and isolated from the main save: if the
