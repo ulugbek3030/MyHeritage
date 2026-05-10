@@ -75,6 +75,10 @@ export const createRequest = async (
         OR phone = $2
         OR regexp_replace(COALESCE(phone, ''), '^\\+', '') = $2
         OR regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = $2
+        -- Click sometimes omits phone_number for non-identified users
+        -- so users.phone is NULL even though the JSONB blob has it.
+        -- Fall back to matching against the cached profile phone too.
+        OR regexp_replace(COALESCE(click_profile->>'phone_number', ''), '[^0-9]', '', 'g') = $2
      LIMIT 1`,
     [phone, noPlus]
   );

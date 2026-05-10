@@ -44,9 +44,16 @@ treeAccessRoutes.get('/tree-access-requests/outgoing', async (req, res, next) =>
 
 treeAccessRoutes.get('/tree-access-requests/incoming', async (req, res, next) => {
   try {
-    // Need the user's own phone to also match requests sent to a phone that
-    // didn't yet have a resolved target_user_id at create-time.
-    const u = await query<{ phone: string | null }>(`SELECT phone FROM users WHERE id = $1`, [req.user!.id]);
+    // Need the user's own phone to match requests sent before the recipient
+    // existed (target_user_id was NULL at create-time). Falls back to the
+    // cached Click profile when users.phone hasn't been populated yet —
+    // non-identified Click users land with phone NULL in our row but the
+    // JSONB blob may still carry their phone_number.
+    const u = await query<{ phone: string | null }>(
+      `SELECT COALESCE(phone, click_profile->>'phone_number') AS phone
+       FROM users WHERE id = $1`,
+      [req.user!.id]
+    );
     res.json(await listIncoming(req.user!.id, u.rows[0]?.phone ?? null));
   } catch (e) { next(e); }
 });
