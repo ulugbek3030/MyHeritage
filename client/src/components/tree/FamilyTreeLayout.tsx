@@ -53,6 +53,10 @@ interface Props {
    *  onFocusConsumed once the autofit has fired. */
   focusPersonId?: string | null;
   onFocusConsumed?: () => void;
+  /** Guest-tree mode — read-only view. Hides the "+" plus button on
+   *  cards and the "Add father / Add mother" placeholders so the user
+   *  can't mutate someone else's tree. */
+  readOnly?: boolean;
 }
 
 // Dashed-card placeholder with a U-shaped notch at the top so the '+' button
@@ -80,7 +84,7 @@ const NotchedPlaceholder = ({ gender, onActivate }: { gender: 'male' | 'female';
   </div>
 );
 
-export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick, onAddParent, onDiveSubfamily, grantedTreesByPhone, onTunnel, onSecondaryEntriesChange, focusPersonId, onFocusConsumed }: Props) => {
+export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick, onAddParent, onDiveSubfamily, grantedTreesByPhone, onTunnel, onSecondaryEntriesChange, focusPersonId, onFocusConsumed, readOnly }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
   // Track real viewport size — re-runs the auto-centre when WebView orientation
   // or chrome height changes.
@@ -875,7 +879,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                 eventIcons={personEventIcons?.[person.id]}
                 onClick={onPersonClick}
                 onPlusClick={onPlusClick}
-                showPlus={true}
+                showPlus={!readOnly}
                 tunnelTreeId={(() => {
                   if (!person.phone || !grantedTreesByPhone) return null;
                   // Normalise the card's phone to digits-only so a "+" or
@@ -1066,7 +1070,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                 eventIcons={personEventIcons?.[person.id]}
                 onClick={onPersonClick}
                 onPlusClick={onPlusClick}
-                showPlus={true}
+                showPlus={!readOnly}
                 tunnelTreeId={(() => {
                   if (!person.phone || !grantedTreesByPhone) return null;
                   // Normalise the card's phone to digits-only so a "+" or
@@ -1137,8 +1141,10 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           );
         })()}
 
-        {/* Placeholder cards from topRowSlots and ownerSpouseSlot. */}
-        {topRowSlots.flatMap((entry) =>
+        {/* Placeholder cards from topRowSlots and ownerSpouseSlot — hidden
+            in read-only / guest-tree mode so the user can't add to
+            someone else's tree. */}
+        {!readOnly && topRowSlots.flatMap((entry) =>
           [entry.fatherSlot, entry.motherSlot].map((slot) => (
             <div
               key={`top-${entry.childId}-${slot.gender}`}
@@ -1160,7 +1166,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             </div>
           ))
         )}
-        {ownerSpouseSlot && (
+        {!readOnly && ownerSpouseSlot && (
           <div
             data-tree-card="placeholder"
             style={{
@@ -1180,9 +1186,10 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           </div>
         )}
 
-        {/* "Start here" hint — only on a brand-new tree (just the Click-seeded
-            owner with both parents missing on the topmost row). */}
-        {persons.length === 1 && (() => {
+        {/* "Start here" hint — only on a brand-new OWN tree (just the
+            Click-seeded owner with both parents missing on the topmost
+            row). Suppressed in read-only/guest-tree mode. */}
+        {!readOnly && persons.length === 1 && (() => {
           const ownerEntry = topRowSlots.find((s) => s.childId === ownerId);
           if (!ownerEntry) return null;
           const motherSlot = ownerEntry.motherSlot;

@@ -276,6 +276,7 @@ export const TreeViewPage = () => {
           onSecondaryEntriesChange={setSecondaryEntries}
           focusPersonId={focusPersonId}
           onFocusConsumed={() => setFocusPersonId(null)}
+          readOnly={!isOwnTree}
         />
       </div>
       <PersonSheet
@@ -283,14 +284,16 @@ export const TreeViewPage = () => {
         onClose={() => setSelectedPerson(null)}
         person={selectedPerson}
         isOwner={!!selectedPerson && selectedPerson.id === data.tree.ownerPersonId}
-        onEdit={() => { if (selectedPerson) { setEditOpen(selectedPerson); setSelectedPerson(null); } }}
-        onEditBio={() => { if (selectedPerson) { setBioOpen(selectedPerson); setSelectedPerson(null); } }}
-        onAdd={() => { if (selectedPerson) { setAddOpen(selectedPerson); setSelectedPerson(null); } }}
-        onDelete={() => {
+        // Guest mode (viewing someone else's tree via tunnel): edit /
+        // add-relative / delete / edit-bio all disabled. View-only.
+        onEdit={isOwnTree ? () => { if (selectedPerson) { setEditOpen(selectedPerson); setSelectedPerson(null); } } : undefined}
+        onEditBio={isOwnTree ? () => { if (selectedPerson) { setBioOpen(selectedPerson); setSelectedPerson(null); } } : undefined}
+        onAdd={isOwnTree ? () => { if (selectedPerson) { setAddOpen(selectedPerson); setSelectedPerson(null); } } : undefined}
+        onDelete={isOwnTree ? () => {
           if (!selectedPerson) return;
           setDeletePending(selectedPerson);
           setSelectedPerson(null);
-        }}
+        } : undefined}
         // Wire "Запросить доступ к древу" only when:
         //   - the person has a phone (= the join key for the request), AND
         //   - access ISN'T already granted (no tunnel on the card yet) —

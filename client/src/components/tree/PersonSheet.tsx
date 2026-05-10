@@ -14,9 +14,12 @@ interface Props {
   /** True when this card is the tree owner — hides the Delete button so the
    *  user can't accidentally wipe themselves out and break the tree. */
   isOwner?: boolean;
-  onEdit: () => void;
-  onAdd: () => void;
-  onDelete: () => void;
+  /** Each action below is optional: callers that pass `undefined` get the
+   *  corresponding button hidden. Used by guest-tree mode (viewing someone
+   *  else's tree via tunnel) to suppress edit / add / delete. */
+  onEdit?: () => void;
+  onAdd?: () => void;
+  onDelete?: () => void;
   onEditBio?: () => void;
   /** When set, "Запросить доступ к древу" button shows. Wires to the
    *  ExpandTree modal with this person's phone pre-filled so the user can
@@ -158,10 +161,15 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, isO
         </div>
       )}
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
-        <button onClick={onEdit} style={{padding:16,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:14,color:'var(--text)',fontWeight:700,fontSize:16}}>Редактировать</button>
-        <button onClick={onAdd} style={{padding:16,background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:'#0a0a0d',border:'none',borderRadius:14,fontWeight:800,fontSize:16}}>+ Родственник</button>
-      </div>
+      {/* Edit / add-relative pair — only when the caller wired the
+          handlers (= own tree). Guest-tree mode omits them so the user
+          can't mutate someone else's data. */}
+      {(onEdit || onAdd) && (
+        <div style={{display:'grid',gridTemplateColumns: onEdit && onAdd ? '1fr 1fr' : '1fr',gap:10,marginBottom:10}}>
+          {onEdit && <button onClick={onEdit} style={{padding:16,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:14,color:'var(--text)',fontWeight:700,fontSize:16}}>Редактировать</button>}
+          {onAdd && <button onClick={onAdd} style={{padding:16,background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:'#0a0a0d',border:'none',borderRadius:14,fontWeight:800,fontSize:16}}>+ Родственник</button>}
+        </div>
+      )}
       {onEditBio && (
         <button onClick={onEditBio} style={{width:'100%',padding:14,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:14,color:'var(--text)',fontSize:15,fontWeight:700,marginBottom:10}}>📝 Описание</button>
       )}
@@ -191,7 +199,7 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, isO
           🌳 Запросить доступ к древу
         </button>
       )}
-      {!isOwner && (
+      {!isOwner && onDelete && (
         <button onClick={onDelete} style={{width:'100%',padding:14,background:'transparent',border:'1px solid rgba(248,113,113,0.3)',borderRadius:14,color:'#f87171',fontSize:15}}>Удалить</button>
       )}
     </BottomSheet>
