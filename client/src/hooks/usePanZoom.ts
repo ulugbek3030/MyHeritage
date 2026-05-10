@@ -218,22 +218,40 @@ export const usePanZoom = (
     ) => {
       const vp = viewportRef.current;
       if (!vp || !vp.clientWidth || !vp.clientHeight) return;
+      // EFFECTIVE viewport size: vp's CSS box can be much taller than the
+      // user's actual visible window (tree-stage has min-height: 75dvh +
+      // flex-stretch). On those devices vp.clientHeight is e.g. 1585px
+      // while window.innerHeight is ~900 — using clientHeight directly
+      // dropped the owner into the middle of the off-screen lower half.
+      // We use the intersection of the tree-stage rect with the screen
+      // viewport so "vp centre" means "screen centre".
+      const rect = vp.getBoundingClientRect();
+      const winH = typeof window !== 'undefined' ? window.innerHeight : vp.clientHeight;
+      const visibleTop = Math.max(0, rect.top);
+      const visibleBottom = Math.min(winH, rect.bottom);
+      const visibleH = Math.max(1, visibleBottom - visibleTop);
+      // Centre of the visible band, expressed in tree-stage-local px
+      // (i.e. relative to rect.top, which is where the frame's natural
+      // top sits at translate=0).
+      const visibleCY = (visibleTop + visibleBottom) / 2 - rect.top;
+      const vpW = vp.clientWidth;
+
       // Picks the largest scale that lets the whole content bbox fit in
-      // viewport with `padding` px of breathing room on each side. Capped
-      // at 1× (never zoom past natural size). Floored at 0.45 so postage-
-      // stamp trees stay readable.
+      // the VISIBLE band with `padding` px of breathing room on each
+      // side. Capped at 1× (never zoom past natural size). Floored at
+      // 0.45 so postage-stamp trees stay readable.
       const boxW = Math.max(1, boxRight - boxLeft);
       const boxH = Math.max(1, boxBottom - boxTop);
-      const fitH = (vp.clientHeight - 2 * padding) / boxH;
-      const fitW = (vp.clientWidth - 2 * padding) / boxW;
+      const fitH = (visibleH - 2 * padding) / boxH;
+      const fitW = (vpW - 2 * padding) / boxW;
       const AUTOFIT_MIN = 0.45;
       const newScale = Math.max(AUTOFIT_MIN, Math.min(MAX_SCALE, Math.min(fitH, fitW, 1)));
       scale.current = newScale;
-      // Place the OWNER's frame-coord at (vp centre X, vp centre Y +
-      // offsetY). With offsetY < 0 the owner sits above centre — top of
-      // the tree gets more room.
-      tx.current = vp.clientWidth / 2 - ownerX * newScale;
-      ty.current = vp.clientHeight / 2 + offsetY - ownerY * newScale;
+      // Place the OWNER's frame-coord at (vp centre X, visibleCY +
+      // offsetY). With offsetY < 0 the owner sits above the visible
+      // centre — top of the tree gets more room.
+      tx.current = vpW / 2 - ownerX * newScale;
+      ty.current = visibleCY + offsetY - ownerY * newScale;
       apply();
     },
     /** Reset zoom to 1 and re-apply the current translate. */
