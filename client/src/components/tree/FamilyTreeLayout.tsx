@@ -558,13 +558,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   const ownerCenterX = ownerNode ? ownerNode.left * (NODE_W / 2) + NODE_W / 2 : layoutW / 2;
   const ownerCenterY = ownerNode ? ownerNode.top * (NODE_H / 2) + TOP_PAD + NODE_H / 2 : contentH / 2;
 
-  // Add one full viewport of drag-room past every content edge so the user
-  // can pull the tree completely off-screen in any direction (the user
-  // explicitly asked for unrestricted drag).
-  const padW = vpSize.w || 0;
-  const padH = vpSize.h || 0;
-  const halfW = Math.max(LAYOUT_W_MIN / 2, ownerCenterX, layoutW - ownerCenterX) + padW;
-  const halfH = Math.max(LAYOUT_H_MIN / 2, ownerCenterY, contentH - ownerCenterY) + padH;
+  const halfW = Math.max(LAYOUT_W_MIN / 2, ownerCenterX, layoutW - ownerCenterX);
+  const halfH = Math.max(LAYOUT_H_MIN / 2, ownerCenterY, contentH - ownerCenterY);
   const W = Math.round(halfW * 2);
   const H = Math.round(halfH * 2);
   const LEFT_PAD = Math.round(halfW - ownerCenterX);
@@ -719,8 +714,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           flexShrink: 0,
         }}
       >
-      <div ref={content} style={{ position: 'absolute', top: TOP_OFFSET, left: LEFT_PAD, width: layoutW, height: H, willChange: 'transform' }}>
-        <svg width={W} height={H} style={{ position: 'absolute', top: TOP_PAD, left: 0, pointerEvents: 'none' }}>
+      <div ref={content} style={{ position: 'absolute', top: TOP_OFFSET, left: LEFT_PAD, width: layoutW, height: contentH, willChange: 'transform' }}>
+        <svg width={layoutW} height={contentH} style={{ position: 'absolute', top: TOP_PAD, left: 0, pointerEvents: 'none' }}>
           {/* strokeLinecap="butt" — at junctions the segment's shortened end and
               the arc's start share the same point; round caps would double up there
               and render as a small dot. Butt caps are flush. */}
