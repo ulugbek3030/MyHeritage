@@ -43,6 +43,10 @@ interface Props {
   grantedTreesByPhone?: Record<string, string>;
   /** Fired when the tunnel icon is tapped on a granted card. */
   onTunnel?: (treeId: string) => void;
+  /** Fires when the lineage / secondary-entry sets are computed so the
+   *  parent can know which cards have a "dive into their subfamily"
+   *  affordance (= same persons that get the tree-collapsed-pill on top). */
+  onSecondaryEntriesChange?: (ids: Set<string>) => void;
 }
 
 // Dashed-card placeholder with a U-shaped notch at the top so the '+' button
@@ -70,7 +74,7 @@ const NotchedPlaceholder = ({ gender, onActivate }: { gender: 'male' | 'female';
   </div>
 );
 
-export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick, onAddParent, onDiveSubfamily, grantedTreesByPhone, onTunnel }: Props) => {
+export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick, onAddParent, onDiveSubfamily, grantedTreesByPhone, onTunnel, onSecondaryEntriesChange }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
   // Track real viewport size — re-runs the auto-centre when WebView orientation
   // or chrome height changes.
@@ -155,6 +159,14 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
     for (const id of hideAnc) hide.add(id);
     return { hidden: hide, secondaryEntries: secondary };
   }, [ownerId, relationships]);
+
+  // Surface secondaryEntries to the parent so it can wire features that
+  // depend on "this card has a tree-collapsed-pill" (e.g. show the
+  // "Посмотреть семью" button in PersonSheet only for these persons).
+  useEffect(() => {
+    onSecondaryEntriesChange?.(secondaryEntries);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secondaryEntries]);
 
   const visiblePersons = useMemo(() => persons.filter((p) => !hidden.has(p.id)), [persons, hidden]);
   const visibleRelationships = useMemo(

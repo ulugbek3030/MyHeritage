@@ -46,6 +46,11 @@ export const TreeViewPage = () => {
   const [expandPrefillPhone, setExpandPrefillPhone] = useState<string | null>(null);
   const [incomingCount, setIncomingCount] = useState(0);
   const [grantedTrees, setGrantedTrees] = useState<GrantedTree[]>([]);
+  // Ids that get the tree-collapsed-pill in the layout (= married-in
+  // spouses whose ancestry is folded away). The "Посмотреть семью"
+  // button in PersonSheet is only meaningful for these — for everyone
+  // else the dive page would just show the same tree.
+  const [secondaryEntries, setSecondaryEntries] = useState<Set<string>>(new Set());
   const [events, setEvents] = useState<FamilyEvent[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   // Tracks any active fetch (initial load or post-mutation reload). Used to
@@ -263,6 +268,7 @@ export const TreeViewPage = () => {
           onDiveSubfamily={(id) => nav(`/trees/${treeId}/dive/${id}`)}
           grantedTreesByPhone={grantedTreesByPhone}
           onTunnel={(otherTreeId) => nav(`/trees/${otherTreeId}`)}
+          onSecondaryEntriesChange={setSecondaryEntries}
         />
       </div>
       <PersonSheet
@@ -304,9 +310,13 @@ export const TreeViewPage = () => {
           };
         })()}
         // "Посмотреть семью" — dive into the subfamily centred on this
-        // person. Existing /trees/:treeId/dive/:personId page.
+        // person. Only wired for persons that ALSO get the
+        // tree-collapsed-pill on top of their card (= married-in
+        // spouses whose ancestry is folded away). For everyone else
+        // the dive page would just show the same tree, so the button
+        // is suppressed.
         onViewSubfamily={
-          selectedPerson
+          selectedPerson && secondaryEntries.has(selectedPerson.id)
             ? () => {
                 const id = selectedPerson.id;
                 setSelectedPerson(null);
