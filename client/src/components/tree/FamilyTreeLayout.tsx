@@ -12,12 +12,15 @@ import { useDrag } from '../../hooks/useDrag';
 // NODE_W/NODE_H control BOTH the per-card grid step (i.e. spacing between
 // siblings/parents) AND the total canvas size. Cards themselves are sized in
 // CSS (.pcard width=72, height ≈92). The gap between cards is NODE_W − 72.
-const NODE_W = 144;   // spacing between siblings ≈ 72 px
-const NODE_H = 184;   // spacing between generations ≈ 92 px
+// All sizes scaled +20% (March 2026 design pass).
+const NODE_W = 173;   // spacing between siblings ≈ 86 px
+const NODE_H = 221;   // spacing between generations ≈ 110 px
+// Card height inside the wrapper — referenced by connector math below.
+const CARD_H = 110;
 // Empty buffer above the top generation. We render "Add father" / "Add mother"
 // placeholders for parentless persons one full generation above their card,
 // so this needs at least NODE_H of room to keep them on canvas.
-const TOP_PAD = 200;
+const TOP_PAD = 240;
 // Extra room below the bottom generation — same intent as TOP_PAD but for
 // kids being added below. 25% is enough breathing room; the canvas grows
 // naturally as descendants get added.
@@ -806,7 +809,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             const lowestParentTop = Math.max(...parentPositions.map((pos) => pos.top));
             const coupleLineY = lowestParentTop * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
             const childCenterX = (childPos.left + 1) * (NODE_W / 2);
-            const childTopY = childPos.top * (NODE_H / 2) + TOP_PAD + (NODE_H - 92) / 2;
+            const childTopY = childPos.top * (NODE_H / 2) + TOP_PAD + (NODE_H - CARD_H) / 2;
             const horizSpan = Math.abs(childCenterX - couplemidX);
             let d: string;
             if (horizSpan < 0.5) {
@@ -855,7 +858,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               // the simple single-parent connector here too would duplicate
               // a line — skip it.
               if (node.parents.length >= 2) return null;
-              const childTopY = e.top * (NODE_H / 2) + TOP_PAD + (NODE_H - 92) / 2;
+              const childTopY = e.top * (NODE_H / 2) + TOP_PAD + (NODE_H - CARD_H) / 2;
               const childCenterX = e.left * (NODE_W / 2) + NODE_W / 2;
 
               const sibInLayout = node.siblings
@@ -869,7 +872,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               if (sameRowSib && parentInLayout.length > 0) {
                 // Halfway between parents' bottom and child's top — same
                 // sibling-bar Y relatives-tree uses internally.
-                const parentBottomY = parentInLayout[0].top * (NODE_H / 2) + TOP_PAD + (NODE_H + 92) / 2;
+                const parentBottomY = parentInLayout[0].top * (NODE_H / 2) + TOP_PAD + (NODE_H + CARD_H) / 2;
                 const barY = parentBottomY + (childTopY - parentBottomY) / 2;
                 // Start the bar extension at the couple-midpoint (or single
                 // parent's centre) so we don't overlap relatives-tree's own
@@ -896,7 +899,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               }
 
               if (parentInLayout.length > 0) {
-                const parentBottomY = parentInLayout[0].top * (NODE_H / 2) + TOP_PAD + (NODE_H + 92) / 2;
+                const parentBottomY = parentInLayout[0].top * (NODE_H / 2) + TOP_PAD + (NODE_H + CARD_H) / 2;
                 return (
                   <line key={`extra-conn-${e.id}`}
                     x1={childCenterX} y1={parentBottomY}
@@ -959,7 +962,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         {(topRowSlots.length > 0 || ownerSpouseSlot) && (() => {
           const stroke = { stroke: 'rgba(255,255,255,0.3)', strokeWidth: '1.4', strokeDasharray: '3 3' };
           const PLACEHOLDER_H = 82;
-          const PERSON_H = 92;
+          const PERSON_H = CARD_H;
           return (
             <svg width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
               {topRowSlots.map((entry) => {
