@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import { pool, query } from '../db/pool.js';
 import { BadRequestError, NotFoundError } from '../utils/errors.js';
 
@@ -182,6 +183,59 @@ const getRequest = async (id: string): Promise<TreeAccessRequest> => {
 };
 
 /**
+ * Whether the given user is allowed to act on (accept / decline) a request.
+ * Either they ARE the target_user_id, OR target_user_id is NULL and their
+ * phone matches the request's target_phone (covers the case where the
+ * recipient hadn't yet existed / had no phone at create time).
+ */
+const userOwnsRequest = async (
+  client: PoolClient,
+  requestId: string,
+  userId: string,
+): Promise<{
+  ok: boolean;
+  requesterId: string;
+  status: string;
+  targetUserId: string | null;
+}> => {
+  const r = await client.query<{
+    requester_id: string;
+    target_user_id: string | null;
+    target_phone: string;
+    status: string;
+  }>(
+    `SELECT requester_id, target_user_id, target_phone, status
+     FROM tree_access_requests WHERE id = $1 FOR UPDATE`,
+    [requestId]
+  );
+  const row = r.rows[0];
+  if (!row) return { ok: false, requesterId: '', status: '', targetUserId: null };
+  if (row.target_user_id === userId) {
+    return { ok: true, requesterId: row.requester_id, status: row.status, targetUserId: row.target_user_id };
+  }
+  if (row.target_user_id === null) {
+    const tp = row.target_phone;
+    const tpNoPlus = tp.replace(/^\++/, '').replace(/[^0-9]/g, '');
+    const u = await client.query<{ id: string }>(
+      `SELECT id FROM users
+       WHERE id = $1
+         AND (
+           phone = $2
+           OR phone = $3
+           OR regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = $3
+           OR regexp_replace(COALESCE(click_profile->>'phone_number', ''), '[^0-9]', '', 'g') = $3
+         )
+       LIMIT 1`,
+      [userId, tp, tpNoPlus]
+    );
+    if (u.rows[0]) {
+      return { ok: true, requesterId: row.requester_id, status: row.status, targetUserId: row.target_user_id };
+    }
+  }
+  return { ok: false, requesterId: row.requester_id, status: row.status, targetUserId: row.target_user_id };
+};
+
+/**
  * Accept a pending request. Inserts TWO grant rows — one in each direction —
  * so both users can see each other's trees afterwards.
  */
@@ -189,17 +243,18 @@ export const acceptRequest = async (id: string, userId: string): Promise<TreeAcc
   const c = await pool.connect();
   try {
     await c.query('BEGIN');
-    const r = await c.query<{ requester_id: string; target_user_id: string | null; status: string }>(
-      `SELECT requester_id, target_user_id, status FROM tree_access_requests WHERE id = $1 FOR UPDATE`,
-      [id]
-    );
-    const row = r.rows[0];
-    if (!row) throw new NotFoundError('Request not found');
-    if (row.target_user_id !== userId) throw new BadRequestError('Not your request');
-    if (row.status !== 'pending') throw new BadRequestError(`Request already ${row.status}`);
+    const own = await userOwnsRequest(c, id, userId);
+    if (!own.ok && !own.requesterId) throw new NotFoundError('Request not found');
+    if (!own.ok) throw new BadRequestError('Not your request');
+    if (own.status !== 'pending') throw new BadRequestError(`Request already ${own.status}`);
+    // Stamp target_user_id while accepting if it was NULL — keeps the row
+    // canonical for future status queries / list filters.
     await c.query(
-      `UPDATE tree_access_requests SET status = 'accepted', responded_at = NOW() WHERE id = $1`,
-      [id]
+      `UPDATE tree_access_requests
+       SET status = 'accepted', responded_at = NOW(),
+           target_user_id = COALESCE(target_user_id, $2)
+       WHERE id = $1`,
+      [id, userId]
     );
     // Reciprocal grants. ON CONFLICT keeps it idempotent if a grant already
     // exists from a previous request.
@@ -207,7 +262,7 @@ export const acceptRequest = async (id: string, userId: string): Promise<TreeAcc
       `INSERT INTO tree_access_grants (user_a_id, user_b_id, request_id)
        VALUES ($1, $2, $3), ($2, $1, $3)
        ON CONFLICT (user_a_id, user_b_id) DO NOTHING`,
-      [row.requester_id, userId, id]
+      [own.requesterId, userId, id]
     );
     await c.query('COMMIT');
     return await getRequest(id);
@@ -220,19 +275,28 @@ export const acceptRequest = async (id: string, userId: string): Promise<TreeAcc
 };
 
 export const declineRequest = async (id: string, userId: string): Promise<TreeAccessRequest> => {
-  const r = await query<{ target_user_id: string | null; status: string }>(
-    `SELECT target_user_id, status FROM tree_access_requests WHERE id = $1`,
-    [id]
-  );
-  const row = r.rows[0];
-  if (!row) throw new NotFoundError('Request not found');
-  if (row.target_user_id !== userId) throw new BadRequestError('Not your request');
-  if (row.status !== 'pending') throw new BadRequestError(`Request already ${row.status}`);
-  await query(
-    `UPDATE tree_access_requests SET status = 'declined', responded_at = NOW() WHERE id = $1`,
-    [id]
-  );
-  return await getRequest(id);
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    const own = await userOwnsRequest(c, id, userId);
+    if (!own.ok && !own.requesterId) throw new NotFoundError('Request not found');
+    if (!own.ok) throw new BadRequestError('Not your request');
+    if (own.status !== 'pending') throw new BadRequestError(`Request already ${own.status}`);
+    await c.query(
+      `UPDATE tree_access_requests
+       SET status = 'declined', responded_at = NOW(),
+           target_user_id = COALESCE(target_user_id, $2)
+       WHERE id = $1`,
+      [id, userId]
+    );
+    await c.query('COMMIT');
+    return await getRequest(id);
+  } catch (e) {
+    await c.query('ROLLBACK');
+    throw e;
+  } finally {
+    c.release();
+  }
 };
 
 export const cancelRequest = async (id: string, userId: string): Promise<TreeAccessRequest> => {
