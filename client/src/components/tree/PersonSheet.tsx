@@ -112,14 +112,18 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, isO
         </div>
       )}
 
-      {/* Phone — tappable on mobile (tel: link). Shown only when set; the
-          Click-SSO auto-seeded owner person comes with it filled in. */}
-      {person.phone && (
-        <div style={{ marginBottom: 24, textAlign: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>Телефон</div>
-          <a href={`tel:${person.phone}`} style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', fontFeatureSettings: "'tnum' 1", textDecoration: 'none' }}>{person.phone}</a>
-        </div>
-      )}
+      {/* Phone — tappable on mobile (tel: link). Always display with a
+          leading "+" regardless of how the value was stored (older rows
+          may not have one). */}
+      {person.phone && (() => {
+        const display = person.phone.startsWith('+') ? person.phone : '+' + person.phone.replace(/^\++/, '');
+        return (
+          <div style={{ marginBottom: 24, textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>Телефон</div>
+            <a href={`tel:${display}`} style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', fontFeatureSettings: "'tnum' 1", textDecoration: 'none' }}>{display}</a>
+          </div>
+        );
+      })()}
 
       {/* Short description / note. Pulled out of the centered items list so
           it can wrap as proper paragraph text instead of a single bullet. */}

@@ -72,11 +72,27 @@ export const TreeViewPage = () => {
     // and we don't want a parallel fetch to mutate state behind the back
     // of a Принять / Отклонить click.
     if (expandOpen || notificationsOpen) return;
-    listIncomingRequests().then((rs) => setIncomingCount(rs.length)).catch(() => {});
-    // Re-fetch granted trees on the same trigger — after the user accepts
-    // a request the grant list grows and tunnel icons on matching cards
-    // should appear without a page reload.
-    listGrantedTrees().then(setGrantedTrees).catch(() => {});
+    const poll = () => {
+      listIncomingRequests().then((rs) => setIncomingCount(rs.length)).catch(() => {});
+      // Re-fetch granted trees on the same trigger — after the user accepts
+      // a request the grant list grows and tunnel icons on matching cards
+      // should appear without a page reload.
+      listGrantedTrees().then(setGrantedTrees).catch(() => {});
+    };
+    poll();
+    // Periodic poll so the recipient sees a request without manually
+    // reloading the page. 30s is light enough not to be wasteful and
+    // tight enough to feel "live".
+    const interval = window.setInterval(poll, 30_000);
+    // Also re-poll when the tab/WebView comes back to the foreground —
+    // covers the case where the user backgrounded the app between the
+    // sender clicking Send and the recipient opening it.
+    const onVisible = () => { if (document.visibilityState === 'visible') poll(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [expandOpen, notificationsOpen]);
 
   // Map phone → other user's tree id. Cards whose person.phone matches one
