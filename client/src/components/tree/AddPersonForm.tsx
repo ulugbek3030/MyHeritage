@@ -514,7 +514,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
               </div>
             )}
 
-            <input className="auth-input" placeholder="Имя" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            <input className="auth-input" placeholder="Имя" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus />
 
             {gender === 'female' && (
               <input className="auth-input" placeholder="Девичья фамилия" value={maidenName} onChange={(e) => setMaidenName(e.target.value)} />
