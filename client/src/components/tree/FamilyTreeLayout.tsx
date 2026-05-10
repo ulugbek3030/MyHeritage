@@ -561,7 +561,10 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   // additionally enforced to be wider than the viewport — otherwise drag-
   // left would be impossible (scrollLeft can't go negative).
   const layoutW = canvasW * (NODE_W / 2);
-  const layoutH = canvasH * (NODE_H / 2) + TOP_PAD;
+  // +40% vertical room: extends the canvas so cards can breathe and drag-down
+  // works even on sparse trees. Driven separately from BOTTOM_PAD_RATIO since
+  // we want the EXTRA height applied before pad math, not after.
+  const layoutH = (canvasH * (NODE_H / 2) + TOP_PAD) * 1.4;
   const naturalW = Math.round(layoutW * (1 + 2 * SIDE_PAD_RATIO));
   const minW = (vpSize.w || 0) + 200;
   const W = Math.max(naturalW, minW);
