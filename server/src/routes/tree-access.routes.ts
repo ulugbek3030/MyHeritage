@@ -92,7 +92,11 @@ treeAccessRoutes.get('/me/granted-trees', async (req, res, next) => {
       phone: string | null;
       treeId: string;
     }>(
-      `SELECT
+      // DISTINCT ON (u.id) collapses the row-set to one entry per granted
+      // user — earlier the JOIN onto trees could multiply when a user has
+      // more than one tree row, and any stray duplicate grants would also
+      // show up twice in the «Подтверждённые» list.
+      `SELECT DISTINCT ON (u.id)
          u.id                                                AS "userId",
          u.display_name                                      AS "displayName",
          -- Phone fallback to click_profile so the client tunnel-lookup
@@ -103,7 +107,7 @@ treeAccessRoutes.get('/me/granted-trees', async (req, res, next) => {
        JOIN users u ON u.id = g.user_b_id
        JOIN trees t ON t.user_id = u.id
        WHERE g.user_a_id = $1
-       ORDER BY g.created_at DESC`,
+       ORDER BY u.id, g.created_at DESC`,
       [req.user!.id]
     );
     res.json(r.rows);
