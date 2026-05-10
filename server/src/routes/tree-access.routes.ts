@@ -93,10 +93,12 @@ treeAccessRoutes.get('/me/granted-trees', async (req, res, next) => {
       treeId: string;
     }>(
       `SELECT
-         u.id           AS "userId",
-         u.display_name AS "displayName",
-         u.phone        AS "phone",
-         t.id           AS "treeId"
+         u.id                                                AS "userId",
+         u.display_name                                      AS "displayName",
+         -- Phone fallback to click_profile so the client tunnel-lookup
+         -- has SOMETHING to match against even if users.phone is NULL.
+         COALESCE(u.phone, u.click_profile->>'phone_number') AS "phone",
+         t.id                                                AS "treeId"
        FROM tree_access_grants g
        JOIN users u ON u.id = g.user_b_id
        JOIN trees t ON t.user_id = u.id

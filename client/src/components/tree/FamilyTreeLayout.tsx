@@ -815,7 +815,14 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                 onClick={onPersonClick}
                 onPlusClick={onPlusClick}
                 showPlus={true}
-                tunnelTreeId={person.phone ? grantedTreesByPhone?.[person.phone] ?? null : null}
+                tunnelTreeId={(() => {
+                  if (!person.phone || !grantedTreesByPhone) return null;
+                  // Normalise the card's phone to digits-only so a "+" or
+                  // whitespace difference vs. the granted user's stored
+                  // phone doesn't defeat the tunnel lookup.
+                  const key = person.phone.replace(/[^0-9]/g, '');
+                  return grantedTreesByPhone[key] ?? null;
+                })()}
                 onTunnelClick={onTunnel}
               />
               {isSecondary && (
@@ -999,7 +1006,14 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                 onClick={onPersonClick}
                 onPlusClick={onPlusClick}
                 showPlus={true}
-                tunnelTreeId={person.phone ? grantedTreesByPhone?.[person.phone] ?? null : null}
+                tunnelTreeId={(() => {
+                  if (!person.phone || !grantedTreesByPhone) return null;
+                  // Normalise the card's phone to digits-only so a "+" or
+                  // whitespace difference vs. the granted user's stored
+                  // phone doesn't defeat the tunnel lookup.
+                  const key = person.phone.replace(/[^0-9]/g, '');
+                  return grantedTreesByPhone[key] ?? null;
+                })()}
                 onTunnelClick={onTunnel}
               />
               {isSecondary && (

@@ -102,13 +102,17 @@ export const TreeViewPage = () => {
     };
   }, [expandOpen, notificationsOpen]);
 
-  // Map phone → other user's tree id. Cards whose person.phone matches one
-  // of these phones render a tunnel icon that navigates into the granted
-  // tree on tap.
+  // Map digits-only phone → other user's tree id. Cards whose person.phone
+  // matches one of these (after normalisation) render a tunnel icon.
+  // Digits-only because the granted phone may come from users.phone in one
+  // format ("+998974035075") and the card phone in another ("998 974 035075"
+  // or no leading "+"). The tunnel lookup must succeed across formats.
   const grantedTreesByPhone = useMemo(() => {
     const m: Record<string, string> = {};
     for (const g of grantedTrees) {
-      if (g.phone) m[g.phone] = g.treeId;
+      if (!g.phone) continue;
+      const key = g.phone.replace(/[^0-9]/g, '');
+      if (key) m[key] = g.treeId;
     }
     return m;
   }, [grantedTrees]);
