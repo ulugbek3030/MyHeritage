@@ -47,6 +47,12 @@ interface Props {
    *  parent can know which cards have a "dive into their subfamily"
    *  affordance (= same persons that get the tree-collapsed-pill on top). */
   onSecondaryEntriesChange?: (ids: Set<string>) => void;
+  /** When set, the next autofit centres on THIS person's card instead of
+   *  the bbox centre. Used right after adding a relative so the new card
+   *  lands under the user's eye. Parent should clear it via
+   *  onFocusConsumed once the autofit has fired. */
+  focusPersonId?: string | null;
+  onFocusConsumed?: () => void;
 }
 
 // Dashed-card placeholder with a U-shaped notch at the top so the '+' button
@@ -74,7 +80,7 @@ const NotchedPlaceholder = ({ gender, onActivate }: { gender: 'male' | 'female';
   </div>
 );
 
-export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick, onAddParent, onDiveSubfamily, grantedTreesByPhone, onTunnel, onSecondaryEntriesChange }: Props) => {
+export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick, onAddParent, onDiveSubfamily, grantedTreesByPhone, onTunnel, onSecondaryEntriesChange, focusPersonId, onFocusConsumed }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
   // Track real viewport size — re-runs the auto-centre when WebView orientation
   // or chrome height changes.
@@ -534,16 +540,31 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               offsetY,
             };
             console.log('[autofit]', dbg);
-            panZoom.fitAndCentreOnOwner(
-              ownerXInFrame,
-              ownerYInFrame,
-              leftPad,
-              topOffset,
-              leftPad + layoutWlocal,
-              topOffset + contentHlocal,
-              16,
-              offsetY,
-            );
+            // If the parent flagged a freshly-added person to centre on,
+            // panZoom.centreOn(theirCard) puts that card under the user's
+            // eye instead of running the usual bbox-centre fit. Useful
+            // right after adding a relative so the user immediately sees
+            // where the new card landed.
+            const focusNode = focusPersonId
+              ? layout.nodes.find((n) => n.id === focusPersonId)
+              : null;
+            if (focusNode) {
+              const focusX = leftPad + focusNode.left * (NODE_W / 2) + NODE_W / 2;
+              const focusY = topOffset + focusNode.top * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
+              panZoom.centreOn(focusX, focusY);
+              onFocusConsumed?.();
+            } else {
+              panZoom.fitAndCentreOnOwner(
+                ownerXInFrame,
+                ownerYInFrame,
+                leftPad,
+                topOffset,
+                leftPad + layoutWlocal,
+                topOffset + contentHlocal,
+                16,
+                offsetY,
+              );
+            }
             const after = panZoom.state();
             console.log('[autofit] state after =', after);
             // Also POST to the server so we can read it from journalctl
@@ -551,7 +572,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             fetch('/api/debug-log', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ autofit: dbg, after }),
+              body: JSON.stringify({ autofit: dbg, after, focusPersonId }),
             }).catch(() => {});
           }
           lastFitDimsRef.current = dimsKey;
@@ -568,7 +589,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       if (timer != null) clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, ownerId]);
+  }, [layout, ownerId, focusPersonId]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 

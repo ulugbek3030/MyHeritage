@@ -51,6 +51,11 @@ export const TreeViewPage = () => {
   // button in PersonSheet is only meaningful for these — for everyone
   // else the dive page would just show the same tree.
   const [secondaryEntries, setSecondaryEntries] = useState<Set<string>>(new Set());
+  // After adding a relative we set this to the new person's id; the
+  // FamilyTreeLayout's autofit centres on that card instead of bbox-
+  // centring the whole tree, so the user immediately sees where the
+  // new card landed. Cleared via onFocusConsumed once autofit fires.
+  const [focusPersonId, setFocusPersonId] = useState<string | null>(null);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   // Tracks any active fetch (initial load or post-mutation reload). Used to
@@ -269,6 +274,8 @@ export const TreeViewPage = () => {
           grantedTreesByPhone={grantedTreesByPhone}
           onTunnel={(otherTreeId) => nav(`/trees/${otherTreeId}`)}
           onSecondaryEntriesChange={setSecondaryEntries}
+          focusPersonId={focusPersonId}
+          onFocusConsumed={() => setFocusPersonId(null)}
         />
       </div>
       <PersonSheet
@@ -333,7 +340,13 @@ export const TreeViewPage = () => {
           targetPerson={addOpen}
           persons={data.persons}
           relationships={data.relationships}
-          onCreated={reload}
+          onCreated={(newPersonId) => {
+            // Flag the new card so the next autofit centres on it
+            // instead of the bbox. Cleared by onFocusConsumed after
+            // the autofit fires.
+            setFocusPersonId(newPersonId);
+            reload();
+          }}
           presetRole={addPreset ?? undefined}
         />
       )}

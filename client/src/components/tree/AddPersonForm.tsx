@@ -17,7 +17,9 @@ interface Props {
   targetPerson: Person;
   persons: Person[];
   relationships: Relationship[];
-  onCreated: () => void;
+  /** Fires after the person is created. Passes the new person's id so
+   *  the parent can centre the view on the newly-created card. */
+  onCreated: (newPersonId: string) => void;
   /**
    * If set, the form skips the role-picker step and opens directly on the
    * "fill details" step with the chosen mode + gender. Used when the user
@@ -346,7 +348,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
           alert('Человек добавлен, но фото загрузить не удалось. Попробуйте JPG/PNG/WEBP до 5 МБ.');
         }
       }
-      onCreated();
+      onCreated(newPerson.id);
       handleClose();
     } catch (err) {
       console.error('[AddPerson] save failed', err);

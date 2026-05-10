@@ -105,7 +105,7 @@ export const SubfamilyPage = () => {
           targetPerson={addOpen}
           persons={data.persons}
           relationships={data.relationships}
-          onCreated={reload}
+          onCreated={() => reload()}
           presetRole={addPreset ?? undefined}
         />
       )}
