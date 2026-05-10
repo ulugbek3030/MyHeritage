@@ -90,5 +90,54 @@ export const updatePerson = async (id: string, fields: Partial<CreatePersonInput
 };
 
 export const deletePerson = async (id: string): Promise<void> => {
-  await query(`DELETE FROM persons WHERE id = $1`, [id]);
+  // After removing the target, sweep the tree: anyone no longer reachable
+  // from the owner (via couple OR parent_child edges) is left as orphaned
+  // garbage in the DB and won't render. Delete them too.
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    const treeRow = await c.query<{ tree_id: string; owner_person_id: string | null }>(
+      `SELECT p.tree_id, t.owner_person_id
+       FROM persons p JOIN trees t ON t.id = p.tree_id
+       WHERE p.id = $1`,
+      [id]
+    );
+    const treeId = treeRow.rows[0]?.tree_id ?? null;
+    const ownerId = treeRow.rows[0]?.owner_person_id ?? null;
+    await c.query('DELETE FROM persons WHERE id = $1', [id]);
+    if (treeId && ownerId && ownerId !== id) {
+      // BFS from owner across both rel categories. Anyone not in `reach`
+      // gets dropped.
+      const all = await c.query<{ id: string }>(`SELECT id FROM persons WHERE tree_id = $1`, [treeId]);
+      const personIds = new Set(all.rows.map((r) => r.id));
+      const rels = await c.query<{ p1: string; p2: string }>(
+        `SELECT person1_id AS p1, person2_id AS p2 FROM relationships WHERE tree_id = $1`,
+        [treeId]
+      );
+      const adj = new Map<string, Set<string>>();
+      for (const pid of personIds) adj.set(pid, new Set());
+      for (const r of rels.rows) {
+        if (adj.has(r.p1)) adj.get(r.p1)!.add(r.p2);
+        if (adj.has(r.p2)) adj.get(r.p2)!.add(r.p1);
+      }
+      const reach = new Set<string>([ownerId]);
+      const q = [ownerId];
+      while (q.length) {
+        const u = q.shift()!;
+        for (const v of adj.get(u) ?? []) {
+          if (!reach.has(v)) { reach.add(v); q.push(v); }
+        }
+      }
+      const orphans = [...personIds].filter((pid) => !reach.has(pid));
+      if (orphans.length) {
+        await c.query(`DELETE FROM persons WHERE id = ANY($1::uuid[])`, [orphans]);
+      }
+    }
+    await c.query('COMMIT');
+  } catch (e) {
+    await c.query('ROLLBACK');
+    throw e;
+  } finally {
+    c.release();
+  }
 };

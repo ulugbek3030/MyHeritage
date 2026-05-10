@@ -113,6 +113,7 @@ export const TreeViewPage = () => {
         open={!!selectedPerson}
         onClose={() => setSelectedPerson(null)}
         person={selectedPerson}
+        isOwner={!!selectedPerson && selectedPerson.id === data.tree.ownerPersonId}
         onEdit={() => { if (selectedPerson) { setEditOpen(selectedPerson); setSelectedPerson(null); } }}
         onEditBio={() => { if (selectedPerson) { setBioOpen(selectedPerson); setSelectedPerson(null); } }}
         onAdd={() => { if (selectedPerson) { setAddOpen(selectedPerson); setSelectedPerson(null); } }}

@@ -10,13 +10,16 @@ interface Props {
   onClose: () => void;
   person: Person | null;
   upcomingBirthdayInDays?: number | null;
+  /** True when this card is the tree owner — hides the Delete button so the
+   *  user can't accidentally wipe themselves out and break the tree. */
+  isOwner?: boolean;
   onEdit: () => void;
   onAdd: () => void;
   onDelete: () => void;
   onEditBio?: () => void;
 }
 
-export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onEdit, onAdd, onDelete, onEditBio }: Props) => {
+export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, isOwner, onEdit, onAdd, onDelete, onEditBio }: Props) => {
   if (!person) return null;
   const fullName = [person.firstName, person.lastName, person.middleName].filter(Boolean).join(' ');
   const showCta = person.isAlive && typeof upcomingBirthdayInDays === 'number' && upcomingBirthdayInDays >= 0 && upcomingBirthdayInDays <= 14;
@@ -135,7 +138,9 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onE
       {onEditBio && (
         <button onClick={onEditBio} style={{width:'100%',padding:14,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:14,color:'var(--text)',fontSize:15,fontWeight:700,marginBottom:10}}>📝 Описание</button>
       )}
-      <button onClick={onDelete} style={{width:'100%',padding:14,background:'transparent',border:'1px solid rgba(248,113,113,0.3)',borderRadius:14,color:'#f87171',fontSize:15}}>Удалить</button>
+      {!isOwner && (
+        <button onClick={onDelete} style={{width:'100%',padding:14,background:'transparent',border:'1px solid rgba(248,113,113,0.3)',borderRadius:14,color:'#f87171',fontSize:15}}>Удалить</button>
+      )}
     </BottomSheet>
   );
 };
