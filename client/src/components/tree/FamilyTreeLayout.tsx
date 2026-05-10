@@ -554,11 +554,17 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               panZoom.centreOn(focusX, focusY);
               onFocusConsumed?.();
             } else {
+              // bbox starts at the first CARD row (= topOffset + TOP_PAD),
+              // not at the content div's top edge. TOP_PAD is empty space
+              // reserved ABOVE the top row for "Add father / Add mother"
+              // placeholders; including it in the bbox shifted the
+              // computed centre half a card upward and the user saw the
+              // whole tree drift one card below screen centre.
               panZoom.fitAndCentreOnOwner(
                 ownerXInFrame,
                 ownerYInFrame,
                 leftPad,
-                topOffset,
+                topOffset + TOP_PAD,
                 leftPad + layoutWlocal,
                 topOffset + contentHlocal,
                 16,
