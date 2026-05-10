@@ -73,11 +73,18 @@ export const TreeViewPage = () => {
     // of a Принять / Отклонить click.
     if (expandOpen || notificationsOpen) return;
     const poll = () => {
-      listIncomingRequests().then((rs) => setIncomingCount(rs.length)).catch(() => {});
+      listIncomingRequests()
+        .then((rs) => {
+          setIncomingCount(rs.length);
+          console.log('[notif poll] incoming=', rs.length);
+        })
+        .catch((e) => console.error('[notif poll] incoming failed', e));
       // Re-fetch granted trees on the same trigger — after the user accepts
       // a request the grant list grows and tunnel icons on matching cards
       // should appear without a page reload.
-      listGrantedTrees().then(setGrantedTrees).catch(() => {});
+      listGrantedTrees()
+        .then(setGrantedTrees)
+        .catch((e) => console.error('[notif poll] grants failed', e));
     };
     poll();
     // Periodic poll so the recipient sees a request without manually

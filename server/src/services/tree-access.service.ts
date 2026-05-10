@@ -69,13 +69,20 @@ export const createRequest = async (
   // first sign in (TODO). Match phones tolerantly: stored users.phone may
   // or may not have a leading "+" depending on which path created the row.
   const noPlus = phoneSansPlus(phone);
-  const t = await query<{ id: string }>(
-    `SELECT id FROM users
-     WHERE phone = $1 OR phone = $2 OR regexp_replace(phone, '^\\+', '') = $2
+  const t = await query<{ id: string; phone: string | null }>(
+    `SELECT id, phone FROM users
+     WHERE phone = $1
+        OR phone = $2
+        OR regexp_replace(COALESCE(phone, ''), '^\\+', '') = $2
+        OR regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = $2
      LIMIT 1`,
     [phone, noPlus]
   );
   const targetUserId = t.rows[0]?.id ?? null;
+  // TEMP debug: log every request creation so we can verify the lookup
+  // is finding the right recipient. Remove once the flow is stable.
+  console.log('[tar create] requester=%s rawPhone=%o normalised=%o noPlus=%o target=%s targetPhone=%o',
+    requesterId, rawPhone, phone, noPlus, targetUserId ?? 'NULL', t.rows[0]?.phone ?? null);
   if (targetUserId === requesterId) {
     throw new BadRequestError('Cannot request access from yourself');
   }
@@ -133,7 +140,7 @@ export const listIncoming = async (
   userPhone: string | null,
 ): Promise<TreeAccessRequest[]> => {
   const phoneWithPlus = userPhone ? (userPhone.startsWith('+') ? userPhone : `+${userPhone.replace(/^\++/, '')}`) : null;
-  const phoneNoPlus = userPhone ? userPhone.replace(/^\++/, '') : null;
+  const phoneNoPlus = userPhone ? userPhone.replace(/^\++/, '').replace(/[^0-9]/g, '') : null;
   const r = await query<TreeAccessRequest>(
     `SELECT ${REQUEST_COLS}
      FROM tree_access_requests tar
@@ -141,16 +148,20 @@ export const listIncoming = async (
      WHERE (
        tar.target_user_id = $1
        OR (
-         tar.target_user_id IS NULL
-         AND (tar.target_phone = $2
-              OR tar.target_phone = $3
-              OR regexp_replace(tar.target_phone, '^\\+', '') = $3)
+         tar.target_phone = $2
+         OR tar.target_phone = $3
+         OR regexp_replace(tar.target_phone, '^\\+', '') = $3
+         OR regexp_replace(tar.target_phone, '[^0-9]', '', 'g') = $3
        )
      )
      AND tar.status = 'pending'
      ORDER BY tar.created_at DESC`,
     [userId, phoneWithPlus, phoneNoPlus]
   );
+  // TEMP debug — log every poll so we can see whether the recipient's
+  // phone matching is reaching anything. Remove once stable.
+  console.log('[tar incoming] user=%s userPhone=%o noPlus=%o → %d rows',
+    userId, phoneWithPlus, phoneNoPlus, r.rows.length);
   return r.rows;
 };
 
