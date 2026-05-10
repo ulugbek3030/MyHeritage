@@ -8,6 +8,7 @@ export interface Person {
   verified: boolean; note: string | null; photoUrl: string | null;
   phone: string | null;
   address: string | null;
+  maritalStatus: string | null;
 }
 export type CoupleStatus = 'married' | 'civil' | 'dating' | 'divorced' | 'widowed' | 'other';
 export type ChildRelation = 'biological' | 'adopted' | 'foster' | 'guardianship' | 'stepchild';

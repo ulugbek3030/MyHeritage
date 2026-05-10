@@ -1,6 +1,7 @@
 import type { Person } from '../../types';
 import { BottomSheet } from '../ui/BottomSheet';
 import { formatBirthFull, formatDeathFull } from '../../utils/dateFormat';
+import { maritalStatusLabel } from '../../utils/maritalStatus';
 
 // Avatar sized at 25% larger than the previous 120px hero.
 const AVATAR = 150;
@@ -95,6 +96,16 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, isO
           </div>
         );
       })()}
+
+      {/* Marital status — only when set. Shown as a labeled row so a long
+          label like "Не проживают совместно" wraps cleanly instead of being
+          stuffed into the bullet-style items above. */}
+      {person.maritalStatus && (
+        <div style={{ marginBottom: 24, textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>Семейное положение</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>{maritalStatusLabel(person.maritalStatus)}</div>
+        </div>
+      )}
 
       {/* Phone — tappable on mobile (tel: link). Shown only when set; the
           Click-SSO auto-seeded owner person comes with it filled in. */}

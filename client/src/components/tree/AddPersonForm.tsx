@@ -3,6 +3,7 @@ import type { Person, Relationship } from '../../types';
 import { createPerson, type CreatePersonInput } from '../../api/persons';
 import { generateMiddleName } from '../../utils/uzNamings';
 import { adjustSurnameForGender } from '../../utils/uzNamings';
+import { MARITAL_STATUSES } from '../../utils/maritalStatus';
 import { BottomSheet } from '../ui/BottomSheet';
 import { Silhouette, type SilhouetteKind } from '../ui/Silhouette';
 import '../../styles/form.css';
@@ -62,6 +63,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
   const [photo, setPhoto] = useState<File | null>(null);
   const [note, setNote] = useState<string>('');
   const [address, setAddress] = useState<string>('');
+  const [maritalStatus, setMaritalStatus] = useState<string>('');
   const [busy, setBusy] = useState(false);
 
   const hasParents = useMemo(
@@ -162,6 +164,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
     setPhoto(null);
     setNote('');
     setAddress('');
+    setMaritalStatus('');
     // When opened with a presetRole the role-picker step is bypassed entirely;
     // skipping back to it would land the user on a meaningless screen.
     setStep(presetRole ? 'form' : 'select');
@@ -286,6 +289,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         deathDateKnown: !isAlive && fullDeathDate,
         note: note.trim() || undefined,
         address: address.trim() || undefined,
+        maritalStatus: maritalStatus || undefined,
         relationships: rels,
       });
       // Photo upload is best-effort — see EditPersonForm for the why.
@@ -599,6 +603,18 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
               value={address}
               onChange={(e) => setAddress(e.target.value)}
             />
+
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Семейное положение</div>
+            <select
+              className="auth-input"
+              value={maritalStatus}
+              onChange={(e) => setMaritalStatus(e.target.value)}
+            >
+              <option value="">— не указано —</option>
+              {MARITAL_STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
 
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Фото</div>
             <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} className="auth-input" />

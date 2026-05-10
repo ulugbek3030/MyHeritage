@@ -41,6 +41,7 @@ export const createPersonSchema = z.object({
   note: z.string().optional(),
   phone: z.string().regex(/^\+?\d{9,15}$/).optional(),
   address: z.string().max(500).optional(),
+  maritalStatus: z.string().max(50).optional(),
   relationships: z
     .array(
       z.object({

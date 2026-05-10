@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { Person, Relationship } from '../../types';
 import { updatePerson } from '../../api/persons';
 import { createRelationship, deleteRelationship } from '../../api/relationships';
+import { MARITAL_STATUSES } from '../../utils/maritalStatus';
 import { BottomSheet } from '../ui/BottomSheet';
 import '../../styles/form.css';
 
@@ -34,6 +35,7 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
   const [photo, setPhoto] = useState<File | null>(null);
   const [note, setNote] = useState<string>(person.note ?? '');
   const [address, setAddress] = useState<string>(person.address ?? '');
+  const [maritalStatus, setMaritalStatus] = useState<string>(person.maritalStatus ?? '');
   const [busy, setBusy] = useState(false);
 
   // Existing parent links + candidate list for "attach another parent".
@@ -72,6 +74,7 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
     setPhoto(null);
     setNote(person.note ?? '');
     setAddress(person.address ?? '');
+    setMaritalStatus(person.maritalStatus ?? '');
   }, [person.id]);
 
   const attachParent = async (parentId: string) => {
@@ -139,6 +142,7 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
         deathDateKnown: !isAlive && fullDeathDate,
         note: note.trim() || undefined,
         address: address.trim() || undefined,
+        maritalStatus: maritalStatus || undefined,
       });
       // Photo upload is best-effort and isolated from the main save: if the
       // user picks a HEIC the browser can't decode, or the server rejects the
@@ -279,6 +283,18 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
           value={address}
           onChange={(e) => setAddress(e.target.value)}
         />
+
+        <div style={dateLabel}>Семейное положение</div>
+        <select
+          className="auth-input"
+          value={maritalStatus}
+          onChange={(e) => setMaritalStatus(e.target.value)}
+        >
+          <option value="">— не указано —</option>
+          {MARITAL_STATUSES.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
 
         {persons && relationships && (
           <>
