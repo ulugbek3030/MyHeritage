@@ -12,10 +12,12 @@ import { BottomSheet } from '../components/ui/BottomSheet';
 import { Breadcrumbs } from '../components/ui/Breadcrumbs';
 import { Loader } from '../components/ui/Loader';
 import { reachableFromRoot, computeRelation } from '../utils/subfamilyTransform';
+import { useAuth } from '../context/AuthContext';
 
 export const SubfamilyPage = () => {
   const { treeId, personId } = useParams<{ treeId: string; personId: string }>();
   const nav = useNavigate();
+  const { user } = useAuth();
   const [data, setData] = useState<FullTree | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [addOpen, setAddOpen] = useState<Person | null>(null);
@@ -39,6 +41,10 @@ export const SubfamilyPage = () => {
   };
 
   const root: Person | undefined = data?.persons.find((p) => p.id === personId);
+  // Guest-mode flag: when viewing a *foreign* tree (via a tunnel from your own
+  // tree), every editing affordance must be suppressed so users can't mutate
+  // someone else's data. Mirrors TreeViewPage's `isOwnTree` check.
+  const isOwnTree = !!user && !!data && data.tree.userId === user.id;
   const reachable = useMemo(() => data && personId ? reachableFromRoot(personId, data.relationships, 3) : new Set<string>(), [data, personId]);
 
   const filteredPersons = useMemo(() => data ? data.persons.filter((p) => reachable.has(p.id)) : [], [data, reachable]);
@@ -62,7 +68,7 @@ export const SubfamilyPage = () => {
         >←</button>
         <div style={{flex:1}}>
           <div style={{fontSize:15,fontWeight:800}}>Семья: {root.firstName}</div>
-          <Breadcrumbs items={[{ label: 'Моё дерево', onClick: () => nav(`/trees/${treeId}`) }, { label: root.firstName }]} />
+          <Breadcrumbs items={[{ label: isOwnTree ? 'Моё дерево' : 'Древо', onClick: () => nav(`/trees/${treeId}`) }, { label: root.firstName }]} />
         </div>
       </header>
 
@@ -72,14 +78,15 @@ export const SubfamilyPage = () => {
           relationships={filteredRels}
           ownerId={root.id}
           onPersonClick={(id) => setSelectedPerson(data.persons.find((p) => p.id === id) ?? null)}
-          onPlusClick={(id) => { const p = data.persons.find((p) => p.id === id); if (p) { setAddPreset(null); setAddOpen(p); } }}
-          onAddParent={(id, gender) => {
+          onPlusClick={isOwnTree ? (id) => { const p = data.persons.find((p) => p.id === id); if (p) { setAddPreset(null); setAddOpen(p); } } : undefined}
+          onAddParent={isOwnTree ? (id, gender) => {
             const p = data.persons.find((pp) => pp.id === id);
             if (!p) return;
             setAddPreset({ mode: 'parent', gender });
             setAddOpen(p);
-          }}
+          } : undefined}
           onDiveSubfamily={(id) => nav(`/trees/${treeId}/dive/${id}`)}
+          readOnly={!isOwnTree}
         />
       </div>
 
@@ -88,14 +95,14 @@ export const SubfamilyPage = () => {
         onClose={() => setSelectedPerson(null)}
         person={selectedPerson}
         isOwner={!!selectedPerson && selectedPerson.id === data.tree.ownerPersonId}
-        onEdit={() => { if (selectedPerson) { setEditOpen(selectedPerson); setSelectedPerson(null); } }}
-        onEditBio={() => { if (selectedPerson) { setBioOpen(selectedPerson); setSelectedPerson(null); } }}
-        onAdd={() => { if (selectedPerson) { setAddOpen(selectedPerson); setSelectedPerson(null); } }}
-        onDelete={() => {
+        onEdit={isOwnTree ? () => { if (selectedPerson) { setEditOpen(selectedPerson); setSelectedPerson(null); } } : undefined}
+        onEditBio={isOwnTree ? () => { if (selectedPerson) { setBioOpen(selectedPerson); setSelectedPerson(null); } } : undefined}
+        onAdd={isOwnTree ? () => { if (selectedPerson) { setAddOpen(selectedPerson); setSelectedPerson(null); } } : undefined}
+        onDelete={isOwnTree ? () => {
           if (!selectedPerson) return;
           setDeletePending(selectedPerson);
           setSelectedPerson(null);
-        }}
+        } : undefined}
       />
       {addOpen && (
         <AddPersonForm
@@ -171,7 +178,11 @@ export const SubfamilyPage = () => {
         );
       })()}
 
-      {relation && (
+      {/* "вы — X" only makes sense on your *own* tree: it computes the
+          relation between the focal person and *the tree owner* (assumed to
+          be you). On a foreign tree the viewer isn't the owner, so the
+          badge would lie. */}
+      {isOwnTree && relation && (
         <div style={{position:'fixed',bottom:18,right:18,fontSize:11,color:'var(--accent)',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',padding:'7px 11px',borderRadius:8,fontWeight:700,boxShadow:'0 4px 14px rgba(0,0,0,0.4)'}}>
           вы — {relation}<br/><span style={{fontSize:9,color:'var(--text-dim)',fontWeight:500}}>в этом дереве</span>
         </div>
