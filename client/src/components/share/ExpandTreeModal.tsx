@@ -59,6 +59,13 @@ const withPlus = (raw: string | null | undefined): string => {
   return t.startsWith('+') ? t : '+' + t.replace(/^\++/, '');
 };
 
+/**
+ * Valid request phone: leading "+" followed by 9-15 digits. Mirrors the
+ * server's validator regex so the submit button only enables when the
+ * server will actually accept the value.
+ */
+const isValidPhone = (raw: string): boolean => /^\+\d{9,15}$/.test(raw.trim());
+
 export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Props) => {
   const [loading, setLoading] = useState(true);
   const [isIdentified, setIsIdentified] = useState<boolean | null>(null);
@@ -355,7 +362,21 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
                 {submitNotice}
               </div>
             )}
-            <button type="submit" disabled={busy || !phone.trim()} className="auth-btn">
+            {/* Submit gated on:
+                  - no network call in flight
+                  - phone matches +XXXXXXXXX (9-15 digits after the +)
+                  - relative selected from the dropdown (when one is
+                    available; if the modal was opened without a
+                    `relatives` list, this part is skipped). */}
+            <button
+              type="submit"
+              disabled={
+                busy
+                || !isValidPhone(phone)
+                || (Array.isArray(relatives) && relatives.length > 0 && !pickedRelativeId)
+              }
+              className="auth-btn"
+            >
               {busy ? 'Отправляем…' : 'Отправить запрос'}
             </button>
           </form>
