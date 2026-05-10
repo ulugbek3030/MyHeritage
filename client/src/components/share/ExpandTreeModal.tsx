@@ -76,13 +76,17 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
     try {
       setLoading(true);
       setError(null);
-      const status = await getIdentificationStatus();
+      // Identification status is still fetched so the read-out / future
+      // gate has its value, but it no longer blocks the rest of the
+      // request flow — we always fetch incoming + outgoing.
+      const [status, inc, out] = await Promise.all([
+        getIdentificationStatus().catch(() => ({ isIdentified: false })),
+        listIncomingRequests().catch(() => []),
+        listOutgoingRequests().catch(() => []),
+      ]);
       setIsIdentified(status.isIdentified);
-      if (status.isIdentified) {
-        const [inc, out] = await Promise.all([listIncomingRequests(), listOutgoingRequests()]);
-        setIncoming(inc);
-        setOutgoing(out.filter((r) => r.status === 'pending'));
-      }
+      setIncoming(inc);
+      setOutgoing(out.filter((r) => r.status === 'pending'));
     } catch (e) {
       console.error('[ExpandTree] failed to load', e);
       setError('Не удалось загрузить запросы. Попробуйте позже.');
@@ -165,28 +169,34 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
         После подтверждения <strong style={{ color: 'var(--text)' }}>вы оба</strong> сможете смотреть деревья друг друга.
       </div>
 
-      {/* Test-only — read-out of the user's identification flag from Click.
-          Lets us verify the SSO sync is writing users.is_identified
-          correctly without poking the DB. Remove once the flow is stable. */}
-      {!loading && isIdentified !== null && (
+      {/* Inline notification: how many pending requests are waiting for
+          this user's approval. Replaces the earlier identification-status
+          read-out — the user explicitly asked for a notification-style
+          message instead. */}
+      {!loading && incoming.length > 0 && (
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            padding: '8px 12px',
+            gap: 10,
+            padding: '10px 14px',
             marginBottom: 14,
-            borderRadius: 10,
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid var(--border)',
-            fontSize: 11,
-            color: 'var(--text-muted)',
-            fontFamily: 'ui-monospace, Menlo, monospace',
+            borderRadius: 12,
+            background: 'linear-gradient(180deg, rgba(251,191,36,0.18), rgba(251,191,36,0.06))',
+            border: '1px solid rgba(251,191,36,0.4)',
+            fontSize: 13,
+            color: 'var(--text)',
+            lineHeight: 1.4,
           }}
         >
-          <span style={{ fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase' }}>Статус идентификации:</span>
-          <span style={{ fontWeight: 800, color: isIdentified ? '#4ade80' : '#f87171' }}>
-            {isIdentified ? 'true (идентифицирован)' : 'false (не идентифицирован)'}
+          <span style={{ fontSize: 18 }}>🔔</span>
+          <span>
+            <strong style={{ color: 'var(--accent)' }}>
+              {incoming.length === 1
+                ? 'У вас новый запрос'
+                : `У вас ${incoming.length} новых запросов`}
+            </strong>{' '}
+            на просмотр древа — смотрите ниже.
           </span>
         </div>
       )}

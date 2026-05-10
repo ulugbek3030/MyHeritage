@@ -129,8 +129,36 @@ export const TreeViewPage = () => {
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
         </button>
-        <button onClick={() => setShareOpen(true)} style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',border:'none',color:'#0a0a0d',fontWeight:800,fontSize:14,marginLeft:6}}>⤴</button>
+        {/* Notification bell — replaces the old share-arrow. Opens the
+            «Расширить древо» modal so the user can see + accept any
+            pending incoming requests. Red dot when incomingCount > 0. */}
+        <button
+          onClick={() => setExpandOpen(true)}
+          aria-label={incomingCount > 0 ? `Уведомления (${incomingCount})` : 'Уведомления'}
+          style={{ position: 'relative', width: 36, height: 36, borderRadius: '50%', background: incomingCount > 0 ? 'linear-gradient(135deg,var(--accent),var(--accent-hover))' : 'rgba(255,255,255,0.06)', border: 'none', color: incomingCount > 0 ? '#0a0a0d' : 'var(--text)', marginLeft: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+          {incomingCount > 0 && (
+            <span aria-hidden="true" style={{ position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#f87171', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg)' }}>
+              {incomingCount}
+            </span>
+          )}
+        </button>
       </header>
+      {/* Entry banner — shows when the user lands on the tree with at least
+          one pending incoming request. Points them at the bell. */}
+      {incomingCount > 0 && (
+        <div style={{ margin: '0 18px 14px', padding: '12px 14px', borderRadius: 14, background: 'linear-gradient(180deg, rgba(251,191,36,0.18), rgba(251,191,36,0.06))', border: '1px solid rgba(251,191,36,0.4)', fontSize: 13, color: 'var(--text)', lineHeight: 1.45, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ fontSize: 18 }}>🔔</div>
+          <div style={{ flex: 1 }}>
+            <strong style={{ color: 'var(--accent)' }}>У вас новый запрос на просмотр древа.</strong>
+            {' '}Нажмите, пожалуйста, на значок уведомления в правом верхнем углу и посмотрите этот запрос.
+          </div>
+        </div>
+      )}
       <QuickActions
         onCalendar={() => nav(`/trees/${treeId}/calendar`)}
         onExpand={() => setExpandOpen(true)}
