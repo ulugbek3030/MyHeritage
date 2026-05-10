@@ -193,6 +193,44 @@ export const usePanZoom = (
       ty.current = vp.clientHeight / 2 - y * s;
       apply();
     },
+    /**
+     * Auto-fit + auto-centre on a bounding box (in unscaled frame coords).
+     *   - Picks a scale that fits the box in the viewport with `padding`
+     *     px of breathing room on each side, capped at 1× (we never zoom
+     *     IN past the natural size — large tree → smaller; small tree →
+     *     stays at 1).
+     *   - Translates the frame so the box centre lands at the viewport
+     *     centre, optionally shifted by `offsetY` screen-px (so the user
+     *     can land owner-card slightly below dead centre, leaving room
+     *     above for the "Add father" placeholders).
+     * Used on first paint and when the canvas reshapes (person added /
+     * removed).
+     */
+    fitAndCentreOnBox: (
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      padding = 40,
+      offsetY = 0,
+    ) => {
+      const vp = viewportRef.current;
+      if (!vp || !vp.clientWidth || !vp.clientHeight) return;
+      const safeW = Math.max(1, width);
+      const safeH = Math.max(1, height);
+      const fit = Math.min(
+        (vp.clientWidth - 2 * padding) / safeW,
+        (vp.clientHeight - 2 * padding) / safeH,
+        1,
+      );
+      const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, fit));
+      scale.current = newScale;
+      const cx = x + width / 2;
+      const cy = y + height / 2;
+      tx.current = vp.clientWidth / 2 - cx * newScale;
+      ty.current = vp.clientHeight / 2 + offsetY - cy * newScale;
+      apply();
+    },
     /** Reset zoom to 1 and re-apply the current translate. */
     resetZoom: () => {
       scale.current = 1;

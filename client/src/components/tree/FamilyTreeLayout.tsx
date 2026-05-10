@@ -446,7 +446,10 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       const vp = viewport.current;
       if (!vp) return;
       if (vp.clientWidth && vp.clientHeight) {
-        const dimsKey = `${layout.canvas.width}x${layout.canvas.height}`;
+        // Key on canvas dims + node count so adding / removing a person
+        // — even one that doesn't change canvas size (e.g. extra sibling
+        // fitting in the same row) — still re-triggers auto-fit-centre.
+        const dimsKey = `${layout.canvas.width}x${layout.canvas.height}|${layout.nodes.length}`;
         if (lastFitDimsRef.current !== dimsKey) {
           const ownerNode = layout.nodes.find((n) => n.id === ownerId);
           if (ownerNode) {
@@ -461,11 +464,21 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             const halfHlocal = Math.max(LAYOUT_H_MIN / 2, ownerCy, contentHlocal - ownerCy);
             const leftPad = halfWlocal - ownerCx;
             const topOffset = halfHlocal - ownerCy;
-            // Shift the centring target 50px ABOVE the owner so the owner
-            // card itself lands 50px BELOW viewport centre — leaves a bit
-            // of room at the top for the "Add father / Add mother"
-            // placeholders that hover above the owner on a fresh tree.
-            panZoom.centreOn(leftPad + ownerCx, topOffset + ownerCy - 50);
+            // Auto-fit + auto-centre: zoom out so the whole tree (cards +
+            // placeholders) fits in viewport with 40px breathing room,
+            // then translate so the layout's bbox centre lands 50px BELOW
+            // viewport centre (room at top for the "Add father / Add
+            // mother" placeholders that hover above the owner on a fresh
+            // tree). For trees that already fit at zoom=1 the scale stays
+            // at 1 — never zoom IN past natural size.
+            panZoom.fitAndCentreOnBox(
+              leftPad,
+              topOffset,
+              layoutWlocal,
+              contentHlocal,
+              40,
+              50,
+            );
           }
           lastFitDimsRef.current = dimsKey;
         }
