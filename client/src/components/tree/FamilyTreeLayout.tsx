@@ -4,8 +4,7 @@ import type { ExtNode } from 'relatives-tree/lib/types';
 import type { Person, Relationship } from '../../types';
 import { transformToTreeNodes } from '../../utils/treeTransform';
 import { PersonCard } from './PersonCard';
-import { useZoom } from '../../hooks/useZoom';
-import { useDrag } from '../../hooks/useDrag';
+import { usePanZoom } from '../../hooks/usePanZoom';
 
 // Card grid units. NODE_W/NODE_H = full unit; relatives-tree uses half-units, so cards
 // occupy 2 half-units wide. Generous values give breathing room between siblings.
@@ -398,21 +397,14 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
     return paths;
   }, [layout, visiblePersons, relationships]);
 
-  // The frame is a box that physically grows/shrinks with the user's zoom so
-  // that overflow-auto on .tree-stage gives correct scroll bounds. The JSX
-  // uses `calc(W * var(--cf-zoom))` and onScale updates ONLY the CSS
-  // variable, which React never sets — so the value survives re-renders
-  // cleanly. The frame is updated mid-pinch as well; combined with the
-  // pinch-focal scrollLeft/Top adjustment in useZoom, the content point
-  // under the user's fingers stays anchored throughout the gesture.
+  // Transform-based pan + zoom on the frame. No native scroll involved —
+  // the viewport (.tree-stage) has overflow:hidden and the frame is moved
+  // around inside it via CSS transform. This gives an "infinite canvas"
+  // feel: drag works in any direction at any zoom level without bumping a
+  // wall, and pinch zoom anchors on the finger midpoint instead of an
+  // arbitrary scroll-clamped position.
   const frame = useRef<HTMLDivElement>(null);
-  // Apply zoom transform on the FRAME (not just inner content) so the whole
-  // tree visually scales together around the owner card at frame centre.
-  // No --cf-zoom mirror on a CSS box — frame stays at its fixed W × H
-  // layout box; the visual size diverges via transform alone.
-  const _zoom = useZoom(frame as React.RefObject<HTMLElement>, undefined, viewport);
-  void _zoom;
-  useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
+  const panZoom = usePanZoom(frame, viewport);
 
   // Observe the viewport so the auto-centre re-runs when chrome/orientation
   // changes (Click WebView occasionally reflows on first paint).
@@ -435,12 +427,17 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   // instead of card.scrollIntoView — the native call walks the scroll chain
   // and was yanking the page header out of view.
   // Auto-centre on first paint AND every time the canvas changes shape
-  // (someone added/removed). The owner card sits at frame centre by
-  // construction (LEFT_PAD/TOP_OFFSET), so we just scroll the viewport
-  // to put frame-centre at vp-centre. No fit-zoom — user pinches if they
-  // want the whole tree on one screen.
+  // (someone added/removed). usePanZoom.centreOn translates the frame so
+  // the given frame-coord lands at the viewport centre — we feed the
+  // OWNER's position so the user always sees their own card in the
+  // middle. lastFitDimsRef gates re-runs to canvas-shape changes only,
+  // so a manual user pan/zoom isn't reset by an unrelated re-render.
+  // LEFT_PAD/TOP_OFFSET are computed below in render scope; we recompute
+  // them inside the effect from layout to avoid pulling them into hook
+  // deps (and to keep this effect above the `if (!layout) return` early
+  // return that breaks hook ordering otherwise).
   useEffect(() => {
-    if (!layout) return;
+    if (!layout || !ownerId) return;
     let attempts = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let raf: number | null = null;
@@ -448,19 +445,24 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       attempts += 1;
       const vp = viewport.current;
       if (!vp) return;
-      if (vp.clientWidth && vp.clientHeight && frame.current) {
+      if (vp.clientWidth && vp.clientHeight) {
         const dimsKey = `${layout.canvas.width}x${layout.canvas.height}`;
-        const dimsChanged = lastFitDimsRef.current !== dimsKey;
-        if (dimsChanged) {
-          // Frame element's getBoundingClientRect reflects the actual on-
-          // screen size (post-zoom). Owner sits at its geometric centre —
-          // so frame-centre IS owner-centre regardless of any user pinch.
-          const fr = frame.current.getBoundingClientRect();
-          const vpRect = vp.getBoundingClientRect();
-          const targetX = (fr.left + fr.width / 2) - (vpRect.left + vpRect.width / 2);
-          const targetY = (fr.top + fr.height / 2) - (vpRect.top + vpRect.height / 2);
-          vp.scrollLeft += targetX;
-          vp.scrollTop += targetY;
+        if (lastFitDimsRef.current !== dimsKey) {
+          const ownerNode = layout.nodes.find((n) => n.id === ownerId);
+          if (ownerNode) {
+            // Recompute the owner-centring frame math here so the effect
+            // doesn't depend on render-scope variables defined after the
+            // early return.
+            const ownerCx = ownerNode.left * (NODE_W / 2) + NODE_W / 2;
+            const ownerCy = ownerNode.top * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
+            const layoutWlocal = layout.canvas.width * (NODE_W / 2);
+            const contentHlocal = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
+            const halfWlocal = Math.max(LAYOUT_W_MIN / 2, ownerCx, layoutWlocal - ownerCx);
+            const halfHlocal = Math.max(LAYOUT_H_MIN / 2, ownerCy, contentHlocal - ownerCy);
+            const leftPad = halfWlocal - ownerCx;
+            const topOffset = halfHlocal - ownerCy;
+            panZoom.centreOn(leftPad + ownerCx, topOffset + ownerCy);
+          }
           lastFitDimsRef.current = dimsKey;
         }
         return;
@@ -475,7 +477,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       if (timer != null) clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout]);
+  }, [layout, ownerId]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 
@@ -657,15 +659,13 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       className="tree-stage"
       style={{
         position: 'relative',
-        overflow: 'auto',
+        // Transform-based pan/zoom — no native scroll, frame moves around
+        // inside this hidden-overflow viewport via translate+scale.
+        overflow: 'hidden',
         width: '100%',
         height: '100%',
         minHeight: 360,
         cursor: 'grab',
-        // No flex-centering here: the auto-fit useEffect explicitly scrolls
-        // the owner card into view, and flex-centering would visibly snap
-        // the frame's anchor when it crosses the viewport-fits-or-not
-        // boundary mid-zoom. Keeping the frame at top-left avoids that.
       }}
     >
       {(() => {
