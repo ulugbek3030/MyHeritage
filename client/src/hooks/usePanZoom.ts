@@ -218,37 +218,22 @@ export const usePanZoom = (
     ) => {
       const vp = viewportRef.current;
       if (!vp || !vp.clientWidth || !vp.clientHeight) return;
-      const halfVw = vp.clientWidth / 2;
-      const halfVh = vp.clientHeight / 2;
-      // Distance from owner to each bbox edge in unscaled frame coords.
-      const dLeft   = Math.max(0, ownerX - boxLeft);
-      const dRight  = Math.max(0, boxRight - ownerX);
-      const dTop    = Math.max(0, ownerY - boxTop);
-      const dBottom = Math.max(0, boxBottom - ownerY);
-      // Room available on each side of the owner-on-screen position
-      // (= vp centre + offsetY). offsetY > 0 means owner shifted DOWN,
-      // so there is MORE room above and LESS room below.
-      const roomLeft   = halfVw - padding;
-      const roomRight  = halfVw - padding;
-      const roomTop    = halfVh + offsetY - padding;
-      const roomBottom = halfVh - offsetY - padding;
-      const ratios = [
-        dLeft   > 0 ? roomLeft   / dLeft   : Infinity,
-        dRight  > 0 ? roomRight  / dRight  : Infinity,
-        dTop    > 0 ? roomTop    / dTop    : Infinity,
-        dBottom > 0 ? roomBottom / dBottom : Infinity,
-        1, // never zoom IN past natural size
-      ];
-      const fit = Math.min(...ratios);
-      // Floor at 0.45 (not the global MIN_SCALE) so the fit-and-centre
-      // never produces a tree so small the user can't read names. Better
-      // to let the bbox slightly overflow than to render postage-stamp
-      // cards. User can still pinch-out down to MIN_SCALE for free pan.
+      // Picks the largest scale that lets the whole content bbox fit in
+      // viewport with `padding` px of breathing room on each side. Capped
+      // at 1× (never zoom past natural size). Floored at 0.45 so postage-
+      // stamp trees stay readable.
+      const boxW = Math.max(1, boxRight - boxLeft);
+      const boxH = Math.max(1, boxBottom - boxTop);
+      const fitH = (vp.clientHeight - 2 * padding) / boxH;
+      const fitW = (vp.clientWidth - 2 * padding) / boxW;
       const AUTOFIT_MIN = 0.45;
-      const newScale = Math.max(AUTOFIT_MIN, Math.min(MAX_SCALE, fit));
+      const newScale = Math.max(AUTOFIT_MIN, Math.min(MAX_SCALE, Math.min(fitH, fitW, 1)));
       scale.current = newScale;
-      tx.current = halfVw - ownerX * newScale;
-      ty.current = halfVh + offsetY - ownerY * newScale;
+      // Place the OWNER's frame-coord at (vp centre X, vp centre Y +
+      // offsetY). With offsetY < 0 the owner sits above centre — top of
+      // the tree gets more room.
+      tx.current = vp.clientWidth / 2 - ownerX * newScale;
+      ty.current = vp.clientHeight / 2 + offsetY - ownerY * newScale;
       apply();
     },
     /** Reset zoom to 1 and re-apply the current translate. */
