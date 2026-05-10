@@ -37,6 +37,9 @@ export const TreeViewPage = () => {
   const [bioOpen, setBioOpen] = useState<Person | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [expandOpen, setExpandOpen] = useState(false);
+  // When set, opening the ExpandTreeModal pre-fills the phone from this
+  // person (used when "Запросить доступ к древу" is tapped on a card).
+  const [expandPrefillPhone, setExpandPrefillPhone] = useState<string | null>(null);
   const [incomingCount, setIncomingCount] = useState(0);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -148,6 +151,17 @@ export const TreeViewPage = () => {
           setDeletePending(selectedPerson);
           setSelectedPerson(null);
         }}
+        // Wire "Запросить доступ к древу" only when the person has a phone
+        // — that's the join key for the request, no phone = no point.
+        onRequestAccess={
+          selectedPerson?.phone
+            ? () => {
+                setExpandPrefillPhone(selectedPerson.phone);
+                setExpandOpen(true);
+                setSelectedPerson(null);
+              }
+            : undefined
+        }
       />
       {addOpen && (
         <AddPersonForm
@@ -182,7 +196,13 @@ export const TreeViewPage = () => {
         />
       )}
       {shareOpen && <ShareModal open onClose={() => setShareOpen(false)} treeId={treeId!} existingToken={data.tree.shareToken} />}
-      {expandOpen && <ExpandTreeModal open onClose={() => setExpandOpen(false)} />}
+      {expandOpen && (
+        <ExpandTreeModal
+          open
+          onClose={() => { setExpandOpen(false); setExpandPrefillPhone(null); }}
+          initialPhone={expandPrefillPhone}
+        />
+      )}
       {searchOpen && <TreeSearch persons={data.persons} onSelect={(id) => { document.querySelector(`[data-person-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onClose={() => setSearchOpen(false)} />}
       <Loader visible={busy} label="Загружаем дерево…" />
       {deletePending && (() => {

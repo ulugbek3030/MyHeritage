@@ -18,9 +18,14 @@ interface Props {
   onAdd: () => void;
   onDelete: () => void;
   onEditBio?: () => void;
+  /** When set, "Запросить доступ к древу" button shows. Wires to the
+   *  ExpandTree modal with this person's phone pre-filled so the user can
+   *  send a tree-access request straight from the person card. Hidden if
+   *  the person has no phone or is the owner themselves. */
+  onRequestAccess?: () => void;
 }
 
-export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, isOwner, onEdit, onAdd, onDelete, onEditBio }: Props) => {
+export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, isOwner, onEdit, onAdd, onDelete, onEditBio, onRequestAccess }: Props) => {
   if (!person) return null;
   const fullName = [person.firstName, person.lastName, person.middleName].filter(Boolean).join(' ');
   const showCta = person.isAlive && typeof upcomingBirthdayInDays === 'number' && upcomingBirthdayInDays >= 0 && upcomingBirthdayInDays <= 14;
@@ -148,6 +153,15 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, isO
       </div>
       {onEditBio && (
         <button onClick={onEditBio} style={{width:'100%',padding:14,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:14,color:'var(--text)',fontSize:15,fontWeight:700,marginBottom:10}}>📝 Описание</button>
+      )}
+      {/* "Запросить доступ к древу" — visible only when caller wires
+          onRequestAccess (which it does only for non-owner persons that
+          have a phone number = potential Click user). Tapping opens the
+          ExpandTree modal pre-filled with this person's phone. */}
+      {onRequestAccess && !isOwner && (
+        <button onClick={onRequestAccess} style={{ width: '100%', padding: 14, background: 'linear-gradient(135deg, rgba(251,191,36,0.18), rgba(251,191,36,0.08))', border: '1px solid rgba(251,191,36,0.35)', borderRadius: 14, color: 'var(--accent)', fontSize: 15, fontWeight: 800, marginBottom: 10, cursor: 'pointer' }}>
+          🌳 Запросить доступ к древу
+        </button>
       )}
       {!isOwner && (
         <button onClick={onDelete} style={{width:'100%',padding:14,background:'transparent',border:'1px solid rgba(248,113,113,0.3)',borderRadius:14,color:'#f87171',fontSize:15}}>Удалить</button>

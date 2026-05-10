@@ -29,14 +29,17 @@ import '../../styles/form.css';
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** Pre-fills the phone field — used when the user clicks "Запросить
+   *  доступ к древу" on a specific person card. */
+  initialPhone?: string | null;
 }
 
-export const ExpandTreeModal = ({ open, onClose }: Props) => {
+export const ExpandTreeModal = ({ open, onClose, initialPhone }: Props) => {
   const [loading, setLoading] = useState(true);
   const [isIdentified, setIsIdentified] = useState<boolean | null>(null);
   const [incoming, setIncoming] = useState<TreeAccessRequest[]>([]);
   const [outgoing, setOutgoing] = useState<TreeAccessRequest[]>([]);
-  const [phone, setPhone] = useState('+998');
+  const [phone, setPhone] = useState(initialPhone || '+998');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,9 +65,15 @@ export const ExpandTreeModal = ({ open, onClose }: Props) => {
   };
 
   useEffect(() => {
-    if (open) refresh();
+    if (open) {
+      refresh();
+      // Re-seed phone field every time the modal re-opens — if the caller
+      // passes a new initialPhone (e.g. opening from a different person
+      // card), prefer that over whatever the user last typed.
+      if (initialPhone) setPhone(initialPhone);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, initialPhone]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
