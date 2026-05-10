@@ -27,12 +27,13 @@ import {
 import '../../styles/form.css';
 
 /** A person from the user's tree, surfaced as an option in the
- *  "Выбрать из родственников" dropdown. Only persons with phones are
- *  passed in — there's no point selecting someone with no Click join key. */
+ *  "Выбрать из родственников" dropdown. `phone` is optional — when
+ *  present, the modal prefills the editable phone field after the user
+ *  picks; when null, the user types it manually. */
 export interface RelativeOption {
   id: string;
   name: string;
-  phone: string;
+  phone: string | null;
 }
 
 interface Props {
@@ -258,13 +259,17 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
                   value=""
                   onChange={(e) => {
                     const picked = relatives.find((r) => r.id === e.target.value);
-                    if (picked) setPhone(picked.phone);
+                    if (!picked) return;
+                    // Pre-fill phone from the person's card when set; if the
+                    // card has no phone, clear the field so the user knows
+                    // they have to type one in.
+                    setPhone(picked.phone ?? '');
                   }}
                 >
                   <option value="">— выбрать из дерева —</option>
                   {relatives.map((r) => (
                     <option key={r.id} value={r.id}>
-                      {r.name} ({r.phone})
+                      {r.name}{r.phone ? ` (${r.phone})` : ' (без телефона)'}
                     </option>
                   ))}
                 </select>

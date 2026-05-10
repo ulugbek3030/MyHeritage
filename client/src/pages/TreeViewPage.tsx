@@ -219,15 +219,16 @@ export const TreeViewPage = () => {
           open
           onClose={() => { setExpandOpen(false); setExpandPrefillPhone(null); }}
           initialPhone={expandPrefillPhone}
-          // Only persons with phones can be Click users → only they are
-          // valid request targets. Owner is excluded (they can't request
-          // access to their own tree).
+          // All relatives (owner excluded) so the user can pick anyone
+          // from the tree to request access from. Phone is optional:
+          // when present, the modal prefills the phone field; when
+          // missing, the user types it after picking.
           relatives={data.persons
-            .filter((p) => p.phone && p.id !== data.tree.ownerPersonId)
+            .filter((p) => p.id !== data.tree.ownerPersonId)
             .map((p) => ({
               id: p.id,
               name: [p.firstName, p.lastName].filter(Boolean).join(' '),
-              phone: p.phone!,
+              phone: p.phone ?? null,
             }))}
         />
       )}
