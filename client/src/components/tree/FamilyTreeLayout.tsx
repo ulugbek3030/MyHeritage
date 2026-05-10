@@ -498,7 +498,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             // Keeping |offsetY| comfortably below vp.h/2 preserves real
             // zoom levels.
             const ownerOnly = persons.length === 1;
-            const offsetY = ownerOnly ? -180 : -(120 + CARD_H);
+            const offsetY = ownerOnly ? -(180 + CARD_H) : -(120 + CARD_H);
             panZoom.fitAndCentreOnOwner(
               ownerXInFrame,
               ownerYInFrame,
