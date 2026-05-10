@@ -21,12 +21,10 @@ const CARD_H = 110;
 // placeholders for parentless persons one full generation above their card,
 // so this needs at least NODE_H of room to keep them on canvas.
 const TOP_PAD = 240;
-// Fixed minimum frame size (May 2026 spec). Owner card sits at the geometric
-// centre of this frame; tree content extends from there. Frame grows past
-// these minimums when the tree's natural extent doesn't fit. The user always
-// sees their own card at frame centre on first paint.
-const LAYOUT_W_MIN = 700;
-const LAYOUT_H_MIN = 1400;
+// TEST: drag-room без ограничений. Фрейм 4000×4000 — больше любого реального
+// дерева на этом этапе разработки, скролл во все стороны почти бесконечный.
+const LAYOUT_W_MIN = 4000;
+const LAYOUT_H_MIN = 4000;
 
 interface Props {
   persons: Person[];

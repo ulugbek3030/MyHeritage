@@ -1,9 +1,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-family); -webkit-font-smoothing: antialiased; }
-/* Block horizontal page scroll and the elastic rubber-band that exposed the
-   light Click WebView background when panning the tree past its viewport. */
-html, body { overflow-x: hidden; }
-body { overscroll-behavior: none; }
+/* TEST: убраны overflow-x:hidden и overscroll-behavior:none — drag без
+   ограничений на уровне страницы тоже. Если будет видно резинку Click
+   WebView'а, вернём. */
+/* html, body { overflow-x: hidden; } */
+/* body { overscroll-behavior: none; } */
 /* Disable native page-level pinch-zoom across the whole app. Click's Android
    WebView ignores the meta-viewport user-scalable=no, so without this the
    user's two-finger pinch on the tree zooms the WHOLE page instead of just
