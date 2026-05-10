@@ -14,6 +14,32 @@ export const BottomSheet = ({ open, onClose, children }: { open: boolean; onClos
     // synchronously without giving the effect a chance to fire with open=false.
     return () => { document.body.style.overflow = ''; };
   }, [open]);
+
+  // Block iOS / Click WebView's auto-scroll-to-focused-input. When the
+  // user taps a field the browser yanks the panel's scrollTop to bring
+  // the input into view; that leaves the form stuck at a random scroll
+  // position and the top fields hidden. We snapshot the scrollTop just
+  // before focus changes the layout and restore it on the next two
+  // animation frames (one for the focus shift, one for iOS's deferred
+  // scroll-into-view).
+  useEffect(() => {
+    if (!open) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const onFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      const saved = panel.scrollTop;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (panel.scrollTop !== saved) panel.scrollTop = saved;
+        });
+      });
+    };
+    panel.addEventListener('focusin', onFocusIn);
+    return () => panel.removeEventListener('focusin', onFocusIn);
+  }, [open]);
   if (!open) return null;
   return (
     <div
