@@ -204,7 +204,9 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
           </label>
         </div>
 
-        <input className="auth-input" placeholder="Имя" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus />
+        {/* No autoFocus on open — keyboard would push the sheet around
+            and obscure fields. User taps the field they want to edit. */}
+        <input className="auth-input" placeholder="Имя" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
 
         {gender === 'female' && (
           <input className="auth-input" placeholder="Девичья фамилия" value={maidenName} onChange={(e) => setMaidenName(e.target.value)} />

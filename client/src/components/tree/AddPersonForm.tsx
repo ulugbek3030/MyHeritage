@@ -526,7 +526,11 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
               </div>
             )}
 
-            <input className="auth-input" placeholder="Имя" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus />
+            {/* No autoFocus on open — the user explicitly didn't want the
+                keyboard popping up the moment the form appears (it pushes
+                the form around and obscures fields). They tap the field
+                they want to fill. */}
+            <input className="auth-input" placeholder="Имя" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
 
             {gender === 'female' && (
               <input className="auth-input" placeholder="Девичья фамилия" value={maidenName} onChange={(e) => setMaidenName(e.target.value)} />
