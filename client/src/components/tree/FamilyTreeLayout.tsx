@@ -468,8 +468,11 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             const ownerYInFrame = topOffset + ownerCy;
             // Auto-fit + auto-centre: scale picked per-side so the bbox
             // fits in viewport with 40px breathing room, then translated
-            // so the OWNER sits at vp centre + 50px (room above for the
-            // "Add father / Add mother" placeholders on a fresh tree).
+            // so the OWNER sits ABOVE vp centre (offsetY negative) — this
+            // leaves the bulk of the viewport below the owner for the
+            // tree to expand into (descendants + spouse + sibling rows).
+            // Placeholders for parents still fit above the owner because
+            // the per-side fit math computes roomTop accordingly.
             // Owner-centred (not bbox-centred) so the user always sees
             // their own card at the same spot regardless of how the tree
             // skews — descendant-heavy or ancestor-heavy.
@@ -481,7 +484,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               leftPad + layoutWlocal,
               topOffset + contentHlocal,
               40,
-              50,
+              -120,
             );
           }
           lastFitDimsRef.current = dimsKey;
