@@ -10,6 +10,7 @@ import {
   acceptRequest,
   declineRequest,
   cancelRequest,
+  revokeGrant,
   userIsIdentified,
 } from '../services/tree-access.service.js';
 
@@ -68,6 +69,16 @@ treeAccessRoutes.post('/tree-access-requests/:id/decline', async (req, res, next
 
 treeAccessRoutes.post('/tree-access-requests/:id/cancel', async (req, res, next) => {
   try { res.json(await cancelRequest(req.params.id, req.user!.id)); } catch (e) { next(e); }
+});
+
+// Revoke a reciprocal tree-view grant with a specific other user. Removes
+// both directions of the grant (the «Отозвать доступ» button in the
+// «Подтверждённые» list of the Расширить modal hits this).
+treeAccessRoutes.delete('/tree-access-grants/:otherUserId', async (req, res, next) => {
+  try {
+    await revokeGrant(req.user!.id, req.params.otherUserId);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
 });
 
 // List trees the calling user has been granted view access to. Used by the

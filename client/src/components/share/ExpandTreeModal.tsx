@@ -23,6 +23,7 @@ import {
   acceptAccessRequest,
   declineAccessRequest,
   cancelAccessRequest,
+  revokeGrant,
   type TreeAccessRequest,
   type GrantedTree,
 } from '../../api/treeAccess';
@@ -159,6 +160,13 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
     setBusy(true); setError(null);
     try { await cancelAccessRequest(id); await refresh(); }
     catch { setError('Не удалось отменить запрос.'); }
+    finally { setBusy(false); }
+  };
+
+  const onRevoke = async (otherUserId: string) => {
+    setBusy(true); setError(null);
+    try { await revokeGrant(otherUserId); await refresh(); }
+    catch { setError('Не удалось отозвать доступ.'); }
     finally { setBusy(false); }
   };
 
@@ -398,7 +406,7 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {grants.map((g) => (
                   <div key={g.userId} style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 16 }}>✓</span>
+                    <span style={{ fontSize: 16, color: '#4ade80' }}>✓</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>
                         {g.displayName ?? 'Пользователь Click'}
@@ -409,6 +417,14 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
                         </div>
                       )}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => onRevoke(g.userId)}
+                      disabled={busy}
+                      style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.3)', background: 'transparent', color: '#f87171', fontWeight: 700, fontSize: 11, cursor: busy ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      Отозвать
+                    </button>
                   </div>
                 ))}
               </div>

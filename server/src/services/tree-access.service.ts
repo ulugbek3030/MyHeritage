@@ -299,6 +299,21 @@ export const declineRequest = async (id: string, userId: string): Promise<TreeAc
   }
 };
 
+/**
+ * Revoke reciprocal tree-view access between the caller and the given other
+ * user. Deletes BOTH grant rows (a → b AND b → a) so the link is fully
+ * severed regardless of which side initiated the original request.
+ */
+export const revokeGrant = async (userId: string, otherUserId: string): Promise<void> => {
+  if (userId === otherUserId) throw new BadRequestError('Cannot revoke yourself');
+  await query(
+    `DELETE FROM tree_access_grants
+     WHERE (user_a_id = $1 AND user_b_id = $2)
+        OR (user_a_id = $2 AND user_b_id = $1)`,
+    [userId, otherUserId]
+  );
+};
+
 export const cancelRequest = async (id: string, userId: string): Promise<TreeAccessRequest> => {
   const r = await query<{ requester_id: string; status: string }>(
     `SELECT requester_id, status FROM tree_access_requests WHERE id = $1`,

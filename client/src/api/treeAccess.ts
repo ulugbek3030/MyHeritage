@@ -43,3 +43,8 @@ export interface GrantedTree {
 
 export const listGrantedTrees = () =>
   api.get<GrantedTree[]>(`/me/granted-trees`).then((r) => r.data);
+
+/** Revoke reciprocal access with the given other user. Deletes both
+ *  directions of the grant. */
+export const revokeGrant = (otherUserId: string) =>
+  api.delete<{ ok: true }>(`/tree-access-grants/${otherUserId}`).then((r) => r.data);
