@@ -10,6 +10,7 @@ import { EditPersonForm } from '../components/tree/EditPersonForm';
 import { BiographyEditor } from '../components/tree/BiographyEditor';
 import { BottomSheet } from '../components/ui/BottomSheet';
 import { Breadcrumbs } from '../components/ui/Breadcrumbs';
+import { Loader } from '../components/ui/Loader';
 import { reachableFromRoot, computeRelation } from '../utils/subfamilyTransform';
 
 export const SubfamilyPage = () => {
@@ -23,10 +24,19 @@ export const SubfamilyPage = () => {
   const [bioOpen, setBioOpen] = useState<Person | null>(null);
   const [deletePending, setDeletePending] = useState<Person | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => { if (treeId) getFullTree(treeId).then(setData); }, [treeId]);
+  useEffect(() => {
+    if (!treeId) return;
+    setBusy(true);
+    getFullTree(treeId).then(setData).finally(() => setBusy(false));
+  }, [treeId]);
 
-  const reload = () => { if (treeId) getFullTree(treeId).then(setData); };
+  const reload = () => {
+    if (!treeId) return;
+    setBusy(true);
+    getFullTree(treeId).then(setData).finally(() => setBusy(false));
+  };
 
   const root: Person | undefined = data?.persons.find((p) => p.id === personId);
   const reachable = useMemo(() => data && personId ? reachableFromRoot(personId, data.relationships, 3) : new Set<string>(), [data, personId]);
@@ -166,6 +176,7 @@ export const SubfamilyPage = () => {
           вы — {relation}<br/><span style={{fontSize:9,color:'var(--text-dim)',fontWeight:500}}>в этом дереве</span>
         </div>
       )}
+      <Loader visible={busy} label="Загружаем семью…" />
     </div>
   );
 };

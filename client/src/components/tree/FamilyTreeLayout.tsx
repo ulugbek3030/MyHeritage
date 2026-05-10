@@ -439,7 +439,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   // instead of card.scrollIntoView — the native call walks the scroll chain
   // and was yanking the page header out of view.
   useEffect(() => {
-    if (!layout || !ownerId) return;
+    if (!layout) return;
     let attempts = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let raf: number | null = null;
@@ -447,8 +447,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       attempts += 1;
       const vp = viewport.current;
       if (!vp) return;
-      const card = vp.querySelector<HTMLElement>(`[data-person-id="${ownerId}"]`);
-      if (card && vp.clientWidth && vp.clientHeight) {
+      const cards = vp.querySelectorAll<HTMLElement>('[data-person-id]');
+      if (cards.length && vp.clientWidth && vp.clientHeight) {
         // Re-fit ONLY when the canvas itself changes shape (someone got
         // added/removed). Viewport-size changes are deliberately excluded
         // — on iOS the address bar can show/hide mid-pinch which changes
@@ -467,15 +467,31 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         // Only auto-centre on initial fit or canvas-size changes. After that
         // the user's manual scroll/zoom must not be reset by re-renders
         // (e.g. when iOS Safari triggers a viewport reflow mid-pinch).
+        // Centre the BOUNDING BOX of all rendered cards in viewport — not
+        // just the owner. For owners with no parents (top of layout) the box
+        // centre is well below the owner card; centring on the box gives the
+        // user "I see the whole tree" rather than "my card with descendants
+        // hanging off the bottom".
         if (dimsChanged) {
-          const centreOwner = () => {
+          const centreBox = () => {
             const vpRect = vp.getBoundingClientRect();
-            const cardRect = card.getBoundingClientRect();
-            vp.scrollLeft += (cardRect.left + cardRect.width / 2) - (vpRect.left + vpRect.width / 2);
-            vp.scrollTop  += (cardRect.top  + cardRect.height / 2) - (vpRect.top  + vpRect.height / 2);
+            let minL = Infinity, maxR = -Infinity, minT = Infinity, maxB = -Infinity;
+            cards.forEach((c) => {
+              const r = c.getBoundingClientRect();
+              if (r.left < minL) minL = r.left;
+              if (r.right > maxR) maxR = r.right;
+              if (r.top < minT) minT = r.top;
+              if (r.bottom > maxB) maxB = r.bottom;
+            });
+            if (!Number.isFinite(minL)) return;
+            vp.scrollLeft += (minL + maxR) / 2 - (vpRect.left + vpRect.width / 2);
+            vp.scrollTop  += (minT + maxB) / 2 - (vpRect.top  + vpRect.height / 2);
           };
-          centreOwner();
-          raf = requestAnimationFrame(centreOwner);
+          centreBox();
+          // Re-run on the next frame so getBoundingClientRect reflects the
+          // post-zoom layout (zoom.setTo above mutates a CSS var which the
+          // browser only applies after a paint).
+          raf = requestAnimationFrame(centreBox);
         }
         return;
       }
@@ -489,7 +505,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       if (timer != null) clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, ownerId, zoom]);
+  }, [layout, zoom]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 

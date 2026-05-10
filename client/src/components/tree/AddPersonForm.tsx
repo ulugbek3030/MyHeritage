@@ -188,8 +188,16 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
     //   • female sibling/daughter   → maidenName = target's lastName (born into family),
     //                                  lastName empty (filled if married)
     //   • female parent (mother)    → maidenName empty (unknown), lastName empty
+    //   • spouse (any gender)       → empty (married in from outside; surname
+    //                                  and patronymic come from a different
+    //                                  family). Patronymic is already empty
+    //                                  because middleNameSource is null for
+    //                                  spouse mode.
     const tLast = targetPerson.lastName ?? '';
-    if (g === 'male') {
+    if (m === 'spouse') {
+      setLastName('');
+      setMaidenName('');
+    } else if (g === 'male') {
       // Strip trailing "а" — Рустамова (target female) → Рустамов (new son).
       setLastName(adjustSurnameForGender(tLast, 'male'));
       setMaidenName('');

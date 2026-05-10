@@ -13,6 +13,7 @@ import { BiographyEditor } from '../components/tree/BiographyEditor';
 import { ShareModal } from '../components/share/ShareModal';
 import { QuickActions } from '../components/home/QuickActions';
 import { Skeleton } from '../components/ui/Skeleton';
+import { Loader } from '../components/ui/Loader';
 import { TreeSearch } from '../components/tree/TreeSearch';
 import { BottomSheet } from '../components/ui/BottomSheet';
 
@@ -35,8 +36,16 @@ export const TreeViewPage = () => {
   const [shareOpen, setShareOpen] = useState(false);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
+  // Tracks any active fetch (initial load or post-mutation reload). Used to
+  // show the Loader overlay so the user has feedback during the network +
+  // re-layout cycle that can otherwise look like a frozen screen.
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => { if (treeId) getFullTree(treeId).then(setData); }, [treeId]);
+  useEffect(() => {
+    if (!treeId) return;
+    setBusy(true);
+    getFullTree(treeId).then(setData).finally(() => setBusy(false));
+  }, [treeId]);
 
   useEffect(() => {
     if (!treeId) return;
@@ -45,7 +54,11 @@ export const TreeViewPage = () => {
     listEvents(treeId, from, to).then(setEvents).catch(() => {});
   }, [treeId]);
 
-  const reload = () => { if (treeId) getFullTree(treeId).then(setData); };
+  const reload = () => {
+    if (!treeId) return;
+    setBusy(true);
+    getFullTree(treeId).then(setData).finally(() => setBusy(false));
+  };
 
   // Per-person distinct icons for events in the current calendar month, so the
   // tree mirrors the calendar's month view: a person with two events in the
@@ -157,6 +170,7 @@ export const TreeViewPage = () => {
       )}
       {shareOpen && <ShareModal open onClose={() => setShareOpen(false)} treeId={treeId!} existingToken={data.tree.shareToken} />}
       {searchOpen && <TreeSearch persons={data.persons} onSelect={(id) => { document.querySelector(`[data-person-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onClose={() => setSearchOpen(false)} />}
+      <Loader visible={busy} label="Загружаем дерево…" />
       {deletePending && (() => {
         const fullName = [deletePending.firstName, deletePending.lastName].filter(Boolean).join(' ');
         const close = () => { if (!deleting) setDeletePending(null); };
