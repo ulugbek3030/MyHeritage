@@ -33,12 +33,17 @@ export const useDrag = (viewportRef: React.RefObject<HTMLElement>, contentRef: R
     };
     const onTMove = (e: TouchEvent) => {
       if (!tdrag) return;
+      // preventDefault so iOS doesn't ALSO run its own native pan in
+      // parallel with our manual scrollLeft/Top sets — without this the
+      // two compete and the canvas judders. Listener is registered as
+      // non-passive (below) so this call actually takes effect.
+      e.preventDefault();
       vp.scrollLeft = tsl - (e.touches[0].clientX - tx);
       vp.scrollTop = tst - (e.touches[0].clientY - ty);
     };
     const onTEnd = () => { tdrag = false; };
     vp.addEventListener('touchstart', onTStart, { passive: true });
-    vp.addEventListener('touchmove', onTMove, { passive: true });
+    vp.addEventListener('touchmove', onTMove, { passive: false });
     vp.addEventListener('touchend', onTEnd, { passive: true });
 
     return () => {
