@@ -19,10 +19,12 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { Loader } from '../components/ui/Loader';
 import { TreeSearch } from '../components/tree/TreeSearch';
 import { BottomSheet } from '../components/ui/BottomSheet';
+import { useAuth } from '../context/AuthContext';
 
 export const TreeViewPage = () => {
   const { treeId } = useParams<{ treeId: string }>();
   const nav = useNavigate();
+  const { user } = useAuth();
   const [data, setData] = useState<FullTree | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [addOpen, setAddOpen] = useState<Person | null>(null);
@@ -102,20 +104,37 @@ export const TreeViewPage = () => {
     };
   }, [expandOpen, notificationsOpen]);
 
-  // Map digits-only phone → other user's tree id. Cards whose person.phone
-  // matches one of these (after normalisation) render a tunnel icon.
-  // Digits-only because the granted phone may come from users.phone in one
-  // format ("+998974035075") and the card phone in another ("998 974 035075"
-  // or no leading "+"). The tunnel lookup must succeed across formats.
+  // Are we looking at the user's OWN tree, or did they arrive here via a
+  // tunnel icon from someone else's card? Drives where tunnel icons
+  // appear: on the own tree, on every connected user's card; on a guest
+  // tree, only on the card representing the CURRENT user (= the way
+  // home).
+  const isOwnTree = !!user && !!data && data.tree.userId === user.id;
+
+  // Map digits-only phone → tree id to navigate to when the tunnel on
+  // a card with that phone is tapped. Digits-only because the granted
+  // phone may come from users.phone in one format ("+998974035075") and
+  // the card phone in another ("998 974 035075" or no leading "+").
+  //
+  //   - On own tree: every granted user gets a tunnel pointing at their
+  //     tree.
+  //   - On a guest tree: only the card representing the CURRENT user
+  //     gets a tunnel — its treeId is the special sentinel "__back__"
+  //     which the onTunnel handler interprets as "go back to my tree".
   const grantedTreesByPhone = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const g of grantedTrees) {
-      if (!g.phone) continue;
-      const key = g.phone.replace(/[^0-9]/g, '');
-      if (key) m[key] = g.treeId;
+    if (isOwnTree) {
+      for (const g of grantedTrees) {
+        if (!g.phone) continue;
+        const key = g.phone.replace(/[^0-9]/g, '');
+        if (key) m[key] = g.treeId;
+      }
+    } else if (user?.phone) {
+      const key = user.phone.replace(/[^0-9]/g, '');
+      if (key) m[key] = '__back__';
     }
     return m;
-  }, [grantedTrees]);
+  }, [grantedTrees, isOwnTree, user?.phone]);
 
   const reload = () => {
     if (!treeId) return;
@@ -226,7 +245,13 @@ export const TreeViewPage = () => {
           }}
           onDiveSubfamily={(id) => nav(`/trees/${treeId}/dive/${id}`)}
           grantedTreesByPhone={grantedTreesByPhone}
-          onTunnel={(otherTreeId) => nav(`/trees/${otherTreeId}`)}
+          onTunnel={(otherTreeId) => {
+            // Sentinel "__back__" means we're already in a guest tree
+            // (own-card tunnel) — pop the route stack to whatever brought
+            // us here, which is the user's own tree.
+            if (otherTreeId === '__back__') nav(-1);
+            else nav(`/trees/${otherTreeId}`);
+          }}
         />
       </div>
       <PersonSheet

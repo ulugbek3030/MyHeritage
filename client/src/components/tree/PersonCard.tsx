@@ -58,7 +58,7 @@ export const PersonCard = ({ person, isOwner, eventIcons, onClick, onPlusClick, 
         >
           {/* Tunnel-shaped SVG: trapezoid with a rounded top, the visual
               metaphor of "passing through" to another tree. */}
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M3 21 L7 7 Q12 3 17 7 L21 21 Z" />
             <line x1="12" y1="11" x2="12" y2="21" />
           </svg>

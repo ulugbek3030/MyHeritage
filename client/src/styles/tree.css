@@ -28,10 +28,13 @@
    navigates into THAT user's tree (read-only). */
 .pcard-tunnel {
   position: absolute;
-  top: -10px;
-  left: -8px;
-  width: 22px;
-  height: 22px;
+  /* Sits ABOVE the card on its left edge — half above, half overlapping
+     the top of the card so it reads as a "doorway through" rather than a
+     pin attached to the corner. */
+  top: -18px;
+  left: -4px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -43,6 +46,7 @@
   padding: 0;
   box-shadow: 0 2px 8px rgba(251, 191, 36, 0.45);
   transition: transform 0.15s ease;
+  z-index: 2;
 }
 .pcard-tunnel:hover { transform: scale(1.1); }
 .pcard-tunnel:active { transform: scale(0.95); }
