@@ -287,6 +287,9 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '4px 0 18px' }} />
           )}
 
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 10 }}>
+            Отправить запрос
+          </div>
           <form onSubmit={submit}>
             {relatives && relatives.length > 0 && (
               <>
