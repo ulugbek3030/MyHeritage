@@ -446,10 +446,19 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       const vp = viewport.current;
       if (!vp) return;
       if (vp.clientWidth && vp.clientHeight) {
-        // Key on canvas dims + node count so adding / removing a person
-        // — even one that doesn't change canvas size (e.g. extra sibling
-        // fitting in the same row) — still re-triggers auto-fit-centre.
-        const dimsKey = `${layout.canvas.width}x${layout.canvas.height}|${layout.nodes.length}`;
+        // Key on canvas dims + node count + raw persons / relationships
+        // counts so ANY add / remove re-triggers the auto-fit-centre.
+        // canvas dims alone weren't enough — relatives-tree sometimes
+        // drops a freshly added person into the "extras" bucket without
+        // changing canvas.width/height, so a delete-then-add of the
+        // same person produced the same key and skipped the re-centre.
+        const dimsKey = [
+          layout.canvas.width,
+          layout.canvas.height,
+          layout.nodes.length,
+          persons.length,
+          relationships.length,
+        ].join('|');
         if (lastFitDimsRef.current !== dimsKey) {
           const ownerNode = layout.nodes.find((n) => n.id === ownerId);
           if (ownerNode) {
