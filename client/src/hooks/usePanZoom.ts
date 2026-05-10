@@ -247,11 +247,19 @@ export const usePanZoom = (
       const AUTOFIT_MIN = 0.45;
       const newScale = Math.max(AUTOFIT_MIN, Math.min(MAX_SCALE, Math.min(fitH, fitW, 1)));
       scale.current = newScale;
-      // Place the OWNER's frame-coord at (vp centre X, visibleCY +
-      // offsetY). With offsetY < 0 the owner sits above the visible
-      // centre — top of the tree gets more room.
-      tx.current = vpW / 2 - ownerX * newScale;
-      ty.current = visibleCY + offsetY - ownerY * newScale;
+      // Centre the BOUNDING BOX of the whole tree in the visible band.
+      // Earlier we centred on the owner (with a -285px lift), but that
+      // left tree-only-siblings or descendant-heavy layouts stuck at
+      // the top of the screen with empty space below. Bbox-centring
+      // puts the visual centre of the tree at the visible centre, so
+      // the user always sees the tree "in the middle".
+      // offsetY still nudges the box up/down a few pixels for callers
+      // that want asymmetric placement (default 0 = exactly centred).
+      void ownerX; void ownerY; // unused for now; kept in the API for future re-centring callers.
+      const boxCX = (boxLeft + boxRight) / 2;
+      const boxCY = (boxTop + boxBottom) / 2;
+      tx.current = vpW / 2 - boxCX * newScale;
+      ty.current = visibleCY + offsetY - boxCY * newScale;
       apply();
     },
     /** Reset zoom to 1 and re-apply the current translate. */

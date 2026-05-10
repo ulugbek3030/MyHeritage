@@ -502,13 +502,11 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             // and the fit fell through to MIN_SCALE (super zoomed out).
             // Keeping |offsetY| comfortably below vp.h/2 preserves real
             // zoom levels.
-            // Half-card extra lift on top of the previous values (one CARD_H
-            // was the user's "lift by one card" pass — this adds another
-            // CARD_H / 2 across the board).
-            const ownerOnly = persons.length === 1;
-            const offsetY = ownerOnly
-              ? -(180 + CARD_H + CARD_H / 2)
-              : -(120 + CARD_H + CARD_H / 2);
+            // Bbox-centre fit — bbox sits at the visible centre of the
+            // screen. No vertical lift: any positive/negative offsetY
+            // would push the tree off-centre again, which is the bug we
+            // just spent a stack of commits chasing.
+            const offsetY = 0;
             // TEMP debug: dump autofit inputs so we can see in DevTools why
             // the tree visually drifts down as the user adds ancestors.
             const dbg = {
