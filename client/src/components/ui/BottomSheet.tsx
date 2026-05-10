@@ -17,28 +17,61 @@ export const BottomSheet = ({ open, onClose, children }: { open: boolean; onClos
 
   // Block iOS / Click WebView's auto-scroll-to-focused-input. When the
   // user taps a field the browser yanks the panel's scrollTop to bring
-  // the input into view; that leaves the form stuck at a random scroll
-  // position and the top fields hidden. We snapshot the scrollTop just
-  // before focus changes the layout and restore it on the next two
-  // animation frames (one for the focus shift, one for iOS's deferred
-  // scroll-into-view).
+  // the input into view; without this fix the form ended up stuck at a
+  // random scroll position and the top fields were hidden.
+  //
+  // Strategy: snapshot scrollTop on focusin, then re-assert it on every
+  // scroll event for the next ~600ms — iOS's deferred scroll-into-view
+  // happens AFTER focus, often 100-400ms later. Concurrent USER scroll
+  // (touchstart on the panel) cancels the lock so manual gestures aren't
+  // fought against.
   useEffect(() => {
     if (!open) return;
     const panel = panelRef.current;
     if (!panel) return;
+
+    let userScrolling = false;
+    let lockUntil = 0;
+    let lockedScrollTop = 0;
+
+    const onTouchStart = () => { userScrolling = true; };
+    const onTouchEnd = () => {
+      // Brief grace period — iOS sometimes fires deferred scrolls a few
+      // frames after touchend that aren't really the user's intent.
+      setTimeout(() => { userScrolling = false; }, 50);
+    };
+
     const onFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
       if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
-      const saved = panel.scrollTop;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (panel.scrollTop !== saved) panel.scrollTop = saved;
-        });
-      });
+      // Anchor at the current scroll position. Re-assert it on every
+      // scroll for the next 600ms to catch iOS's deferred adjustment.
+      lockedScrollTop = panel.scrollTop;
+      lockUntil = Date.now() + 600;
     };
+
+    const onScroll = () => {
+      if (userScrolling) return;
+      if (Date.now() > lockUntil) return;
+      if (panel.scrollTop !== lockedScrollTop) {
+        panel.scrollTop = lockedScrollTop;
+      }
+    };
+
     panel.addEventListener('focusin', onFocusIn);
-    return () => panel.removeEventListener('focusin', onFocusIn);
+    panel.addEventListener('scroll', onScroll, { passive: true });
+    panel.addEventListener('touchstart', onTouchStart, { passive: true });
+    panel.addEventListener('touchend', onTouchEnd, { passive: true });
+    panel.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+    return () => {
+      panel.removeEventListener('focusin', onFocusIn);
+      panel.removeEventListener('scroll', onScroll);
+      panel.removeEventListener('touchstart', onTouchStart);
+      panel.removeEventListener('touchend', onTouchEnd);
+      panel.removeEventListener('touchcancel', onTouchEnd);
+    };
   }, [open]);
   if (!open) return null;
   return (
