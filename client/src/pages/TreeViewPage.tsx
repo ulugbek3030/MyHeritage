@@ -153,20 +153,32 @@ export const TreeViewPage = () => {
         {/* Notification bell — opens a dedicated NotificationsModal that
             shows ONLY incoming tree-access requests with Принять /
             Отклонить buttons. Sending a NEW request is a separate flow
-            («Расширить» quick-action). Red dot when incomingCount > 0. */}
+            («Расширить» quick-action). Plain red dot in the corner
+            when incomingCount > 0. */}
         <button
           onClick={() => setNotificationsOpen(true)}
           aria-label={incomingCount > 0 ? `Уведомления (${incomingCount})` : 'Уведомления'}
-          style={{ position: 'relative', width: 36, height: 36, borderRadius: '50%', background: incomingCount > 0 ? 'linear-gradient(135deg,var(--accent),var(--accent-hover))' : 'rgba(255,255,255,0.06)', border: 'none', color: incomingCount > 0 ? '#0a0a0d' : 'var(--text)', marginLeft: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          style={{ position: 'relative', width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: 'none', color: 'var(--text)', marginLeft: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
             <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
           </svg>
           {incomingCount > 0 && (
-            <span aria-hidden="true" style={{ position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#f87171', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg)' }}>
-              {incomingCount}
-            </span>
+            <span
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                top: 2,
+                right: 2,
+                width: 9,
+                height: 9,
+                borderRadius: '50%',
+                background: '#f87171',
+                border: '2px solid var(--bg)',
+                boxShadow: '0 0 6px rgba(248, 113, 113, 0.6)',
+              }}
+            />
           )}
         </button>
       </header>
