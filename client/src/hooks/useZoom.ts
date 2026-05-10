@@ -88,11 +88,8 @@ export const useZoom = (
           const ratio = newScale / pinchStart.scale;
           const newScrollLeft = (pinchStart.scrollLeft + pinchStart.focalX) * ratio - pinchStart.focalX;
           const newScrollTop = (pinchStart.scrollTop + pinchStart.focalY) * ratio - pinchStart.focalY;
-          // TEST: no Math.max(0, ...) — let the browser clamp natively if it
-          // wants. Don't impose our own floor so the pinch focal point is
-          // tracked even when it would push scroll past edges.
-          vp.scrollLeft = newScrollLeft;
-          vp.scrollTop = newScrollTop;
+          vp.scrollLeft = Math.max(0, newScrollLeft);
+          vp.scrollTop = Math.max(0, newScrollTop);
         }
         start();
       }
