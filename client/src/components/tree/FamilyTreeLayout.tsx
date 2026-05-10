@@ -485,7 +485,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       if (raf != null) cancelAnimationFrame(raf);
       if (timer != null) clearTimeout(timer);
     };
-  }, [layout, ownerId, vpSize.w, vpSize.h, zoom]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout, ownerId, zoom]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 
