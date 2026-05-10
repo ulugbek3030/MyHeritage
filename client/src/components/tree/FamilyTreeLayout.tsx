@@ -461,7 +461,11 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             const halfHlocal = Math.max(LAYOUT_H_MIN / 2, ownerCy, contentHlocal - ownerCy);
             const leftPad = halfWlocal - ownerCx;
             const topOffset = halfHlocal - ownerCy;
-            panZoom.centreOn(leftPad + ownerCx, topOffset + ownerCy);
+            // Shift the centring target 50px ABOVE the owner so the owner
+            // card itself lands 50px BELOW viewport centre — leaves a bit
+            // of room at the top for the "Add father / Add mother"
+            // placeholders that hover above the owner on a fresh tree.
+            panZoom.centreOn(leftPad + ownerCx, topOffset + ownerCy - 50);
           }
           lastFitDimsRef.current = dimsKey;
         }
