@@ -498,17 +498,22 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
           )}
 
           <form onSubmit={onSubmit}>
-            {/* Gender override (role pre-selects, but user can flip if mistake) */}
-            <div style={{ display: 'flex', gap: 18, marginBottom: 14 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
-                <input type="radio" name="gender" checked={gender === 'male'} onChange={() => setGender('male')} style={{ accentColor: 'var(--accent)' }} />
-                Мужчина
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
-                <input type="radio" name="gender" checked={gender === 'female'} onChange={() => setGender('female')} style={{ accentColor: 'var(--accent)' }} />
-                Женщина
-              </label>
-            </div>
+            {/* Gender selector visible only for the spouse role — for parent/
+                sibling/child the role-picker has already locked the correct
+                gender (отец = male, мать = female, etc.) and re-asking just
+                creates a chance for inconsistent input. */}
+            {mode === 'spouse' && (
+              <div style={{ display: 'flex', gap: 18, marginBottom: 14 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+                  <input type="radio" name="gender" checked={gender === 'male'} onChange={() => setGender('male')} style={{ accentColor: 'var(--accent)' }} />
+                  Мужчина
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+                  <input type="radio" name="gender" checked={gender === 'female'} onChange={() => setGender('female')} style={{ accentColor: 'var(--accent)' }} />
+                  Женщина
+                </label>
+              </div>
+            )}
 
             <input className="auth-input" placeholder="Имя" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus />
 

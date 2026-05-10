@@ -98,13 +98,26 @@ export const loginWithEmail = async (email: string, password: string) => {
  * Skip condition: user already has ≥1 person across all their trees.
  */
 const ensureClickUserHasOwnerPerson = async (userId: string, profile: ClickProfile): Promise<void> => {
-  const existingPersons = await query<{ c: string }>(
-    `SELECT COUNT(p.id)::text AS c
-     FROM persons p JOIN trees t ON p.tree_id = t.id
-     WHERE t.user_id = $1`,
+  // Skip ONLY when the user already has a tree with an owner_person_id
+  // pointing at a real person. The previous "any person at all" check was
+  // wrong: if the user deleted their own card but still had relatives in
+  // the tree, count > 0 and the seeder bailed, leaving owner_person_id
+  // null and breaking everything that needs the owner (auto-fit, lineage,
+  // hero, etc.).
+  const ownerCheck = await query<{ owner_person_id: string | null; tree_id: string }>(
+    `SELECT t.owner_person_id, t.id AS tree_id
+     FROM trees t
+     LEFT JOIN persons p ON p.id = t.owner_person_id
+     WHERE t.user_id = $1
+     ORDER BY t.created_at
+     LIMIT 1`,
     [userId]
   );
-  if (Number(existingPersons.rows[0]?.c ?? 0) > 0) return;
+  const existingTreeRow = ownerCheck.rows[0];
+  if (existingTreeRow && existingTreeRow.owner_person_id) {
+    // Real owner still alive — nothing to do.
+    return;
+  }
 
   const surname = String(profile.surname ?? '').trim();
   const firstName = String(profile.name ?? '').trim() || 'Я';
@@ -126,14 +139,15 @@ const ensureClickUserHasOwnerPerson = async (userId: string, profile: ClickProfi
     // ('Семья Abdukadirov' twice) before either can commit.
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`cf-seed:${userId}`]);
     // Re-check inside the lock — by the time we got here someone else may
-    // have already finished the seed.
-    const personsAgain = await c.query<{ c: string }>(
-      `SELECT COUNT(p.id)::text AS c
-       FROM persons p JOIN trees t ON p.tree_id = t.id
-       WHERE t.user_id = $1`,
+    // have already finished the seed. Same "owner present" check as above.
+    const ownerAgain = await c.query<{ owner_person_id: string | null }>(
+      `SELECT t.owner_person_id
+       FROM trees t LEFT JOIN persons p ON p.id = t.owner_person_id
+       WHERE t.user_id = $1
+       ORDER BY t.created_at LIMIT 1`,
       [userId]
     );
-    if (Number(personsAgain.rows[0]?.c ?? 0) > 0) {
+    if (ownerAgain.rows[0] && ownerAgain.rows[0].owner_person_id) {
       await c.query('COMMIT');
       return;
     }
