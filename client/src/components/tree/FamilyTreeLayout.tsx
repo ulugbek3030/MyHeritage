@@ -407,13 +407,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   // pinch-focal scrollLeft/Top adjustment in useZoom, the content point
   // under the user's fingers stays anchored throughout the gesture.
   const frame = useRef<HTMLDivElement>(null);
-  const zoom = useZoom(
-    content as React.RefObject<HTMLElement>,
-    (s: number) => {
-      frame.current?.style.setProperty('--cf-zoom', String(s));
-    },
-    viewport,
-  );
+  // Apply zoom transform on the FRAME (not just inner content) so the whole
+  // tree visually scales together around the owner card at frame centre.
+  // No --cf-zoom mirror on a CSS box — frame stays at its fixed W × H
+  // layout box; the visual size diverges via transform alone.
+  const _zoom = useZoom(frame as React.RefObject<HTMLElement>, undefined, viewport);
+  void _zoom;
   useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
 
   // Observe the viewport so the auto-centre re-runs when chrome/orientation

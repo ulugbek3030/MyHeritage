@@ -23,7 +23,11 @@ export const useZoom = (
     const apply = () => {
       const s = scale.current;
       el.style.transform = `scale(${s})`;
-      el.style.transformOrigin = 'top left';
+      // Scale around the geometric centre of the element. The owner card is
+      // placed at frame centre by FamilyTreeLayout, so this anchors zoom on
+      // the owner — zooming in/out keeps their card under the user's eye
+      // instead of drifting toward a corner.
+      el.style.transformOrigin = '50% 50%';
       onScaleRef.current?.(s);
     };
     const tick = () => {
@@ -137,7 +141,7 @@ export const useZoom = (
       const el = containerRef.current;
       if (el) {
         el.style.transform = `scale(${clamped})`;
-        el.style.transformOrigin = 'top left';
+        el.style.transformOrigin = '50% 50%';
       }
       onScaleRef.current?.(clamped);
     },
