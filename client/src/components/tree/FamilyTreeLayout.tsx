@@ -399,22 +399,20 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   }, [layout, visiblePersons, relationships]);
 
   // The frame is a box that physically grows/shrinks with the user's zoom so
-  // that overflow-auto on .tree-stage gives correct scroll bounds. We avoid
-  // imperative width/height writes that React would clobber on the next
-  // render — instead the JSX uses `calc(W * var(--cf-zoom))` and onScale
-  // updates ONLY the CSS variable. React never sets that variable, so the
-  // value survives re-renders cleanly.
-  // IMPORTANT: skip the frame-size update WHILE the user is pinching. The
-  // browser reflow caused by changing frame width/height in-gesture fights
-  // with the active pinch and makes the canvas tremble. The tick keeps
-  // running after fingers lift (LERP settle) and the final apply commits
-  // the new size in one go — by then the gesture is done and there's no
-  // more conflict.
+  // that overflow-auto on .tree-stage gives correct scroll bounds. The JSX
+  // uses `calc(W * var(--cf-zoom))` and onScale updates ONLY the CSS
+  // variable, which React never sets — so the value survives re-renders
+  // cleanly. The frame is updated mid-pinch as well; combined with the
+  // pinch-focal scrollLeft/Top adjustment in useZoom, the content point
+  // under the user's fingers stays anchored throughout the gesture.
   const frame = useRef<HTMLDivElement>(null);
-  const zoom = useZoom(content as React.RefObject<HTMLElement>, (s: number) => {
-    if (content.current?.dataset.pinching === '1') return;
-    frame.current?.style.setProperty('--cf-zoom', String(s));
-  });
+  const zoom = useZoom(
+    content as React.RefObject<HTMLElement>,
+    (s: number) => {
+      frame.current?.style.setProperty('--cf-zoom', String(s));
+    },
+    viewport,
+  );
   useDrag(viewport as React.RefObject<HTMLElement>, content as React.RefObject<HTMLElement>);
 
   // Observe the viewport so the auto-centre re-runs when chrome/orientation

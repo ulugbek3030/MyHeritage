@@ -2,7 +2,14 @@ import { useEffect, useMemo, useRef } from 'react';
 
 const LERP = 0.15, SETTLE = 0.0005, MAX_SCALE = 1.8, MIN_SCALE = 0.2;
 
-export const useZoom = (containerRef: React.RefObject<HTMLElement>, onScale?: (s: number) => void) => {
+export const useZoom = (
+  containerRef: React.RefObject<HTMLElement>,
+  onScale?: (s: number) => void,
+  /** Scroll-container ref. Required for pinch-to-zoom to anchor on the user's
+   *  fingers — we adjust its scrollLeft/Top so the content point under the
+   *  pinch midpoint stays under their fingers as the scale changes. */
+  viewportRef?: React.RefObject<HTMLElement | null>,
+) => {
   const scale = useRef(1);
   const target = useRef(1);
   const raf = useRef<number | null>(null);
@@ -36,24 +43,55 @@ export const useZoom = (containerRef: React.RefObject<HTMLElement>, onScale?: (s
       start();
     };
 
-    let pinchStartDist = 0, pinchStartScale = 1;
+    let pinchStart: null | {
+      dist: number;
+      scale: number;
+      focalX: number;
+      focalY: number;
+      scrollLeft: number;
+      scrollTop: number;
+    } = null;
     const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
         el.dataset.pinching = '1';
-        pinchStartDist = dist(e.touches);
-        pinchStartScale = target.current;
+        const vp = viewportRef?.current ?? null;
+        const vpRect = vp?.getBoundingClientRect();
+        const vpLeft = vpRect?.left ?? 0;
+        const vpTop = vpRect?.top ?? 0;
+        const fx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - vpLeft;
+        const fy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - vpTop;
+        pinchStart = {
+          dist: dist(e.touches),
+          scale: target.current,
+          focalX: fx,
+          focalY: fy,
+          scrollLeft: vp?.scrollLeft ?? 0,
+          scrollTop: vp?.scrollTop ?? 0,
+        };
       }
     };
     const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2 && pinchStartDist) {
+      if (e.touches.length === 2 && pinchStart) {
         e.preventDefault();
-        target.current = clamp(pinchStartScale * (dist(e.touches) / pinchStartDist));
+        const newScale = clamp(pinchStart.scale * (dist(e.touches) / pinchStart.dist));
+        target.current = newScale;
+        // Anchor the pinch midpoint: keep the content point that was under
+        // the user's fingers at the start of the gesture pinned at the
+        // same on-screen location across the whole pinch.
+        const vp = viewportRef?.current ?? null;
+        if (vp) {
+          const ratio = newScale / pinchStart.scale;
+          const newScrollLeft = (pinchStart.scrollLeft + pinchStart.focalX) * ratio - pinchStart.focalX;
+          const newScrollTop = (pinchStart.scrollTop + pinchStart.focalY) * ratio - pinchStart.focalY;
+          vp.scrollLeft = Math.max(0, newScrollLeft);
+          vp.scrollTop = Math.max(0, newScrollTop);
+        }
         start();
       }
     };
     const onTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) { delete el.dataset.pinching; pinchStartDist = 0; }
+      if (e.touches.length < 2) { delete el.dataset.pinching; pinchStart = null; }
     };
 
     let gStartScale = 1;
