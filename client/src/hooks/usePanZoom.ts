@@ -218,9 +218,14 @@ export const usePanZoom = (
       if (!vp || !vp.clientWidth || !vp.clientHeight) return;
       const safeW = Math.max(1, width);
       const safeH = Math.max(1, height);
+      // Available room shrinks by 2 × |offsetY| vertically: shifting the
+      // box centre down by N means the bottom edge needs N less room and
+      // the top edge needs N more before clipping. For pad=40, offsetY=50
+      // available height becomes vp.h - 80 - 100 = vp.h - 180, so the box
+      // gets a smaller fit-zoom but never extends past viewport.
       const fit = Math.min(
         (vp.clientWidth - 2 * padding) / safeW,
-        (vp.clientHeight - 2 * padding) / safeH,
+        (vp.clientHeight - 2 * padding - 2 * Math.abs(offsetY)) / safeH,
         1,
       );
       const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, fit));
