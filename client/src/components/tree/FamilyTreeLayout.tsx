@@ -484,7 +484,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               leftPad + layoutWlocal,
               topOffset + contentHlocal,
               40,
-              -120,
+              -250,
             );
           }
           lastFitDimsRef.current = dimsKey;
