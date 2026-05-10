@@ -10,7 +10,6 @@ export const MARITAL_STATUSES = [
   { value: 'spouse',    label: 'Супруг(-а)' },
   { value: 'dating',    label: 'Встречаются' },
   { value: 'annulled',  label: 'Признание брака недействительным' },
-  { value: 'unknown',   label: 'Неизвестное' },
   { value: 'other',     label: 'Другое' },
 ] as const;
 
