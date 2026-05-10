@@ -19,10 +19,12 @@ import {
   createAccessRequest,
   listIncomingRequests,
   listOutgoingRequests,
+  listGrantedTrees,
   acceptAccessRequest,
   declineAccessRequest,
   cancelAccessRequest,
   type TreeAccessRequest,
+  type GrantedTree,
 } from '../../api/treeAccess';
 import '../../styles/form.css';
 
@@ -62,6 +64,9 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
   const [isIdentified, setIsIdentified] = useState<boolean | null>(null);
   const [incoming, setIncoming] = useState<TreeAccessRequest[]>([]);
   const [outgoing, setOutgoing] = useState<TreeAccessRequest[]>([]);
+  // Approved grants — by design they're reciprocal, so this is also the
+  // set of users whose tree the caller can view.
+  const [grants, setGrants] = useState<GrantedTree[]>([]);
   const [phone, setPhone] = useState(withPlus(initialPhone) || '+998');
   // Track the dropdown selection separately from the phone input so the
   // <select> visually shows what was picked (with value="" it was
@@ -79,14 +84,16 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
       // Identification status is still fetched so the read-out / future
       // gate has its value, but it no longer blocks the rest of the
       // request flow — we always fetch incoming + outgoing.
-      const [status, inc, out] = await Promise.all([
+      const [status, inc, out, gr] = await Promise.all([
         getIdentificationStatus().catch(() => ({ isIdentified: false })),
         listIncomingRequests().catch(() => []),
         listOutgoingRequests().catch(() => []),
+        listGrantedTrees().catch(() => []),
       ]);
       setIsIdentified(status.isIdentified);
       setIncoming(inc);
       setOutgoing(out.filter((r) => r.status === 'pending'));
+      setGrants(gr);
     } catch (e) {
       console.error('[ExpandTree] failed to load', e);
       setError('Не удалось загрузить запросы. Попробуйте позже.');
@@ -352,6 +359,40 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
               {busy ? 'Отправляем…' : 'Отправить запрос'}
             </button>
           </form>
+
+          {/* Reciprocal access list — by design every accepted request
+              inserts grants in BOTH directions, so this list doubles as
+              "кто видит ваше древо" AND "чьё древо вы видите". Names +
+              phones are shown so the user can confirm who's already
+              connected and (later) revoke if needed. */}
+          {grants.length > 0 && (
+            <>
+              <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '18px 0' }} />
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 10 }}>
+                Подтверждённые ({grants.length})
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.45 }}>
+                Эти пользователи могут просматривать ваше древо. И вы тоже можете смотреть их древо.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {grants.map((g) => (
+                  <div key={g.userId} style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 16 }}>✓</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>
+                        {g.displayName ?? 'Пользователь Click'}
+                      </div>
+                      {g.phone && (
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'ui-monospace, Menlo, monospace' }}>
+                          {g.phone.startsWith('+') ? g.phone : '+' + g.phone.replace(/^\++/, '')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
     </BottomSheet>
