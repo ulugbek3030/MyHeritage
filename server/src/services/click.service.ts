@@ -8,6 +8,10 @@ export interface ClickProfile {
   patronym: string;
   gender: string;
   phone_number: string;
+  // Click's KYC flag — true once the user has completed identification.
+  // Optional in the type because older snapshots / mocks may not include it;
+  // the auth service treats `undefined` as `false`.
+  is_identified?: boolean;
 }
 
 /**

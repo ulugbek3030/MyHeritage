@@ -15,12 +15,13 @@ export interface AuthUser {
   displayName: string | null;
   avatarUrl: string | null;
   clickClientId: number | null;
+  isIdentified?: boolean;
   [key: string]: unknown;
 }
 
 const BCRYPT_ROUNDS = 12;
 
-const USER_COLS = `id, phone, email, display_name AS "displayName", avatar_url AS "avatarUrl", click_client_id AS "clickClientId"`;
+const USER_COLS = `id, phone, email, display_name AS "displayName", avatar_url AS "avatarUrl", click_client_id AS "clickClientId", is_identified AS "isIdentified"`;
 
 export const upsertUserByPhone = async (phone: string): Promise<AuthUser> => {
   const r = await query<AuthUser>(
@@ -208,6 +209,9 @@ export const loginWithClickSession = async (webSession: string) => {
   const phone = String(profile.phone_number ?? '').trim() || null;
   const display = [profile.name, profile.surname].filter(Boolean).join(' ').trim() || null;
   const profileJson = JSON.stringify(profile);
+  // Click's KYC flag. Treat missing as false so mocks / older snapshots
+  // default to "not identified".
+  const isIdentified = profile.is_identified === true;
 
   // Try click_client_id first; if that row doesn't exist, fall back to phone.
   // We do an explicit two-step (instead of a single ON CONFLICT) because we
@@ -219,10 +223,11 @@ export const loginWithClickSession = async (webSession: string) => {
        display_name = COALESCE(NULLIF(display_name, ''), $3),
        click_profile = $4::jsonb,
        click_synced_at = NOW(),
+       is_identified = $5,
        updated_at = NOW()
      WHERE click_client_id = $1
      RETURNING ${USER_COLS}`,
-    [clientId, phone, display, profileJson]
+    [clientId, phone, display, profileJson, isIdentified]
   );
   if (byClick.rows[0]) {
     await ensureClickUserHasOwnerPerson(byClick.rows[0].id, profile);
@@ -236,10 +241,11 @@ export const loginWithClickSession = async (webSession: string) => {
          display_name = COALESCE(NULLIF(display_name, ''), $3),
          click_profile = $4::jsonb,
          click_synced_at = NOW(),
+         is_identified = $5,
          updated_at = NOW()
        WHERE phone = $2
        RETURNING ${USER_COLS}`,
-      [clientId, phone, display, profileJson]
+      [clientId, phone, display, profileJson, isIdentified]
     );
     if (byPhone.rows[0]) {
       await ensureClickUserHasOwnerPerson(byPhone.rows[0].id, profile);
@@ -248,10 +254,10 @@ export const loginWithClickSession = async (webSession: string) => {
   }
 
   const inserted = await query<AuthUser>(
-    `INSERT INTO users (click_client_id, phone, display_name, click_profile, click_synced_at)
-     VALUES ($1, $2, $3, $4::jsonb, NOW())
+    `INSERT INTO users (click_client_id, phone, display_name, click_profile, click_synced_at, is_identified)
+     VALUES ($1, $2, $3, $4::jsonb, NOW(), $5)
      RETURNING ${USER_COLS}`,
-    [clientId, phone, display, profileJson]
+    [clientId, phone, display, profileJson, isIdentified]
   );
   await ensureClickUserHasOwnerPerson(inserted.rows[0].id, profile);
   return tokensFor(inserted.rows[0]);

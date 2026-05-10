@@ -11,6 +11,8 @@ import { AddPersonForm } from '../components/tree/AddPersonForm';
 import { EditPersonForm } from '../components/tree/EditPersonForm';
 import { BiographyEditor } from '../components/tree/BiographyEditor';
 import { ShareModal } from '../components/share/ShareModal';
+import { ExpandTreeModal } from '../components/share/ExpandTreeModal';
+import { listIncomingRequests } from '../api/treeAccess';
 import { QuickActions } from '../components/home/QuickActions';
 import { Skeleton } from '../components/ui/Skeleton';
 import { Loader } from '../components/ui/Loader';
@@ -34,6 +36,8 @@ export const TreeViewPage = () => {
   const [deleting, setDeleting] = useState(false);
   const [bioOpen, setBioOpen] = useState<Person | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [expandOpen, setExpandOpen] = useState(false);
+  const [incomingCount, setIncomingCount] = useState(0);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   // Tracks any active fetch (initial load or post-mutation reload). Used to
@@ -53,6 +57,14 @@ export const TreeViewPage = () => {
     const to = new Date(Date.now() + 90 * 86400000).toISOString();
     listEvents(treeId, from, to).then(setEvents).catch(() => {});
   }, [treeId]);
+
+  // Light-weight badge: how many pending access requests are waiting for the
+  // user's approval. Re-fetched whenever the Расширить modal closes (after
+  // an action it will be different) and on first paint.
+  useEffect(() => {
+    if (expandOpen) return; // skip while open — the modal already shows them
+    listIncomingRequests().then((rs) => setIncomingCount(rs.length)).catch(() => {});
+  }, [expandOpen]);
 
   const reload = () => {
     if (!treeId) return;
@@ -102,8 +114,9 @@ export const TreeViewPage = () => {
       </header>
       <QuickActions
         onCalendar={() => nav(`/trees/${treeId}/calendar`)}
-        onShare={() => setShareOpen(true)}
+        onExpand={() => setExpandOpen(true)}
         eventCount={events.length}
+        expandBadge={incomingCount}
       />
       <div style={{padding:'24px 12px 24px',flex:1}}>
         <FamilyTreeLayout
@@ -169,6 +182,7 @@ export const TreeViewPage = () => {
         />
       )}
       {shareOpen && <ShareModal open onClose={() => setShareOpen(false)} treeId={treeId!} existingToken={data.tree.shareToken} />}
+      {expandOpen && <ExpandTreeModal open onClose={() => setExpandOpen(false)} />}
       {searchOpen && <TreeSearch persons={data.persons} onSelect={(id) => { document.querySelector(`[data-person-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onClose={() => setSearchOpen(false)} />}
       <Loader visible={busy} label="Загружаем дерево…" />
       {deletePending && (() => {

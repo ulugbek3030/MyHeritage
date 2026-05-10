@@ -27,3 +27,9 @@ export class ValidationError extends AppError {
     super(400, m, 'VALIDATION');
   }
 }
+
+export class BadRequestError extends AppError {
+  constructor(m = 'Bad request') {
+    super(400, m, 'BAD_REQUEST');
+  }
+}

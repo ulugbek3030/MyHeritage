@@ -10,6 +10,7 @@ import { photosRoutes } from './routes/photos.routes.js';
 import { relsRoutes } from './routes/relationships.routes.js';
 import { eventsRoutes } from './routes/events.routes.js';
 import { shareRoutes, sharePublicRoutes } from './routes/share.routes.js';
+import { treeAccessRoutes } from './routes/tree-access.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export const createApp = () => {
@@ -27,6 +28,7 @@ export const createApp = () => {
   app.use('/api/trees/:treeId/relationships', relsRoutes);
   app.use('/api/trees/:treeId/events', eventsRoutes);
   app.use('/api/trees/:treeId/share', shareRoutes);
+  app.use('/api', treeAccessRoutes);
   app.use(errorHandler);
   return app;
 };
