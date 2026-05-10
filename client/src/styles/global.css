@@ -4,6 +4,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
    light Click WebView background when panning the tree past its viewport. */
 html, body { overflow-x: hidden; }
 body { overscroll-behavior: none; }
+/* Disable native page-level pinch-zoom across the whole app. Click's Android
+   WebView ignores the meta-viewport user-scalable=no, so without this the
+   user's two-finger pinch on the tree zooms the WHOLE page instead of just
+   the tree canvas. The tree canvas (.tree-stage / its inner frame) handles
+   pinch via JS in useZoom — pan-x/pan-y still allows native scroll there.
+   Form controls still get implicit pinch behavior in their own input UIs
+   (date picker etc.) since those are native widgets. */
+html, body { touch-action: pan-x pan-y; }
 button { font-family: inherit; cursor: pointer; }
 
 /* No top inset on the body — Click's WebView already sits below their

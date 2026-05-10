@@ -1,4 +1,8 @@
-.tree-stage { background: radial-gradient(80% 60% at 50% 0%, rgba(251,191,36,0.04), transparent 70%), #050507; border: 1px solid var(--border); border-radius: 22px; min-height: 75dvh; scrollbar-width: none; -ms-overflow-style: none; }
+/* touch-action: explicitly opt OUT of native pinch-zoom inside the tree so
+   our JS pinch handler in useZoom is the only one that fires. Pan still
+   works (native scroll + manual useDrag), only the browser's two-finger
+   page-zoom is suppressed. */
+.tree-stage { background: radial-gradient(80% 60% at 50% 0%, rgba(251,191,36,0.04), transparent 70%), #050507; border: 1px solid var(--border); border-radius: 22px; min-height: 75dvh; scrollbar-width: none; -ms-overflow-style: none; touch-action: pan-x pan-y; }
 .tree-stage::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .pcard { min-width: 86px; max-width: 154px; width: max-content; background: linear-gradient(180deg, var(--surface-2), #0f0f12); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px 10px 14px; text-align: center; font-size: 12px; position: relative; }
 .pcard.male::before, .pcard.female::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
