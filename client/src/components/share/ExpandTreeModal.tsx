@@ -125,6 +125,32 @@ export const ExpandTreeModal = ({ open, onClose }: Props) => {
         После подтверждения <strong style={{ color: 'var(--text)' }}>вы оба</strong> сможете смотреть деревья друг друга.
       </div>
 
+      {/* Test-only — read-out of the user's identification flag from Click.
+          Lets us verify the SSO sync is writing users.is_identified
+          correctly without poking the DB. Remove once the flow is stable. */}
+      {!loading && isIdentified !== null && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 12px',
+            marginBottom: 14,
+            borderRadius: 10,
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid var(--border)',
+            fontSize: 11,
+            color: 'var(--text-muted)',
+            fontFamily: 'ui-monospace, Menlo, monospace',
+          }}
+        >
+          <span style={{ fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase' }}>Статус идентификации:</span>
+          <span style={{ fontWeight: 800, color: isIdentified ? '#4ade80' : '#f87171' }}>
+            {isIdentified ? 'true (идентифицирован)' : 'false (не идентифицирован)'}
+          </span>
+        </div>
+      )}
+
       {loading && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Загрузка…</div>}
 
       {!loading && isIdentified === false && (
