@@ -21,14 +21,12 @@ const CARD_H = 110;
 // placeholders for parentless persons one full generation above their card,
 // so this needs at least NODE_H of room to keep them on canvas.
 const TOP_PAD = 240;
-// Extra room below the bottom generation — same intent as TOP_PAD but for
-// kids being added below. 25% is enough breathing room; the canvas grows
-// naturally as descendants get added.
-const BOTTOM_PAD_RATIO = 0.25;
-// Mirror that on the X axis so the user can pan past the rightmost card
-// when adding new branches (otherwise overflow:auto stops at the last
-// laid-out column and the right side is unreachable).
-const SIDE_PAD_RATIO = 0.3;
+// Fixed minimum frame size (May 2026 spec). Owner card sits at the geometric
+// centre of this frame; tree content extends from there. Frame grows past
+// these minimums when the tree's natural extent doesn't fit. The user always
+// sees their own card at frame centre on first paint.
+const LAYOUT_W_MIN = 700;
+const LAYOUT_H_MIN = 1400;
 
 interface Props {
   persons: Person[];
@@ -438,6 +436,11 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   // Uses a manual scrollLeft/scrollTop delta on the .tree-stage container
   // instead of card.scrollIntoView — the native call walks the scroll chain
   // and was yanking the page header out of view.
+  // Auto-centre on first paint AND every time the canvas changes shape
+  // (someone added/removed). The owner card sits at frame centre by
+  // construction (LEFT_PAD/TOP_OFFSET), so we just scroll the viewport
+  // to put frame-centre at vp-centre. No fit-zoom — user pinches if they
+  // want the whole tree on one screen.
   useEffect(() => {
     if (!layout) return;
     let attempts = 0;
@@ -447,57 +450,20 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       attempts += 1;
       const vp = viewport.current;
       if (!vp) return;
-      // Include real cards AND placeholder slots in the bbox so a brand-new
-      // owner-only tree (where the only data-person-id is the owner card and
-      // the rest is "Add father / Add mother" notched placeholders) still
-      // centres BOTH the owner and the placeholders in viewport. Otherwise
-      // the placeholders end up off-screen above and the user can't see them
-      // without dragging.
-      const cards = vp.querySelectorAll<HTMLElement>('[data-person-id], [data-tree-card]');
-      if (cards.length && vp.clientWidth && vp.clientHeight) {
-        // Re-fit ONLY when the canvas itself changes shape (someone got
-        // added/removed). Viewport-size changes are deliberately excluded
-        // — on iOS the address bar can show/hide mid-pinch which changes
-        // dvh, which used to trigger an auto-fit and reset the user's
-        // active zoom to 1.0. Once fitted, the user's manual zoom is
-        // preserved across viewport reflows.
+      if (vp.clientWidth && vp.clientHeight && frame.current) {
         const dimsKey = `${layout.canvas.width}x${layout.canvas.height}`;
         const dimsChanged = lastFitDimsRef.current !== dimsKey;
         if (dimsChanged) {
-          const W = layout.canvas.width * (NODE_W / 2);
-          const H = layout.canvas.height * (NODE_H / 2) + TOP_PAD;
-          const fit = Math.min(vp.clientWidth / W, vp.clientHeight / H, 1);
-          zoom.setTo(fit < 1 ? fit : 1);
+          // Frame element's getBoundingClientRect reflects the actual on-
+          // screen size (post-zoom). Owner sits at its geometric centre —
+          // so frame-centre IS owner-centre regardless of any user pinch.
+          const fr = frame.current.getBoundingClientRect();
+          const vpRect = vp.getBoundingClientRect();
+          const targetX = (fr.left + fr.width / 2) - (vpRect.left + vpRect.width / 2);
+          const targetY = (fr.top + fr.height / 2) - (vpRect.top + vpRect.height / 2);
+          vp.scrollLeft += targetX;
+          vp.scrollTop += targetY;
           lastFitDimsRef.current = dimsKey;
-        }
-        // Only auto-centre on initial fit or canvas-size changes. After that
-        // the user's manual scroll/zoom must not be reset by re-renders
-        // (e.g. when iOS Safari triggers a viewport reflow mid-pinch).
-        // Centre the BOUNDING BOX of all rendered cards in viewport — not
-        // just the owner. For owners with no parents (top of layout) the box
-        // centre is well below the owner card; centring on the box gives the
-        // user "I see the whole tree" rather than "my card with descendants
-        // hanging off the bottom".
-        if (dimsChanged) {
-          const centreBox = () => {
-            const vpRect = vp.getBoundingClientRect();
-            let minL = Infinity, maxR = -Infinity, minT = Infinity, maxB = -Infinity;
-            cards.forEach((c) => {
-              const r = c.getBoundingClientRect();
-              if (r.left < minL) minL = r.left;
-              if (r.right > maxR) maxR = r.right;
-              if (r.top < minT) minT = r.top;
-              if (r.bottom > maxB) maxB = r.bottom;
-            });
-            if (!Number.isFinite(minL)) return;
-            vp.scrollLeft += (minL + maxR) / 2 - (vpRect.left + vpRect.width / 2);
-            vp.scrollTop  += (minT + maxB) / 2 - (vpRect.top  + vpRect.height / 2);
-          };
-          centreBox();
-          // Re-run on the next frame so getBoundingClientRect reflects the
-          // post-zoom layout (zoom.setTo above mutates a CSS var which the
-          // browser only applies after a paint).
-          raf = requestAnimationFrame(centreBox);
         }
         return;
       }
@@ -511,7 +477,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       if (timer != null) clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, zoom]);
+  }, [layout]);
 
   if (!layout) return <div style={{padding:24,color:'var(--text-muted)'}}>Дерево пусто. Добавьте первого родственника.</div>;
 
@@ -576,34 +542,30 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   }
 
   // canvas.width/height come back in HALF-units (same scale as node.left/top),
-  // so the rendered box must be NODE_W/2 × NODE_H/2 per half-unit. Spacing
-  // and canvas size are now both driven by NODE_W/NODE_H — no extra fudge.
-  // Frame is padded both horizontally and vertically so the user can drag
-  // past the tree edges in any direction. For sparse trees the frame is
-  // additionally enforced to be wider than the viewport — otherwise drag-
-  // left would be impossible (scrollLeft can't go negative).
+  // so the rendered box must be NODE_W/2 × NODE_H/2 per half-unit.
   const layoutW = canvasW * (NODE_W / 2);
-  // Content height (before pad/centring math).
+  // Content height includes the TOP_PAD reserved above the topmost card row
+  // for "Add father / Add mother" placeholders.
   const contentH = canvasH * (NODE_H / 2) + TOP_PAD;
-  const layoutH = contentH * 1.4;
-  const naturalW = Math.round(layoutW * (1 + 2 * SIDE_PAD_RATIO));
-  const minW = (vpSize.w || 0) + 200;
-  // Frame is wider than viewport on each side so drag-left/right has room
-  // past the layout edges. naturalW already adds SIDE_PAD_RATIO; minW makes
-  // sure the frame is bigger than viewport even when layout is tiny so that
-  // scrollLeft has somewhere to go.
-  const W = Math.max(naturalW, minW + (vpSize.w || 0));
-  const LEFT_PAD = Math.round((W - layoutW) / 2);
-  // Frame is contentH + ~2 viewports tall: one viewport of slack ABOVE the
-  // top row (so the user can drag the tree fully off-screen downward) and
-  // one BELOW the bottom row (drag fully off-screen upward). The 1.25 ×
-  // layoutH baseline keeps the +40% breathing room intact for trees big
-  // enough that 2 × vp.h would have been less.
-  const H = Math.round(Math.max(layoutH * (1 + BOTTOM_PAD_RATIO), contentH + 2 * (vpSize.h || 0)));
-  // Push content DOWN by one viewport so there is empty drag-room ABOVE the
-  // top row of placeholders. Without this, dragging the tree DOWN bumps
-  // immediately at scrollTop=0.
-  const TOP_OFFSET = vpSize.h || 0;
+
+  // Owner-at-centre frame math (May 2026 spec):
+  //   1. The frame is at LEAST LAYOUT_W_MIN × LAYOUT_H_MIN px so even a
+  //      brand-new owner-only tree has a generous canvas around it.
+  //   2. The frame extends as far past the OWNER as the farthest card on
+  //      that side — guarantees no card ever clips off the edge regardless
+  //      of how the topology shakes out.
+  //   3. Owner card centre lands at exactly (W/2, H/2). LEFT_PAD/TOP_OFFSET
+  //      shift the content div inside the frame to make that happen.
+  const ownerNode = ownerId ? layout.nodes.find((n) => n.id === ownerId) : undefined;
+  const ownerCenterX = ownerNode ? ownerNode.left * (NODE_W / 2) + NODE_W / 2 : layoutW / 2;
+  const ownerCenterY = ownerNode ? ownerNode.top * (NODE_H / 2) + TOP_PAD + NODE_H / 2 : contentH / 2;
+
+  const halfW = Math.max(LAYOUT_W_MIN / 2, ownerCenterX, layoutW - ownerCenterX);
+  const halfH = Math.max(LAYOUT_H_MIN / 2, ownerCenterY, contentH - ownerCenterY);
+  const W = Math.round(halfW * 2);
+  const H = Math.round(halfH * 2);
+  const LEFT_PAD = Math.round(halfW - ownerCenterX);
+  const TOP_OFFSET = Math.round(halfH - ownerCenterY);
 
   // Two flavours of parent-slot placeholders coexist:
   //   1. "topRow" — one pair (father + mother) above each parentless person
@@ -741,12 +703,16 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           </div>
         );
       })()}
+      {/* Frame's CSS box is always W × H px — pinch-zoom only scales the
+          content visually via transform on the inner div. tree-stage's scroll
+          bounds stay tied to the unscaled frame so user pan room is the
+          same regardless of zoom. */}
       <div
         ref={frame}
         style={{
           position: 'relative',
-          width: `calc(${W}px * var(--cf-zoom, 1))`,
-          height: `calc(${H}px * var(--cf-zoom, 1))`,
+          width: W,
+          height: H,
           flexShrink: 0,
         }}
       >
