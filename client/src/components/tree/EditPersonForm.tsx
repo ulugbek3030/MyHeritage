@@ -3,7 +3,6 @@ import type { Person, Relationship } from '../../types';
 import { updatePerson } from '../../api/persons';
 import { createRelationship, deleteRelationship } from '../../api/relationships';
 import { BottomSheet } from '../ui/BottomSheet';
-import { DateWheelPicker } from '../ui/DateWheelPicker';
 import '../../styles/form.css';
 
 interface Props {
@@ -215,9 +214,12 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
         <input className="auth-input" placeholder="Отчество" value={middleName} onChange={(e) => setMiddleName(e.target.value)} />
 
         <div style={dateLabel}>Дата рождения</div>
-        <DateWheelPicker
+        <input
+          type="date"
+          className="auth-input"
           value={birthDate}
-          onChange={(iso) => { setBirthDate(iso); if (iso) setYear(''); }}
+          onChange={(e) => { setBirthDate(e.target.value); if (e.target.value) setYear(''); }}
+          max={new Date().toISOString().slice(0, 10)}
         />
         {!birthDate && (
           <input className="auth-input" placeholder="Или только год (1985)" inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))} />
@@ -237,9 +239,12 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
         {!isAlive && (
           <>
             <div style={dateLabel}>Дата смерти</div>
-            <DateWheelPicker
+            <input
+              type="date"
+              className="auth-input"
               value={deathDate}
-              onChange={(iso) => { setDeathDate(iso); if (iso) setDeathYear(''); }}
+              onChange={(e) => { setDeathDate(e.target.value); if (e.target.value) setDeathYear(''); }}
+              max={new Date().toISOString().slice(0, 10)}
             />
             {!deathDate && (
               <input className="auth-input" placeholder="Или только год (2010)" inputMode="numeric" value={deathYear} onChange={(e) => setDeathYear(e.target.value.replace(/\D/g, '').slice(0, 4))} />

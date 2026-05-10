@@ -5,7 +5,6 @@ import { generateMiddleName } from '../../utils/uzNamings';
 import { adjustSurnameForGender } from '../../utils/uzNamings';
 import { BottomSheet } from '../ui/BottomSheet';
 import { Silhouette, type SilhouetteKind } from '../ui/Silhouette';
-import { DateWheelPicker } from '../ui/DateWheelPicker';
 import '../../styles/form.css';
 
 type Mode = 'parent' | 'sibling' | 'child' | 'spouse';
@@ -533,11 +532,16 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
               onChange={(e) => setMiddleName(e.target.value)}
             />
 
-            {/* Birth date — custom wheel-picker (iPhone-style spinners). */}
+            {/* Birth date — native <input type="date">. On iOS this opens
+                the system date picker; everywhere else it's a calendar
+                popover. No timezone shift, no debounce / scroll-snap bugs. */}
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Дата рождения</div>
-            <DateWheelPicker
+            <input
+              type="date"
+              className="auth-input"
               value={birthDate}
-              onChange={(iso) => { setBirthDate(iso); if (iso) setYear(''); }}
+              onChange={(e) => { setBirthDate(e.target.value); if (e.target.value) setYear(''); }}
+              max={new Date().toISOString().slice(0, 10)}
             />
             {!birthDate && (
               <input
@@ -564,9 +568,12 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
             {!isAlive && (
               <>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Дата смерти</div>
-                <DateWheelPicker
+                <input
+                  type="date"
+                  className="auth-input"
                   value={deathDate}
-                  onChange={(iso) => { setDeathDate(iso); if (iso) setDeathYear(''); }}
+                  onChange={(e) => { setDeathDate(e.target.value); if (e.target.value) setDeathYear(''); }}
+                  max={new Date().toISOString().slice(0, 10)}
                 />
                 {!deathDate && (
                   <input
