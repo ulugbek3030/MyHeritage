@@ -578,12 +578,25 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
 
   // Frame must extend at least as far past the owner as the FARTHEST content
   // edge from the owner — otherwise content would render at negative offsets
-  // and clip. The minRoom term keeps the +40% layoutH breathing space + the
-  // BOTTOM_PAD drag-down room (= contentH * 1.4 * 1.25 ≈ 1.75) intact for
-  // typical near-centre owners.
+  // and clip. We additionally add a half-viewport of EXTRA pad past the
+  // farthest content edge so the user can drag-up / drag-down past the top-
+  // most / bottom-most card by half a screen on each side. Without this the
+  // frame ends exactly at the descendant- (or ancestor-) heavy edge and pan-
+  // up bumps a wall asymmetrically.
+  const padV = (vpSize.h || 600) * 0.5;
+  const padH = (vpSize.w || 400) * 0.5;
   const minVerticalRoom = contentH * 1.4 * (1 + BOTTOM_PAD_RATIO);
-  const halfW = Math.max(ownerCenterX, layoutW - ownerCenterX, naturalW / 2, minW / 2);
-  const halfH = Math.max(ownerCenterY, contentH - ownerCenterY, minVerticalRoom / 2);
+  const halfW = Math.max(
+    ownerCenterX + padH,
+    layoutW - ownerCenterX + padH,
+    naturalW / 2,
+    minW / 2,
+  );
+  const halfH = Math.max(
+    ownerCenterY + padV,
+    contentH - ownerCenterY + padV,
+    minVerticalRoom / 2,
+  );
   const W = Math.round(halfW * 2);
   const H = Math.round(halfH * 2);
   const LEFT_PAD = Math.round(W / 2 - ownerCenterX);
