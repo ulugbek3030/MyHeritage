@@ -278,6 +278,15 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
             </div>
           )}
 
+          {/* Divider between the "уже отправленные" section above and the
+              new-request form below — gives the eye a clear boundary so
+              the form doesn't read as more of the pending list. Only
+              rendered when there ARE outgoing items (otherwise the form
+              sits at the top and a stray line would look orphaned). */}
+          {outgoing.length > 0 && (
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '4px 0 18px' }} />
+          )}
+
           <form onSubmit={submit}>
             {relatives && relatives.length > 0 && (
               <>
