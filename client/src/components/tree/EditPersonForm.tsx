@@ -42,6 +42,7 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
   const [photo, setPhoto] = useState<File | null>(null);
   const [note, setNote] = useState<string>(person.note ?? '');
   const [address, setAddress] = useState<string>(person.address ?? '');
+  const [phone, setPhone] = useState<string>(person.phone ?? '');
   const [maritalStatus, setMaritalStatus] = useState<string>(person.maritalStatus ?? '');
   const [busy, setBusy] = useState(false);
 
@@ -83,6 +84,7 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
     setPhoto(null);
     setNote(person.note ?? '');
     setAddress(person.address ?? '');
+    setPhone(person.phone ?? '');
     setMaritalStatus(person.maritalStatus ?? '');
   }, [person.id]);
 
@@ -164,6 +166,7 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
         deathDateKnown: fullDeathDate,
         note: note.trim() || undefined,
         address: address.trim() || undefined,
+        phone: phone.trim() || undefined,
         maritalStatus: maritalStatus || undefined,
       });
       // Photo upload is best-effort and isolated from the main save: if the
@@ -332,6 +335,16 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
           value={note}
           onChange={(e) => setNote(e.target.value)}
           style={{ resize: 'vertical', minHeight: 70, fontFamily: 'inherit', lineHeight: 1.4 }}
+        />
+
+        <div style={dateLabel}>Телефон</div>
+        <input
+          className="auth-input"
+          type="tel"
+          inputMode="tel"
+          placeholder="+998901234567"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
         />
 
         <div style={dateLabel}>Домашний адрес</div>

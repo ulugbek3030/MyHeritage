@@ -80,6 +80,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
   const [photo, setPhoto] = useState<File | null>(null);
   const [note, setNote] = useState<string>('');
   const [address, setAddress] = useState<string>('');
+  const [phone, setPhone] = useState<string>('');
   const [maritalStatus, setMaritalStatus] = useState<string>('');
   const [busy, setBusy] = useState(false);
 
@@ -183,6 +184,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
     setPhoto(null);
     setNote('');
     setAddress('');
+    setPhone('');
     setMaritalStatus('');
     // When opened with a presetRole the role-picker step is bypassed entirely;
     // skipping back to it would land the user on a meaningless screen.
@@ -326,6 +328,7 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         deathDateKnown: !isAlive && fullDeathDate,
         note: note.trim() || undefined,
         address: address.trim() || undefined,
+        phone: phone.trim() || undefined,
         maritalStatus: maritalStatus || undefined,
         relationships: rels,
       });
@@ -666,6 +669,16 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
               value={note}
               onChange={(e) => setNote(e.target.value)}
               style={{ resize: 'vertical', minHeight: 70, fontFamily: 'inherit', lineHeight: 1.4 }}
+            />
+
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Телефон</div>
+            <input
+              className="auth-input"
+              type="tel"
+              inputMode="tel"
+              placeholder="+998901234567"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
             />
 
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Домашний адрес</div>
