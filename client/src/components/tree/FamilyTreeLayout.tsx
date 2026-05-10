@@ -552,12 +552,16 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   // canvas.width/height come back in HALF-units (same scale as node.left/top),
   // so the rendered box must be NODE_W/2 × NODE_H/2 per half-unit. Spacing
   // and canvas size are now both driven by NODE_W/NODE_H — no extra fudge.
-  // We pad the rendered canvas an extra 25% below the bottom generation and
-  // 30% past the rightmost column so the user can pan past the tree edges
-  // when adding new branches.
+  // Frame is padded both horizontally and vertically so the user can drag
+  // past the tree edges in any direction. For sparse trees the frame is
+  // additionally enforced to be wider than the viewport — otherwise drag-
+  // left would be impossible (scrollLeft can't go negative).
   const layoutW = canvasW * (NODE_W / 2);
-  const W = Math.round(layoutW * (1 + SIDE_PAD_RATIO));
   const layoutH = canvasH * (NODE_H / 2) + TOP_PAD;
+  const naturalW = Math.round(layoutW * (1 + 2 * SIDE_PAD_RATIO));
+  const minW = (vpSize.w || 0) + 200;
+  const W = Math.max(naturalW, minW);
+  const LEFT_PAD = Math.round((W - layoutW) / 2);
   const H = Math.round(layoutH * (1 + BOTTOM_PAD_RATIO));
 
   // Two flavours of parent-slot placeholders coexist:
@@ -705,7 +709,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           flexShrink: 0,
         }}
       >
-      <div ref={content} style={{ position: 'absolute', top: 0, left: 0, width: W, height: H, willChange: 'transform' }}>
+      <div ref={content} style={{ position: 'absolute', top: 0, left: LEFT_PAD, width: layoutW, height: H, willChange: 'transform' }}>
         <svg width={W} height={H} style={{ position: 'absolute', top: TOP_PAD, left: 0, pointerEvents: 'none' }}>
           {/* strokeLinecap="butt" — at junctions the segment's shortened end and
               the arc's start share the same point; round caps would double up there
