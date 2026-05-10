@@ -12,7 +12,7 @@ import { EditPersonForm } from '../components/tree/EditPersonForm';
 import { BiographyEditor } from '../components/tree/BiographyEditor';
 import { ShareModal } from '../components/share/ShareModal';
 import { ExpandTreeModal } from '../components/share/ExpandTreeModal';
-import { listIncomingRequests } from '../api/treeAccess';
+import { listIncomingRequests, listGrantedTrees, type GrantedTree } from '../api/treeAccess';
 import { QuickActions } from '../components/home/QuickActions';
 import { Skeleton } from '../components/ui/Skeleton';
 import { Loader } from '../components/ui/Loader';
@@ -41,6 +41,7 @@ export const TreeViewPage = () => {
   // person (used when "Запросить доступ к древу" is tapped on a card).
   const [expandPrefillPhone, setExpandPrefillPhone] = useState<string | null>(null);
   const [incomingCount, setIncomingCount] = useState(0);
+  const [grantedTrees, setGrantedTrees] = useState<GrantedTree[]>([]);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   // Tracks any active fetch (initial load or post-mutation reload). Used to
@@ -67,7 +68,22 @@ export const TreeViewPage = () => {
   useEffect(() => {
     if (expandOpen) return; // skip while open — the modal already shows them
     listIncomingRequests().then((rs) => setIncomingCount(rs.length)).catch(() => {});
+    // Re-fetch granted trees on the same trigger — after the user accepts a
+    // request inside the modal, the grant list grows and tunnel icons on
+    // matching cards should appear without a page reload.
+    listGrantedTrees().then(setGrantedTrees).catch(() => {});
   }, [expandOpen]);
+
+  // Map phone → other user's tree id. Cards whose person.phone matches one
+  // of these phones render a tunnel icon that navigates into the granted
+  // tree on tap.
+  const grantedTreesByPhone = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const g of grantedTrees) {
+      if (g.phone) m[g.phone] = g.treeId;
+    }
+    return m;
+  }, [grantedTrees]);
 
   const reload = () => {
     if (!treeId) return;
@@ -136,6 +152,8 @@ export const TreeViewPage = () => {
             setAddOpen(p);
           }}
           onDiveSubfamily={(id) => nav(`/trees/${treeId}/dive/${id}`)}
+          grantedTreesByPhone={grantedTreesByPhone}
+          onTunnel={(otherTreeId) => nav(`/trees/${otherTreeId}`)}
         />
       </div>
       <PersonSheet

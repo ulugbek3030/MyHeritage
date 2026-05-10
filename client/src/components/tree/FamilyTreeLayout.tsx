@@ -38,6 +38,11 @@ interface Props {
   onAddParent?: (personId: string, gender: 'male' | 'female') => void;
   /** Click on the collapsed-ancestors pills above a married-in spouse. */
   onDiveSubfamily?: (personId: string) => void;
+  /** Map of phone → other user's tree id for persons that match a granted
+   *  Click user. Renders a tunnel icon on those cards. */
+  grantedTreesByPhone?: Record<string, string>;
+  /** Fired when the tunnel icon is tapped on a granted card. */
+  onTunnel?: (treeId: string) => void;
 }
 
 // Dashed-card placeholder with a U-shaped notch at the top so the '+' button
@@ -65,7 +70,7 @@ const NotchedPlaceholder = ({ gender, onActivate }: { gender: 'male' | 'female';
   </div>
 );
 
-export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick, onAddParent, onDiveSubfamily }: Props) => {
+export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventIcons, onPersonClick, onPlusClick, onAddParent, onDiveSubfamily, grantedTreesByPhone, onTunnel }: Props) => {
   const viewport = useRef<HTMLDivElement>(null);
   // Track real viewport size — re-runs the auto-centre when WebView orientation
   // or chrome height changes.
@@ -805,6 +810,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                 onClick={onPersonClick}
                 onPlusClick={onPlusClick}
                 showPlus={true}
+                tunnelTreeId={person.phone ? grantedTreesByPhone?.[person.phone] ?? null : null}
+                onTunnelClick={onTunnel}
               />
               {isSecondary && (
                 <button
@@ -987,6 +994,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
                 onClick={onPersonClick}
                 onPlusClick={onPlusClick}
                 showPlus={true}
+                tunnelTreeId={person.phone ? grantedTreesByPhone?.[person.phone] ?? null : null}
+                onTunnelClick={onTunnel}
               />
               {isSecondary && (
                 <button

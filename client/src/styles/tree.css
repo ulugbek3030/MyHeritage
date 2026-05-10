@@ -23,6 +23,29 @@
 .pcard.me .pcard-verified { background: #0a0a0d; color: var(--accent); }
 .pcard-events { position: absolute; top: -10px; right: -8px; display: flex; gap: 2px; padding: 3px 5px; background: #050507; border: 1px solid var(--border); border-radius: 12px; font-size: 14px; line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
 .pcard-events span { display: inline-block; }
+/* Tunnel — small pill on the top-left of a card with a tunnel-shape glyph.
+   Visible only on cards whose phone matches a granted Click user; tapping
+   navigates into THAT user's tree (read-only). */
+.pcard-tunnel {
+  position: absolute;
+  top: -10px;
+  left: -8px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: #0a0a0d;
+  border: 2px solid #050507;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.45);
+  transition: transform 0.15s ease;
+}
+.pcard-tunnel:hover { transform: scale(1.1); }
+.pcard-tunnel:active { transform: scale(0.95); }
 /* Empty-slot card for missing parents — clicking it opens AddPersonForm
    pre-targeted to "Add father" / "Add mother". Sized to match .pcard so it
    sits cleanly in the same NODE_W × NODE_H grid wrapper. */

@@ -33,3 +33,13 @@ export const declineAccessRequest = (id: string) =>
 
 export const cancelAccessRequest = (id: string) =>
   api.post<TreeAccessRequest>(`/tree-access-requests/${id}/cancel`).then((r) => r.data);
+
+export interface GrantedTree {
+  userId: string;
+  displayName: string | null;
+  phone: string | null;
+  treeId: string;
+}
+
+export const listGrantedTrees = () =>
+  api.get<GrantedTree[]>(`/me/granted-trees`).then((r) => r.data);

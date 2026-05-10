@@ -62,3 +62,30 @@ treeAccessRoutes.post('/tree-access-requests/:id/decline', async (req, res, next
 treeAccessRoutes.post('/tree-access-requests/:id/cancel', async (req, res, next) => {
   try { res.json(await cancelRequest(req.params.id, req.user!.id)); } catch (e) { next(e); }
 });
+
+// List trees the calling user has been granted view access to. Used by the
+// tree-view page to render a small "tunnel" icon on cards whose phone
+// matches one of these granted users.
+treeAccessRoutes.get('/me/granted-trees', async (req, res, next) => {
+  try {
+    const r = await query<{
+      userId: string;
+      displayName: string | null;
+      phone: string | null;
+      treeId: string;
+    }>(
+      `SELECT
+         u.id           AS "userId",
+         u.display_name AS "displayName",
+         u.phone        AS "phone",
+         t.id           AS "treeId"
+       FROM tree_access_grants g
+       JOIN users u ON u.id = g.user_b_id
+       JOIN trees t ON t.user_id = u.id
+       WHERE g.user_a_id = $1
+       ORDER BY g.created_at DESC`,
+      [req.user!.id]
+    );
+    res.json(r.rows);
+  } catch (e) { next(e); }
+});
