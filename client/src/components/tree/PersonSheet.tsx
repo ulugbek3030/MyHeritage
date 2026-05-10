@@ -23,9 +23,16 @@ interface Props {
    *  send a tree-access request straight from the person card. Hidden if
    *  the person has no phone or is the owner themselves. */
   onRequestAccess?: () => void;
+  /** When set, "Посмотреть древо" button shows — leads into this
+   *  relative's own tree (only visible when there's a granted Click
+   *  user backing this card). */
+  onViewTree?: () => void;
+  /** Dive into the subfamily centred on this person. Always wired —
+   *  shows "Посмотреть семью" button. */
+  onViewSubfamily?: () => void;
 }
 
-export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, isOwner, onEdit, onAdd, onDelete, onEditBio, onRequestAccess }: Props) => {
+export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, isOwner, onEdit, onAdd, onDelete, onEditBio, onRequestAccess, onViewTree, onViewSubfamily }: Props) => {
   if (!person) return null;
   const fullName = [person.firstName, person.lastName, person.middleName].filter(Boolean).join(' ');
   const showCta = person.isAlive && typeof upcomingBirthdayInDays === 'number' && upcomingBirthdayInDays >= 0 && upcomingBirthdayInDays <= 14;
@@ -157,6 +164,23 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, isO
       </div>
       {onEditBio && (
         <button onClick={onEditBio} style={{width:'100%',padding:14,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:14,color:'var(--text)',fontSize:15,fontWeight:700,marginBottom:10}}>📝 Описание</button>
+      )}
+      {/* "Посмотреть семью" — dive into the subfamily centred on this
+          person (existing /trees/:treeId/dive/:personId page). Always
+          wired by the caller. */}
+      {onViewSubfamily && (
+        <button onClick={onViewSubfamily} style={{ width: '100%', padding: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 14, color: 'var(--text)', fontSize: 15, fontWeight: 700, marginBottom: 10, cursor: 'pointer' }}>
+          👥 Посмотреть семью
+        </button>
+      )}
+      {/* "Посмотреть древо" — only shows when there's a granted Click
+          user backing this card; jumps into their own tree. Sits in the
+          same gold style as the tunnel itself so the visual link is
+          obvious. */}
+      {onViewTree && (
+        <button onClick={onViewTree} style={{ width: '100%', padding: 14, background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))', border: 'none', borderRadius: 14, color: '#0a0a0d', fontSize: 15, fontWeight: 800, marginBottom: 10, cursor: 'pointer', boxShadow: '0 4px 14px rgba(251,191,36,0.35)' }}>
+          🌳 Посмотреть древо
+        </button>
       )}
       {/* "Запросить доступ к древу" — visible only when caller wires
           onRequestAccess (which it does only for non-owner persons that

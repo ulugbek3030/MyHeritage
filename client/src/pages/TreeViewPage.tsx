@@ -123,18 +123,19 @@ export const TreeViewPage = () => {
   //     which the onTunnel handler interprets as "go back to my tree".
   const grantedTreesByPhone = useMemo(() => {
     const m: Record<string, string> = {};
+    // Tunnels are an OWN-TREE-only affordance — on a guest tree the
+    // back button in the header is the way home, and tunnels on the
+    // user's own card would just be a duplicate "go back". So we leave
+    // the map empty here too.
     if (isOwnTree) {
       for (const g of grantedTrees) {
         if (!g.phone) continue;
         const key = g.phone.replace(/[^0-9]/g, '');
         if (key) m[key] = g.treeId;
       }
-    } else if (user?.phone) {
-      const key = user.phone.replace(/[^0-9]/g, '');
-      if (key) m[key] = '__back__';
     }
     return m;
-  }, [grantedTrees, isOwnTree, user?.phone]);
+  }, [grantedTrees, isOwnTree]);
 
   const reload = () => {
     if (!treeId) return;
@@ -261,13 +262,7 @@ export const TreeViewPage = () => {
           }}
           onDiveSubfamily={(id) => nav(`/trees/${treeId}/dive/${id}`)}
           grantedTreesByPhone={grantedTreesByPhone}
-          onTunnel={(otherTreeId) => {
-            // Sentinel "__back__" means we're already in a guest tree
-            // (own-card tunnel) — pop the route stack to whatever brought
-            // us here, which is the user's own tree.
-            if (otherTreeId === '__back__') nav(-1);
-            else nav(`/trees/${otherTreeId}`);
-          }}
+          onTunnel={(otherTreeId) => nav(`/trees/${otherTreeId}`)}
         />
       </div>
       <PersonSheet
@@ -291,6 +286,31 @@ export const TreeViewPage = () => {
                 setExpandPrefillPhone(selectedPerson.phone);
                 setExpandOpen(true);
                 setSelectedPerson(null);
+              }
+            : undefined
+        }
+        // "Посмотреть древо" — when this person's phone matches a granted
+        // Click user, navigate into their own tree (same destination as
+        // the tunnel icon on the card, but reachable from the details
+        // sheet too).
+        onViewTree={(() => {
+          if (!isOwnTree || !selectedPerson?.phone) return undefined;
+          const key = selectedPerson.phone.replace(/[^0-9]/g, '');
+          const treeIdForPerson = grantedTreesByPhone[key];
+          if (!treeIdForPerson) return undefined;
+          return () => {
+            setSelectedPerson(null);
+            nav(`/trees/${treeIdForPerson}`);
+          };
+        })()}
+        // "Посмотреть семью" — dive into the subfamily centred on this
+        // person. Existing /trees/:treeId/dive/:personId page.
+        onViewSubfamily={
+          selectedPerson
+            ? () => {
+                const id = selectedPerson.id;
+                setSelectedPerson(null);
+                nav(`/trees/${treeId}/dive/${id}`);
               }
             : undefined
         }
