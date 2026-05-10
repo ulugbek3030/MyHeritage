@@ -509,6 +509,20 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             const offsetY = ownerOnly
               ? -(180 + CARD_H + CARD_H / 2)
               : -(120 + CARD_H + CARD_H / 2);
+            // TEMP debug: dump autofit inputs so we can see in DevTools why
+            // the tree visually drifts down as the user adds ancestors.
+            console.log('[autofit]', {
+              dimsKey,
+              vpW: vp.clientWidth,
+              vpH: vp.clientHeight,
+              ownerCy,
+              contentH: contentHlocal,
+              halfH: halfHlocal,
+              ownerYInFrame,
+              boxTop: topOffset,
+              boxBottom: topOffset + contentHlocal,
+              offsetY,
+            });
             panZoom.fitAndCentreOnOwner(
               ownerXInFrame,
               ownerYInFrame,
@@ -519,6 +533,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               16,
               offsetY,
             );
+            console.log('[autofit] state after =', panZoom.state());
           }
           lastFitDimsRef.current = dimsKey;
         }
