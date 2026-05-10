@@ -561,15 +561,33 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   // additionally enforced to be wider than the viewport — otherwise drag-
   // left would be impossible (scrollLeft can't go negative).
   const layoutW = canvasW * (NODE_W / 2);
-  // +40% vertical room: extends the canvas so cards can breathe and drag-down
-  // works even on sparse trees. Driven separately from BOTTOM_PAD_RATIO since
-  // we want the EXTRA height applied before pad math, not after.
-  const layoutH = (canvasH * (NODE_H / 2) + TOP_PAD) * 1.4;
+  // Content height (before pad/centring math).
+  const contentH = canvasH * (NODE_H / 2) + TOP_PAD;
   const naturalW = Math.round(layoutW * (1 + 2 * SIDE_PAD_RATIO));
   const minW = (vpSize.w || 0) + 200;
-  const W = Math.max(naturalW, minW);
-  const LEFT_PAD = Math.round((W - layoutW) / 2);
-  const H = Math.round(layoutH * (1 + BOTTOM_PAD_RATIO));
+
+  // Frame centring: on first paint we want the OWNER's card at the geometric
+  // centre of the frame (W/2, H/2) — not the layout centre. relatives-tree
+  // places the owner wherever the topology demands (often left-of-centre, or
+  // at the very top when they have no parents), so we add pad on whichever
+  // side has less content. Net effect: the user opens the tree and sees
+  // their own card at dead-centre regardless of how the topology shakes out.
+  const ownerNode = ownerId ? layout.nodes.find((n) => n.id === ownerId) : undefined;
+  const ownerCenterX = ownerNode ? ownerNode.left * (NODE_W / 2) + NODE_W / 2 : layoutW / 2;
+  const ownerCenterY = ownerNode ? ownerNode.top * (NODE_H / 2) + TOP_PAD + NODE_H / 2 : contentH / 2;
+
+  // Frame must extend at least as far past the owner as the FARTHEST content
+  // edge from the owner — otherwise content would render at negative offsets
+  // and clip. The minRoom term keeps the +40% layoutH breathing space + the
+  // BOTTOM_PAD drag-down room (= contentH * 1.4 * 1.25 ≈ 1.75) intact for
+  // typical near-centre owners.
+  const minVerticalRoom = contentH * 1.4 * (1 + BOTTOM_PAD_RATIO);
+  const halfW = Math.max(ownerCenterX, layoutW - ownerCenterX, naturalW / 2, minW / 2);
+  const halfH = Math.max(ownerCenterY, contentH - ownerCenterY, minVerticalRoom / 2);
+  const W = Math.round(halfW * 2);
+  const H = Math.round(halfH * 2);
+  const LEFT_PAD = Math.round(W / 2 - ownerCenterX);
+  const TOP_OFFSET = Math.round(H / 2 - ownerCenterY);
 
   // Two flavours of parent-slot placeholders coexist:
   //   1. "topRow" — one pair (father + mother) above each parentless person
@@ -716,7 +734,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           flexShrink: 0,
         }}
       >
-      <div ref={content} style={{ position: 'absolute', top: 0, left: LEFT_PAD, width: layoutW, height: H, willChange: 'transform' }}>
+      <div ref={content} style={{ position: 'absolute', top: TOP_OFFSET, left: LEFT_PAD, width: layoutW, height: H, willChange: 'transform' }}>
         <svg width={W} height={H} style={{ position: 'absolute', top: TOP_PAD, left: 0, pointerEvents: 'none' }}>
           {/* strokeLinecap="butt" — at junctions the segment's shortened end and
               the arc's start share the same point; round caps would double up there
