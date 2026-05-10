@@ -447,7 +447,13 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
       attempts += 1;
       const vp = viewport.current;
       if (!vp) return;
-      const cards = vp.querySelectorAll<HTMLElement>('[data-person-id]');
+      // Include real cards AND placeholder slots in the bbox so a brand-new
+      // owner-only tree (where the only data-person-id is the owner card and
+      // the rest is "Add father / Add mother" notched placeholders) still
+      // centres BOTH the owner and the placeholders in viewport. Otherwise
+      // the placeholders end up off-screen above and the user can't see them
+      // without dragging.
+      const cards = vp.querySelectorAll<HTMLElement>('[data-person-id], [data-tree-card]');
       if (cards.length && vp.clientWidth && vp.clientHeight) {
         // Re-fit ONLY when the canvas itself changes shape (someone got
         // added/removed). Viewport-size changes are deliberately excluded
@@ -582,13 +588,22 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
   const layoutH = contentH * 1.4;
   const naturalW = Math.round(layoutW * (1 + 2 * SIDE_PAD_RATIO));
   const minW = (vpSize.w || 0) + 200;
-  const W = Math.max(naturalW, minW);
+  // Frame is wider than viewport on each side so drag-left/right has room
+  // past the layout edges. naturalW already adds SIDE_PAD_RATIO; minW makes
+  // sure the frame is bigger than viewport even when layout is tiny so that
+  // scrollLeft has somewhere to go.
+  const W = Math.max(naturalW, minW + (vpSize.w || 0));
   const LEFT_PAD = Math.round((W - layoutW) / 2);
-  // Frame is at least one viewport taller than the content so the user can
-  // drag the tree fully off-screen in either vertical direction. The +40%
-  // layoutH baseline gives breathing room above; the +1 vp.h pads below.
-  const H = Math.round(Math.max(layoutH * (1 + BOTTOM_PAD_RATIO), contentH + (vpSize.h || 0)));
-  const TOP_OFFSET = 0;
+  // Frame is contentH + ~2 viewports tall: one viewport of slack ABOVE the
+  // top row (so the user can drag the tree fully off-screen downward) and
+  // one BELOW the bottom row (drag fully off-screen upward). The 1.25 ×
+  // layoutH baseline keeps the +40% breathing room intact for trees big
+  // enough that 2 × vp.h would have been less.
+  const H = Math.round(Math.max(layoutH * (1 + BOTTOM_PAD_RATIO), contentH + 2 * (vpSize.h || 0)));
+  // Push content DOWN by one viewport so there is empty drag-room ABOVE the
+  // top row of placeholders. Without this, dragging the tree DOWN bumps
+  // immediately at scrollTop=0.
+  const TOP_OFFSET = vpSize.h || 0;
 
   // Two flavours of parent-slot placeholders coexist:
   //   1. "topRow" — one pair (father + mother) above each parentless person
@@ -1027,6 +1042,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           [entry.fatherSlot, entry.motherSlot].map((slot) => (
             <div
               key={`top-${entry.childId}-${slot.gender}`}
+              data-tree-card="placeholder"
               style={{
                 position: 'absolute',
                 transform: `translate(${slot.x}px, ${slot.y}px)`,
@@ -1046,6 +1062,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         )}
         {ownerSpouseSlot && (
           <div
+            data-tree-card="placeholder"
             style={{
               position: 'absolute',
               transform: `translate(${ownerSpouseSlot.x}px, ${ownerSpouseSlot.y}px)`,
