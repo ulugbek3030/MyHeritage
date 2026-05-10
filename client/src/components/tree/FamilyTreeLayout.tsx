@@ -486,14 +486,19 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             // their own card at the same spot regardless of how the tree
             // skews — descendant-heavy or ancestor-heavy.
             // Owner lift on first paint, two cases:
-            //   - Brand-new tree (only the owner): big lift so the empty
-            //     canvas leaves room BELOW for the parent placeholders
-            //     and future descendants.
-            //   - Anything else: base lift (-250) PLUS one CARD_H more,
-            //     so the user sees one extra generation row above the
-            //     viewport's vertical centre on every reshape.
+            //   - Brand-new tree (only the owner): owner sits high enough
+            //     that the empty canvas leaves room BELOW for the parent
+            //     placeholders and future descendants.
+            //   - Anything else: base lift PLUS one CARD_H more, so the
+            //     user sees one extra generation row above the viewport's
+            //     vertical centre on every reshape.
+            // The offsets are MODEST on purpose — earlier values of -380 /
+            // -360 made the fit's roomTop go negative for typical phones
+            // and the fit fell through to MIN_SCALE (super zoomed out).
+            // Keeping |offsetY| comfortably below vp.h/2 preserves real
+            // zoom levels.
             const ownerOnly = persons.length === 1;
-            const offsetY = ownerOnly ? -380 : -(250 + CARD_H);
+            const offsetY = ownerOnly ? -180 : -(120 + CARD_H);
             panZoom.fitAndCentreOnOwner(
               ownerXInFrame,
               ownerYInFrame,
@@ -501,7 +506,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               topOffset,
               leftPad + layoutWlocal,
               topOffset + contentHlocal,
-              40,
+              16,
               offsetY,
             );
           }

@@ -240,7 +240,12 @@ export const usePanZoom = (
         1, // never zoom IN past natural size
       ];
       const fit = Math.min(...ratios);
-      const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, fit));
+      // Floor at 0.45 (not the global MIN_SCALE) so the fit-and-centre
+      // never produces a tree so small the user can't read names. Better
+      // to let the bbox slightly overflow than to render postage-stamp
+      // cards. User can still pinch-out down to MIN_SCALE for free pan.
+      const AUTOFIT_MIN = 0.45;
+      const newScale = Math.max(AUTOFIT_MIN, Math.min(MAX_SCALE, fit));
       scale.current = newScale;
       tx.current = halfVw - ownerX * newScale;
       ty.current = halfVh + offsetY - ownerY * newScale;

@@ -212,6 +212,11 @@ export const loginWithClickSession = async (webSession: string) => {
   // Click's KYC flag. Treat missing as false so mocks / older snapshots
   // default to "not identified".
   const isIdentified = profile.is_identified === true;
+  // TEMP debug: dump the raw is_identified field straight from Click so
+  // we can confirm whether the integration API actually returns it.
+  // Remove once is_identified handling is verified end-to-end.
+  console.log('[click sso] click_id=%s is_identified=%o has_field=%o',
+    clientId, profile.is_identified, 'is_identified' in profile);
 
   // Try click_client_id first; if that row doesn't exist, fall back to phone.
   // We do an explicit two-step (instead of a single ON CONFLICT) because we
