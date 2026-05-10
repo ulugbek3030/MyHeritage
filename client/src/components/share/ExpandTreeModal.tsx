@@ -26,15 +26,27 @@ import {
 } from '../../api/treeAccess';
 import '../../styles/form.css';
 
+/** A person from the user's tree, surfaced as an option in the
+ *  "Выбрать из родственников" dropdown. Only persons with phones are
+ *  passed in — there's no point selecting someone with no Click join key. */
+export interface RelativeOption {
+  id: string;
+  name: string;
+  phone: string;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
   /** Pre-fills the phone field — used when the user clicks "Запросить
    *  доступ к древу" on a specific person card. */
   initialPhone?: string | null;
+  /** Relatives in the user's tree with phone numbers. Renders a dropdown
+   *  before the phone input so the user can pick one instead of typing. */
+  relatives?: RelativeOption[];
 }
 
-export const ExpandTreeModal = ({ open, onClose, initialPhone }: Props) => {
+export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Props) => {
   const [loading, setLoading] = useState(true);
   const [isIdentified, setIsIdentified] = useState<boolean | null>(null);
   const [incoming, setIncoming] = useState<TreeAccessRequest[]>([]);
@@ -250,6 +262,26 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone }: Props) => {
           )}
 
           <form onSubmit={submit}>
+            {relatives && relatives.length > 0 && (
+              <>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Выбрать из родственников</div>
+                <select
+                  className="auth-input"
+                  value=""
+                  onChange={(e) => {
+                    const picked = relatives.find((r) => r.id === e.target.value);
+                    if (picked) setPhone(picked.phone);
+                  }}
+                >
+                  <option value="">— выбрать из дерева —</option>
+                  {relatives.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} ({r.phone})
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Номер телефона родственника</div>
             <input
               className="auth-input"

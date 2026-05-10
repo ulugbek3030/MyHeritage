@@ -201,6 +201,16 @@ export const TreeViewPage = () => {
           open
           onClose={() => { setExpandOpen(false); setExpandPrefillPhone(null); }}
           initialPhone={expandPrefillPhone}
+          // Only persons with phones can be Click users → only they are
+          // valid request targets. Owner is excluded (they can't request
+          // access to their own tree).
+          relatives={data.persons
+            .filter((p) => p.phone && p.id !== data.tree.ownerPersonId)
+            .map((p) => ({
+              id: p.id,
+              name: [p.firstName, p.lastName].filter(Boolean).join(' '),
+              phone: p.phone!,
+            }))}
         />
       )}
       {searchOpen && <TreeSearch persons={data.persons} onSelect={(id) => { document.querySelector(`[data-person-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onClose={() => setSearchOpen(false)} />}
