@@ -479,12 +479,9 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
             </div>
           </div>
 
-          {mode === 'parent' && otherParent && (
-            <div style={{ padding: '10px 12px', marginBottom: 14, borderRadius: 12, background: 'linear-gradient(180deg,#1c1409,#0e0a04)', border: '1px solid rgba(251,191,36,0.25)', fontSize: 11, color: 'var(--text)' }}>
-              <span style={{ color: 'var(--accent)', fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: 1.2 }}>Авто-couple</span>{' '}
-              с <b>{otherParent.firstName}</b> ({otherParent.gender === 'male' ? 'отцом' : 'матерью'})
-            </div>
-          )}
+          {/* Auto-couple notice removed for parent mode: there's always at
+              most ONE other parent, so the notice is just noise. The
+              coupling still happens in onSubmit. */}
           {mode === 'sibling' && existingParents.length > 0 && (
             <div style={{ padding: '10px 12px', marginBottom: 14, borderRadius: 12, background: 'linear-gradient(180deg,#1c1409,#0e0a04)', border: '1px solid rgba(251,191,36,0.25)', fontSize: 11, color: 'var(--text)' }}>
               <span style={{ color: 'var(--accent)', fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: 1.2 }}>Общие родители</span>{' '}
