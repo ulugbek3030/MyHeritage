@@ -453,9 +453,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
         if (lastFitDimsRef.current !== dimsKey) {
           const ownerNode = layout.nodes.find((n) => n.id === ownerId);
           if (ownerNode) {
-            // Recompute the owner-centring frame math here so the effect
-            // doesn't depend on render-scope variables defined after the
-            // early return.
+            // Recompute frame-coords here so the effect doesn't depend on
+            // render-scope variables defined after the early return.
             const ownerCx = ownerNode.left * (NODE_W / 2) + NODE_W / 2;
             const ownerCy = ownerNode.top * (NODE_H / 2) + TOP_PAD + NODE_H / 2;
             const layoutWlocal = layout.canvas.width * (NODE_W / 2);
@@ -464,18 +463,23 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             const halfHlocal = Math.max(LAYOUT_H_MIN / 2, ownerCy, contentHlocal - ownerCy);
             const leftPad = halfWlocal - ownerCx;
             const topOffset = halfHlocal - ownerCy;
-            // Auto-fit + auto-centre: zoom out so the whole tree (cards +
-            // placeholders) fits in viewport with 40px breathing room,
-            // then translate so the layout's bbox centre lands 50px BELOW
-            // viewport centre (room at top for the "Add father / Add
-            // mother" placeholders that hover above the owner on a fresh
-            // tree). For trees that already fit at zoom=1 the scale stays
-            // at 1 — never zoom IN past natural size.
-            panZoom.fitAndCentreOnBox(
+            // Owner's position + bbox in frame coords.
+            const ownerXInFrame = leftPad + ownerCx;
+            const ownerYInFrame = topOffset + ownerCy;
+            // Auto-fit + auto-centre: scale picked per-side so the bbox
+            // fits in viewport with 40px breathing room, then translated
+            // so the OWNER sits at vp centre + 50px (room above for the
+            // "Add father / Add mother" placeholders on a fresh tree).
+            // Owner-centred (not bbox-centred) so the user always sees
+            // their own card at the same spot regardless of how the tree
+            // skews — descendant-heavy or ancestor-heavy.
+            panZoom.fitAndCentreOnOwner(
+              ownerXInFrame,
+              ownerYInFrame,
               leftPad,
               topOffset,
-              layoutWlocal,
-              contentHlocal,
+              leftPad + layoutWlocal,
+              topOffset + contentHlocal,
               40,
               50,
             );

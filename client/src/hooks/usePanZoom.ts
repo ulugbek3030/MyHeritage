@@ -194,46 +194,56 @@ export const usePanZoom = (
       apply();
     },
     /**
-     * Auto-fit + auto-centre on a bounding box (in unscaled frame coords).
-     *   - Picks a scale that fits the box in the viewport with `padding`
-     *     px of breathing room on each side, capped at 1× (we never zoom
-     *     IN past the natural size — large tree → smaller; small tree →
-     *     stays at 1).
-     *   - Translates the frame so the box centre lands at the viewport
-     *     centre, optionally shifted by `offsetY` screen-px (so the user
-     *     can land owner-card slightly below dead centre, leaving room
-     *     above for the "Add father" placeholders).
+     * Auto-fit + auto-centre on the OWNER, ensuring the surrounding bbox
+     * (cards + placeholders) still fits in the viewport.
+     *   - `ownerX`, `ownerY` (unscaled frame coords) land at the viewport
+     *     centre, shifted by `offsetY` screen-px (e.g. 50 → owner ends
+     *     up 50px below centre, leaving room for placeholders above).
+     *   - `boxLeft/Top/Right/Bottom` describe the full content bbox.
+     *     Scale is picked per-side so the farthest edge from the owner
+     *     fits with `padding` px of breathing room, capped at 1× (never
+     *     zoom in past natural size).
      * Used on first paint and when the canvas reshapes (person added /
      * removed).
      */
-    fitAndCentreOnBox: (
-      x: number,
-      y: number,
-      width: number,
-      height: number,
+    fitAndCentreOnOwner: (
+      ownerX: number,
+      ownerY: number,
+      boxLeft: number,
+      boxTop: number,
+      boxRight: number,
+      boxBottom: number,
       padding = 40,
       offsetY = 0,
     ) => {
       const vp = viewportRef.current;
       if (!vp || !vp.clientWidth || !vp.clientHeight) return;
-      const safeW = Math.max(1, width);
-      const safeH = Math.max(1, height);
-      // Available room shrinks by 2 × |offsetY| vertically: shifting the
-      // box centre down by N means the bottom edge needs N less room and
-      // the top edge needs N more before clipping. For pad=40, offsetY=50
-      // available height becomes vp.h - 80 - 100 = vp.h - 180, so the box
-      // gets a smaller fit-zoom but never extends past viewport.
-      const fit = Math.min(
-        (vp.clientWidth - 2 * padding) / safeW,
-        (vp.clientHeight - 2 * padding - 2 * Math.abs(offsetY)) / safeH,
-        1,
-      );
+      const halfVw = vp.clientWidth / 2;
+      const halfVh = vp.clientHeight / 2;
+      // Distance from owner to each bbox edge in unscaled frame coords.
+      const dLeft   = Math.max(0, ownerX - boxLeft);
+      const dRight  = Math.max(0, boxRight - ownerX);
+      const dTop    = Math.max(0, ownerY - boxTop);
+      const dBottom = Math.max(0, boxBottom - ownerY);
+      // Room available on each side of the owner-on-screen position
+      // (= vp centre + offsetY). offsetY > 0 means owner shifted DOWN,
+      // so there is MORE room above and LESS room below.
+      const roomLeft   = halfVw - padding;
+      const roomRight  = halfVw - padding;
+      const roomTop    = halfVh + offsetY - padding;
+      const roomBottom = halfVh - offsetY - padding;
+      const ratios = [
+        dLeft   > 0 ? roomLeft   / dLeft   : Infinity,
+        dRight  > 0 ? roomRight  / dRight  : Infinity,
+        dTop    > 0 ? roomTop    / dTop    : Infinity,
+        dBottom > 0 ? roomBottom / dBottom : Infinity,
+        1, // never zoom IN past natural size
+      ];
+      const fit = Math.min(...ratios);
       const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, fit));
       scale.current = newScale;
-      const cx = x + width / 2;
-      const cy = y + height / 2;
-      tx.current = vp.clientWidth / 2 - cx * newScale;
-      ty.current = vp.clientHeight / 2 + offsetY - cy * newScale;
+      tx.current = halfVw - ownerX * newScale;
+      ty.current = halfVh + offsetY - ownerY * newScale;
       apply();
     },
     /** Reset zoom to 1 and re-apply the current translate. */
