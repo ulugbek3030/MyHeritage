@@ -16,8 +16,52 @@ export const BottomSheet = ({ open, onClose, children }: { open: boolean; onClos
   }, [open]);
   if (!open) return null;
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'stretch',background:'rgba(0,0,0,0.55)'}}>
-      <div ref={panelRef} onClick={(e) => e.stopPropagation()} style={{width:'100%',height:'100dvh',overflowY:'auto',background:'linear-gradient(180deg,var(--surface),var(--bg))',padding:'calc(18px + var(--safe-top, 0px)) 28px 28px',animation:'sheetIn 220ms cubic-bezier(0.32,0.72,0,1)'}}>
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'stretch',
+        background: 'rgba(0,0,0,0.55)',
+        // Don't let the backdrop itself scroll when the on-screen keyboard
+        // pushes content around — the keyboard chrome was treating the
+        // backdrop as a scrollable parent and yanking the sheet around.
+        overflow: 'hidden',
+        // Block native pinch on the sheet too; the panel uses pan-y only
+        // for its own vertical scroll.
+        touchAction: 'none',
+      }}
+    >
+      <div
+        ref={panelRef}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%',
+          // svh = "small viewport height": the stable minimum size that
+          // ignores the iOS address bar AND on-screen keyboard, so the
+          // panel doesn't resize/jump when an input focuses. dvh used to
+          // shrink under the keyboard and the user saw the sheet "moving".
+          height: '100svh',
+          overflowY: 'auto',
+          // Keep scroll contained: don't bounce past the panel edges and
+          // don't propagate scroll back to the page underneath.
+          overscrollBehavior: 'contain',
+          // Allow only vertical pan inside the panel — no native pinch,
+          // no horizontal slide that could leak to the tree behind.
+          touchAction: 'pan-y',
+          // Stop iOS Safari from auto-scrolling the panel above the
+          // address bar when an input is focused (it tries to "bring the
+          // input into view" by treating the panel as a scrollable
+          // ancestor — combined with svh that scrolling looks like the
+          // sheet is sliding away).
+          WebkitOverflowScrolling: 'touch',
+          background: 'linear-gradient(180deg,var(--surface),var(--bg))',
+          padding: 'calc(18px + var(--safe-top, 0px)) 28px 28px',
+          animation: 'sheetIn 220ms cubic-bezier(0.32,0.72,0,1)',
+        }}
+      >
         {children}
       </div>
       <style>{`@keyframes sheetIn { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
