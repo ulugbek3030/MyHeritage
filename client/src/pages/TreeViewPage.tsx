@@ -12,6 +12,7 @@ import { EditPersonForm } from '../components/tree/EditPersonForm';
 import { BiographyEditor } from '../components/tree/BiographyEditor';
 import { ShareModal } from '../components/share/ShareModal';
 import { ExpandTreeModal } from '../components/share/ExpandTreeModal';
+import { NotificationsModal } from '../components/share/NotificationsModal';
 import { listIncomingRequests, listGrantedTrees, type GrantedTree } from '../api/treeAccess';
 import { QuickActions } from '../components/home/QuickActions';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -37,6 +38,7 @@ export const TreeViewPage = () => {
   const [bioOpen, setBioOpen] = useState<Person | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [expandOpen, setExpandOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   // When set, opening the ExpandTreeModal pre-fills the phone from this
   // person (used when "Запросить доступ к древу" is tapped on a card).
   const [expandPrefillPhone, setExpandPrefillPhone] = useState<string | null>(null);
@@ -66,13 +68,16 @@ export const TreeViewPage = () => {
   // user's approval. Re-fetched whenever the Расширить modal closes (after
   // an action it will be different) and on first paint.
   useEffect(() => {
-    if (expandOpen) return; // skip while open — the modal already shows them
+    // Skip while either modal is open — the modal already shows the data
+    // and we don't want a parallel fetch to mutate state behind the back
+    // of a Принять / Отклонить click.
+    if (expandOpen || notificationsOpen) return;
     listIncomingRequests().then((rs) => setIncomingCount(rs.length)).catch(() => {});
-    // Re-fetch granted trees on the same trigger — after the user accepts a
-    // request inside the modal, the grant list grows and tunnel icons on
-    // matching cards should appear without a page reload.
+    // Re-fetch granted trees on the same trigger — after the user accepts
+    // a request the grant list grows and tunnel icons on matching cards
+    // should appear without a page reload.
     listGrantedTrees().then(setGrantedTrees).catch(() => {});
-  }, [expandOpen]);
+  }, [expandOpen, notificationsOpen]);
 
   // Map phone → other user's tree id. Cards whose person.phone matches one
   // of these phones render a tunnel icon that navigates into the granted
@@ -129,11 +134,12 @@ export const TreeViewPage = () => {
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
         </button>
-        {/* Notification bell — replaces the old share-arrow. Opens the
-            «Расширить древо» modal so the user can see + accept any
-            pending incoming requests. Red dot when incomingCount > 0. */}
+        {/* Notification bell — opens a dedicated NotificationsModal that
+            shows ONLY incoming tree-access requests with Принять /
+            Отклонить buttons. Sending a NEW request is a separate flow
+            («Расширить» quick-action). Red dot when incomingCount > 0. */}
         <button
-          onClick={() => setExpandOpen(true)}
+          onClick={() => setNotificationsOpen(true)}
           aria-label={incomingCount > 0 ? `Уведомления (${incomingCount})` : 'Уведомления'}
           style={{ position: 'relative', width: 36, height: 36, borderRadius: '50%', background: incomingCount > 0 ? 'linear-gradient(135deg,var(--accent),var(--accent-hover))' : 'rgba(255,255,255,0.06)', border: 'none', color: incomingCount > 0 ? '#0a0a0d' : 'var(--text)', marginLeft: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
         >
@@ -242,6 +248,18 @@ export const TreeViewPage = () => {
         />
       )}
       {shareOpen && <ShareModal open onClose={() => setShareOpen(false)} treeId={treeId!} existingToken={data.tree.shareToken} />}
+      {notificationsOpen && (
+        <NotificationsModal
+          open
+          onClose={() => setNotificationsOpen(false)}
+          // After accept/decline, refresh the badge + granted-trees so
+          // the tunnel icons appear (or disappear) right away.
+          onChange={() => {
+            listIncomingRequests().then((rs) => setIncomingCount(rs.length)).catch(() => {});
+            listGrantedTrees().then(setGrantedTrees).catch(() => {});
+          }}
+        />
+      )}
       {expandOpen && (
         <ExpandTreeModal
           open
