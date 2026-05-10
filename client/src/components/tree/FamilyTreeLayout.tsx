@@ -763,7 +763,13 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
           flexShrink: 0,
         }}
       >
-      <div ref={content} style={{ position: 'absolute', top: TOP_OFFSET, left: LEFT_PAD, width: layoutW, height: H, willChange: 'transform' }}>
+      {/* top/left scale with --cf-zoom: at zoom < 1 the frame's CSS box
+          shrinks (calc(W * --cf-zoom)) but TOP_OFFSET/LEFT_PAD are fixed
+          CSS px, so without the calc multiplier the content gets pushed
+          outside the shrunk frame and produces a blank canvas on first
+          paint. Scaling them keeps content's relative position inside the
+          frame the same regardless of zoom. */}
+      <div ref={content} style={{ position: 'absolute', top: `calc(${TOP_OFFSET}px * var(--cf-zoom, 1))`, left: `calc(${LEFT_PAD}px * var(--cf-zoom, 1))`, width: layoutW, height: H, willChange: 'transform' }}>
         <svg width={W} height={H} style={{ position: 'absolute', top: TOP_PAD, left: 0, pointerEvents: 'none' }}>
           {/* strokeLinecap="butt" — at junctions the segment's shortened end and
               the arc's start share the same point; round caps would double up there
