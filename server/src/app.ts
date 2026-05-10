@@ -18,6 +18,15 @@ export const createApp = () => {
   app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
   app.use(express.json({ limit: '10mb' }));
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
+  // TEMP debug bridge: lets the client surface its console.log into server
+  // journalctl so we can read it remotely without DevTools access. Remove
+  // once autofit drift bug is closed.
+  app.post('/api/debug-log', (req, res) => {
+    try {
+      console.log('[client log]', JSON.stringify(req.body));
+    } catch { /* ignore */ }
+    res.json({ ok: true });
+  });
   app.use('/api/auth', authRoutes);
   if (env.NODE_ENV !== 'production') app.use('/api/auth', devAuthRoutes);
   app.use('/api', photoPublicRoutes);

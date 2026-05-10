@@ -511,7 +511,7 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               : -(120 + CARD_H + CARD_H / 2);
             // TEMP debug: dump autofit inputs so we can see in DevTools why
             // the tree visually drifts down as the user adds ancestors.
-            console.log('[autofit]', {
+            const dbg = {
               dimsKey,
               vpW: vp.clientWidth,
               vpH: vp.clientHeight,
@@ -522,7 +522,8 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               boxTop: topOffset,
               boxBottom: topOffset + contentHlocal,
               offsetY,
-            });
+            };
+            console.log('[autofit]', dbg);
             panZoom.fitAndCentreOnOwner(
               ownerXInFrame,
               ownerYInFrame,
@@ -533,7 +534,15 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
               16,
               offsetY,
             );
-            console.log('[autofit] state after =', panZoom.state());
+            const after = panZoom.state();
+            console.log('[autofit] state after =', after);
+            // Also POST to the server so we can read it from journalctl
+            // without DevTools access. Fire-and-forget.
+            fetch('/api/debug-log', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ autofit: dbg, after }),
+            }).catch(() => {});
           }
           lastFitDimsRef.current = dimsKey;
         }
