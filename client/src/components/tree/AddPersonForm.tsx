@@ -39,13 +39,24 @@ interface RoleOption {
 export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, relationships, onCreated, presetRole }: Props) => {
   // Mirror what `pick()` would compute for a given (mode, gender) so a presetRole
   // arrives with the same smart-surname defaults a manual click would set.
+  //   • female parent (mother placeholder)   → lastName = target's surname
+  //                                            adjusted to feminine ("Рустамов" → "Рустамова").
+  //                                            maidenName empty.
+  //   • female spouse                        → same as mother (wife takes
+  //                                            husband's surname).
+  //   • male parent (father placeholder)     → lastName = target's surname
+  //                                            adjusted to masculine.
+  //   • female non-parent / non-spouse       → maidenName = feminine form,
+  //                                            lastName empty.
   const tLast = targetPerson.lastName ?? '';
   const presetLastName = presetRole
     ? (presetRole.gender === 'male'
         ? adjustSurnameForGender(tLast, 'male')
-        : '')
+        : (presetRole.mode === 'parent' || presetRole.mode === 'spouse')
+          ? adjustSurnameForGender(tLast, 'female')
+          : '')
     : tLast;
-  const presetMaidenName = presetRole && presetRole.gender === 'female' && presetRole.mode !== 'parent'
+  const presetMaidenName = presetRole && presetRole.gender === 'female' && presetRole.mode !== 'parent' && presetRole.mode !== 'spouse'
     ? adjustSurnameForGender(tLast, 'female')
     : '';
 
