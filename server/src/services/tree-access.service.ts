@@ -51,9 +51,9 @@ export const createRequest = async (
   rawPhone: string,
   message: string | null,
 ): Promise<TreeAccessRequest> => {
-  if (!await userIsIdentified(requesterId)) {
-    throw new BadRequestError('not_identified');
-  }
+  // Click KYC gate temporarily disabled — re-enable by re-introducing
+  // `if (!await userIsIdentified(requesterId)) throw new BadRequestError('not_identified');`
+  // once Click's is_identified flag is reliably populated on every user.
   const phone = normalisePhone(rawPhone);
   if (!/^\+?\d{9,15}$/.test(phone)) {
     throw new BadRequestError('Invalid phone format');

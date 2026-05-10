@@ -502,8 +502,13 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             // and the fit fell through to MIN_SCALE (super zoomed out).
             // Keeping |offsetY| comfortably below vp.h/2 preserves real
             // zoom levels.
+            // Half-card extra lift on top of the previous values (one CARD_H
+            // was the user's "lift by one card" pass — this adds another
+            // CARD_H / 2 across the board).
             const ownerOnly = persons.length === 1;
-            const offsetY = ownerOnly ? -(180 + CARD_H) : -(120 + CARD_H);
+            const offsetY = ownerOnly
+              ? -(180 + CARD_H + CARD_H / 2)
+              : -(120 + CARD_H + CARD_H / 2);
             panZoom.fitAndCentreOnOwner(
               ownerXInFrame,
               ownerYInFrame,

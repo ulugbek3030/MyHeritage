@@ -174,24 +174,12 @@ export const ExpandTreeModal = ({ open, onClose, initialPhone, relatives }: Prop
 
       {loading && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Загрузка…</div>}
 
-      {!loading && isIdentified === false && (
-        <div
-          style={{
-            padding: 16,
-            borderRadius: 14,
-            background: 'rgba(248,113,113,0.08)',
-            border: '1px solid rgba(248,113,113,0.3)',
-            fontSize: 13,
-            color: 'var(--text)',
-            lineHeight: 1.5,
-          }}
-        >
-          <div style={{ fontWeight: 800, color: '#f87171', marginBottom: 6 }}>Требуется идентификация</div>
-          Вам необходимо пройти идентификацию в Click. Вернитесь, пожалуйста, на главную страницу и нажмите значок профиля в левом верхнем углу.
-        </div>
-      )}
-
-      {!loading && isIdentified === true && (
+      {/* Identification gate temporarily removed — the form is shown
+          regardless of isIdentified so we can test the request/grant
+          flow without needing Click KYC. Re-enable by restoring the
+          `isIdentified === false` branch above and gating this block
+          on `isIdentified === true`. */}
+      {!loading && (
         <>
           {incoming.length > 0 && (
             <div style={{ marginBottom: 18 }}>
