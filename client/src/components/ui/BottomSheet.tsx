@@ -95,6 +95,7 @@ export const BottomSheet = ({ open, onClose, children }: { open: boolean; onClos
     >
       <div
         ref={panelRef}
+        className="cf-bottom-sheet-panel"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
@@ -116,6 +117,10 @@ export const BottomSheet = ({ open, onClose, children }: { open: boolean; onClos
           // ancestor — combined with svh that scrolling looks like the
           // sheet is sliding away).
           WebkitOverflowScrolling: 'touch',
+          // Hide the scrollbar on Firefox / Edge — webkit hidden via the
+          // ::-webkit-scrollbar rule in the <style> block below.
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
           background: 'linear-gradient(180deg,var(--surface),var(--bg))',
           padding: 'calc(18px + var(--safe-top, 0px)) 28px 28px',
           animation: 'sheetIn 220ms cubic-bezier(0.32,0.72,0,1)',
@@ -123,7 +128,10 @@ export const BottomSheet = ({ open, onClose, children }: { open: boolean; onClos
       >
         {children}
       </div>
-      <style>{`@keyframes sheetIn { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
+      <style>{`
+        @keyframes sheetIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .cf-bottom-sheet-panel::-webkit-scrollbar { display: none; width: 0; height: 0; }
+      `}</style>
     </div>
   );
 };
