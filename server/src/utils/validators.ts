@@ -31,12 +31,15 @@ export const createPersonSchema = z.object({
   middleName: z.string().max(100).optional(),
   maidenName: z.string().max(100).optional(),
   gender: genderSchema,
-  birthDate: z.string().date().optional(),
-  birthYear: z.number().int().min(1800).max(2100).optional(),
+  // Nullable so the client can explicitly CLEAR a previously-set date /
+  // year (PATCH semantics with JSON: undefined drops the key from the
+  // payload entirely; null tells the server "set this column to NULL").
+  birthDate: z.string().date().nullable().optional(),
+  birthYear: z.number().int().min(1800).max(2100).nullable().optional(),
   birthDateKnown: z.boolean().default(false),
   isAlive: z.boolean().default(true),
-  deathDate: z.string().date().optional(),
-  deathYear: z.number().int().min(1800).max(2100).optional(),
+  deathDate: z.string().date().nullable().optional(),
+  deathYear: z.number().int().min(1800).max(2100).nullable().optional(),
   deathDateKnown: z.boolean().default(false),
   note: z.string().optional(),
   phone: z.string().regex(/^\+?\d{9,15}$/).optional(),

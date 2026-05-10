@@ -55,9 +55,15 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState(presetLastName);
   const [maidenName, setMaidenName] = useState(presetMaidenName);
+  // birthType / deathType pick which of the three input modes is shown:
+  //   'date'    — full YYYY-MM-DD picker (default)
+  //   'year'    — year-only fallback
+  //   'unknown' — no input, dates left blank
+  const [birthType, setBirthType] = useState<'date' | 'year' | 'unknown'>('date');
   const [birthDate, setBirthDate] = useState<string>(''); // YYYY-MM-DD via <input type="date">
   const [year, setYear] = useState<string>('');           // year-only fallback
   const [isAlive, setIsAlive] = useState(true);
+  const [deathType, setDeathType] = useState<'date' | 'year' | 'unknown'>('date');
   const [deathDate, setDeathDate] = useState<string>('');
   const [deathYear, setDeathYear] = useState<string>('');
   const [photo, setPhoto] = useState<File | null>(null);
@@ -156,9 +162,11 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
     setLastName(presetLastName);
     setMaidenName(presetMaidenName);
     setMiddleName(generateMiddleName(middleNameSource, gender));
+    setBirthType('date');
     setBirthDate('');
     setYear('');
     setIsAlive(true);
+    setDeathType('date');
     setDeathDate('');
     setDeathYear('');
     setPhoto(null);
@@ -187,25 +195,29 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
     //   • male sibling/child/father → inherits target's lastName
     //   • female sibling/daughter   → maidenName = target's lastName (born into family),
     //                                  lastName empty (filled if married)
-    //   • female parent (mother)    → maidenName empty (unknown), lastName empty
-    //   • spouse (any gender)       → empty (married in from outside; surname
-    //                                  and patronymic come from a different
-    //                                  family). Patronymic is already empty
-    //                                  because middleNameSource is null for
-    //                                  spouse mode.
+    //   • female parent (mother)    → lastName = target's lastName adjusted to
+    //                                  feminine (assumed family name after marriage),
+    //                                  maidenName empty (her birth family unknown)
+    //   • female spouse (wife)      → same as mother — takes husband's surname
+    //                                  after marriage, maiden left for the user
+    //   • male spouse (husband)     → empty (no inheritance from the target)
     const tLast = targetPerson.lastName ?? '';
-    if (m === 'spouse') {
+    if (m === 'spouse' && g === 'male') {
       setLastName('');
+      setMaidenName('');
+    } else if (g === 'female' && (m === 'parent' || m === 'spouse')) {
+      // Wife / mother — inherits family surname adjusted to feminine form.
+      // "Рустамов" → "Рустамова". Maiden stays empty: she married in from
+      // a different family and the user can fill it in.
+      setLastName(adjustSurnameForGender(tLast, 'female'));
       setMaidenName('');
     } else if (g === 'male') {
       // Strip trailing "а" — Рустамова (target female) → Рустамов (new son).
       setLastName(adjustSurnameForGender(tLast, 'male'));
       setMaidenName('');
-    } else if (m === 'parent') {
-      setLastName('');
-      setMaidenName('');
     } else {
-      // Append "а" — Рустамов (target male) → Рустамова (new daughter's maiden).
+      // Sister / daughter — born into the family. Append "а" for maiden.
+      // "Рустамов" (target male) → "Рустамова" (new daughter's maiden).
       setMaidenName(adjustSurnameForGender(tLast, 'female'));
       setLastName('');
     }
@@ -267,16 +279,22 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
         }
       }
 
-      // birthDate / deathDate are already ISO strings (YYYY-MM-DD) from
-      // <input type="date">. If only year is provided, store as birthYear.
-      const fullBirthDate = !!birthDate;
-      const fullDeathDate = !!deathDate;
-      const effectiveBirthYear = fullBirthDate
-        ? Number(birthDate.split('-')[0])
-        : (year ? Number(year) : undefined);
-      const effectiveDeathYear = fullDeathDate
-        ? Number(deathDate.split('-')[0])
-        : (deathYear ? Number(deathYear) : undefined);
+      // birthType / deathType control which payload we send:
+      //   'date'    → full birthDate + derive birthYear from the year part
+      //   'year'    → only birthYear (no birthDate)
+      //   'unknown' → nothing
+      const fullBirthDate = birthType === 'date' && !!birthDate;
+      const fullDeathDate = deathType === 'date' && !!deathDate;
+      const effectiveBirthYear = birthType === 'date'
+        ? (birthDate ? Number(birthDate.split('-')[0]) : undefined)
+        : birthType === 'year'
+          ? (year ? Number(year) : undefined)
+          : undefined;
+      const effectiveDeathYear = deathType === 'date'
+        ? (deathDate ? Number(deathDate.split('-')[0]) : undefined)
+        : deathType === 'year'
+          ? (deathYear ? Number(deathYear) : undefined)
+          : undefined;
 
       // For unmarried women, lastName falls back to maidenName so display logic
       // (which prefers lastName) shows the right surname.
@@ -549,21 +567,38 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
             />
 
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Дата рождения</div>
-            <input
-              type="date"
-              className="auth-input"
-              value={birthDate}
-              onChange={(e) => { setBirthDate(e.target.value); if (e.target.value) setYear(''); }}
-              max={new Date().toISOString().slice(0, 10)}
-            />
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', margin: '-6px 4px 6px', textAlign: 'center' }}>или, если точная дата неизвестна — только год:</div>
-            <input
-              className="auth-input"
-              placeholder="Год (1985)"
-              inputMode="numeric"
-              value={year}
-              onChange={(e) => { setYear(e.target.value.replace(/\D/g, '').slice(0, 4)); if (e.target.value) setBirthDate(''); }}
-            />
+            <div style={{ display: 'flex', gap: 18, marginBottom: 10, flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+                <input type="radio" name="birthType" checked={birthType === 'date'} onChange={() => setBirthType('date')} style={{ accentColor: 'var(--accent)' }} />
+                Полная дата
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+                <input type="radio" name="birthType" checked={birthType === 'year'} onChange={() => setBirthType('year')} style={{ accentColor: 'var(--accent)' }} />
+                Только год
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+                <input type="radio" name="birthType" checked={birthType === 'unknown'} onChange={() => setBirthType('unknown')} style={{ accentColor: 'var(--accent)' }} />
+                Неизвестно
+              </label>
+            </div>
+            {birthType === 'date' && (
+              <input
+                type="date"
+                className="auth-input"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+              />
+            )}
+            {birthType === 'year' && (
+              <input
+                className="auth-input"
+                placeholder="Год (1985)"
+                inputMode="numeric"
+                value={year}
+                onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              />
+            )}
 
             {/* Alive / Deceased toggle */}
             <div style={{ display: 'flex', gap: 18, marginBottom: 14 }}>
@@ -580,21 +615,38 @@ export const AddPersonForm = ({ open, onClose, treeId, targetPerson, persons, re
             {!isAlive && (
               <>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, letterSpacing: 0.2 }}>Дата смерти</div>
-                <input
-                  type="date"
-                  className="auth-input"
-                  value={deathDate}
-                  onChange={(e) => { setDeathDate(e.target.value); if (e.target.value) setDeathYear(''); }}
-                  max={new Date().toISOString().slice(0, 10)}
-                />
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', margin: '-6px 4px 6px', textAlign: 'center' }}>или только год:</div>
-                <input
-                  className="auth-input"
-                  placeholder="Год (2010)"
-                  inputMode="numeric"
-                  value={deathYear}
-                  onChange={(e) => { setDeathYear(e.target.value.replace(/\D/g, '').slice(0, 4)); if (e.target.value) setDeathDate(''); }}
-                />
+                <div style={{ display: 'flex', gap: 18, marginBottom: 10, flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+                    <input type="radio" name="deathType" checked={deathType === 'date'} onChange={() => setDeathType('date')} style={{ accentColor: 'var(--accent)' }} />
+                    Полная дата
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+                    <input type="radio" name="deathType" checked={deathType === 'year'} onChange={() => setDeathType('year')} style={{ accentColor: 'var(--accent)' }} />
+                    Только год
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+                    <input type="radio" name="deathType" checked={deathType === 'unknown'} onChange={() => setDeathType('unknown')} style={{ accentColor: 'var(--accent)' }} />
+                    Неизвестно
+                  </label>
+                </div>
+                {deathType === 'date' && (
+                  <input
+                    type="date"
+                    className="auth-input"
+                    value={deathDate}
+                    onChange={(e) => setDeathDate(e.target.value)}
+                    max={new Date().toISOString().slice(0, 10)}
+                  />
+                )}
+                {deathType === 'year' && (
+                  <input
+                    className="auth-input"
+                    placeholder="Год (2010)"
+                    inputMode="numeric"
+                    value={deathYear}
+                    onChange={(e) => setDeathYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  />
+                )}
               </>
             )}
 

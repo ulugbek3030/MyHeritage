@@ -27,9 +27,16 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
   // ("YYYY-MM-DDT00:00:00.000Z"); the wheel-picker / save path want only
   // the YYYY-MM-DD prefix.
   const isoDate = (v?: string | null) => (v ? v.slice(0, 10) : '');
+  // Pick the initial date-input mode from what the person already has.
+  const inferBirthType = (p: Person): 'date' | 'year' | 'unknown' =>
+    p.birthDate ? 'date' : p.birthYear ? 'year' : 'unknown';
+  const inferDeathType = (p: Person): 'date' | 'year' | 'unknown' =>
+    p.deathDate ? 'date' : p.deathYear ? 'year' : 'unknown';
+  const [birthType, setBirthType] = useState<'date' | 'year' | 'unknown'>(inferBirthType(person));
   const [birthDate, setBirthDate] = useState(isoDate(person.birthDate));
   const [year, setYear] = useState(person.birthDate ? '' : (person.birthYear ? String(person.birthYear) : ''));
   const [isAlive, setIsAlive] = useState(person.isAlive);
+  const [deathType, setDeathType] = useState<'date' | 'year' | 'unknown'>(inferDeathType(person));
   const [deathDate, setDeathDate] = useState(isoDate(person.deathDate));
   const [deathYear, setDeathYear] = useState(person.deathDate ? '' : (person.deathYear ? String(person.deathYear) : ''));
   const [photo, setPhoto] = useState<File | null>(null);
@@ -66,9 +73,11 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
     setLastName(person.lastName ?? '');
     setMiddleName(person.middleName ?? '');
     setMaidenName(person.maidenName ?? '');
+    setBirthType(inferBirthType(person));
     setBirthDate(isoDate(person.birthDate));
     setYear(person.birthDate ? '' : (person.birthYear ? String(person.birthYear) : ''));
     setIsAlive(person.isAlive);
+    setDeathType(inferDeathType(person));
     setDeathDate(isoDate(person.deathDate));
     setDeathYear(person.deathDate ? '' : (person.deathYear ? String(person.deathYear) : ''));
     setPhoto(null);
@@ -118,14 +127,27 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
     e.preventDefault();
     setBusy(true);
     try {
-      const fullBirthDate = !!birthDate;
-      const fullDeathDate = !!deathDate;
-      const effectiveBirthYear = fullBirthDate
-        ? Number(birthDate.split('-')[0])
-        : (year ? Number(year) : undefined);
-      const effectiveDeathYear = fullDeathDate
-        ? Number(deathDate.split('-')[0])
-        : (deathYear ? Number(deathYear) : undefined);
+      // Build birth/death payload from the type radio:
+      //   'date'    → birthDate + derived year, birthDateKnown = true
+      //   'year'    → birthYear only, birthDate cleared (null), known=false
+      //   'unknown' → everything cleared (null), known=false
+      const fullBirthDate = birthType === 'date' && !!birthDate;
+      const fullDeathDate = deathType === 'date' && !!deathDate;
+      const birthDatePayload =
+        birthType === 'date' ? (birthDate || null) :
+        birthType === 'year' ? null :
+        null;
+      const birthYearPayload =
+        birthType === 'date' ? (birthDate ? Number(birthDate.split('-')[0]) : null) :
+        birthType === 'year' ? (year ? Number(year) : null) :
+        null;
+      const deathDatePayload =
+        !isAlive && deathType === 'date' ? (deathDate || null) :
+        null;
+      const deathYearPayload =
+        !isAlive && deathType === 'date' ? (deathDate ? Number(deathDate.split('-')[0]) : null) :
+        !isAlive && deathType === 'year' ? (deathYear ? Number(deathYear) : null) :
+        null;
 
       await updatePerson(treeId, person.id, {
         firstName: firstName.trim(),
@@ -133,13 +155,13 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
         middleName: middleName.trim() || undefined,
         maidenName: gender === 'female' ? maidenName.trim() || undefined : undefined,
         gender,
-        birthYear: effectiveBirthYear,
-        birthDate: fullBirthDate ? birthDate : undefined,
+        birthYear: birthYearPayload,
+        birthDate: birthDatePayload,
         birthDateKnown: fullBirthDate,
         isAlive,
-        deathYear: !isAlive ? effectiveDeathYear : undefined,
-        deathDate: !isAlive && fullDeathDate ? deathDate : undefined,
-        deathDateKnown: !isAlive && fullDeathDate,
+        deathYear: deathYearPayload,
+        deathDate: deathDatePayload,
+        deathDateKnown: fullDeathDate,
         note: note.trim() || undefined,
         address: address.trim() || undefined,
         maritalStatus: maritalStatus || undefined,
@@ -220,21 +242,38 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
         <input className="auth-input" placeholder="Отчество" value={middleName} onChange={(e) => setMiddleName(e.target.value)} />
 
         <div style={dateLabel}>Дата рождения</div>
-        <input
-          type="date"
-          className="auth-input"
-          value={birthDate}
-          onChange={(e) => { setBirthDate(e.target.value); if (e.target.value) setYear(''); }}
-          max={new Date().toISOString().slice(0, 10)}
-        />
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', margin: '-6px 4px 6px', textAlign: 'center' }}>или, если точная дата неизвестна — только год:</div>
-        <input
-          className="auth-input"
-          placeholder="Год (1985)"
-          inputMode="numeric"
-          value={year}
-          onChange={(e) => { setYear(e.target.value.replace(/\D/g, '').slice(0, 4)); if (e.target.value) setBirthDate(''); }}
-        />
+        <div style={{ display: 'flex', gap: 18, marginBottom: 10, flexWrap: 'wrap' }}>
+          <label style={radioStyle}>
+            <input type="radio" name="edit-birthType" checked={birthType === 'date'} onChange={() => setBirthType('date')} style={{ accentColor: 'var(--accent)' }} />
+            Полная дата
+          </label>
+          <label style={radioStyle}>
+            <input type="radio" name="edit-birthType" checked={birthType === 'year'} onChange={() => setBirthType('year')} style={{ accentColor: 'var(--accent)' }} />
+            Только год
+          </label>
+          <label style={radioStyle}>
+            <input type="radio" name="edit-birthType" checked={birthType === 'unknown'} onChange={() => setBirthType('unknown')} style={{ accentColor: 'var(--accent)' }} />
+            Неизвестно
+          </label>
+        </div>
+        {birthType === 'date' && (
+          <input
+            type="date"
+            className="auth-input"
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
+            max={new Date().toISOString().slice(0, 10)}
+          />
+        )}
+        {birthType === 'year' && (
+          <input
+            className="auth-input"
+            placeholder="Год (1985)"
+            inputMode="numeric"
+            value={year}
+            onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+          />
+        )}
 
         <div style={{ display: 'flex', gap: 18, marginBottom: 14 }}>
           <label style={radioStyle}>
@@ -250,21 +289,38 @@ export const EditPersonForm = ({ open, onClose, treeId, person, persons, relatio
         {!isAlive && (
           <>
             <div style={dateLabel}>Дата смерти</div>
-            <input
-              type="date"
-              className="auth-input"
-              value={deathDate}
-              onChange={(e) => { setDeathDate(e.target.value); if (e.target.value) setDeathYear(''); }}
-              max={new Date().toISOString().slice(0, 10)}
-            />
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', margin: '-6px 4px 6px', textAlign: 'center' }}>или только год:</div>
-            <input
-              className="auth-input"
-              placeholder="Год (2010)"
-              inputMode="numeric"
-              value={deathYear}
-              onChange={(e) => { setDeathYear(e.target.value.replace(/\D/g, '').slice(0, 4)); if (e.target.value) setDeathDate(''); }}
-            />
+            <div style={{ display: 'flex', gap: 18, marginBottom: 10, flexWrap: 'wrap' }}>
+              <label style={radioStyle}>
+                <input type="radio" name="edit-deathType" checked={deathType === 'date'} onChange={() => setDeathType('date')} style={{ accentColor: 'var(--accent)' }} />
+                Полная дата
+              </label>
+              <label style={radioStyle}>
+                <input type="radio" name="edit-deathType" checked={deathType === 'year'} onChange={() => setDeathType('year')} style={{ accentColor: 'var(--accent)' }} />
+                Только год
+              </label>
+              <label style={radioStyle}>
+                <input type="radio" name="edit-deathType" checked={deathType === 'unknown'} onChange={() => setDeathType('unknown')} style={{ accentColor: 'var(--accent)' }} />
+                Неизвестно
+              </label>
+            </div>
+            {deathType === 'date' && (
+              <input
+                type="date"
+                className="auth-input"
+                value={deathDate}
+                onChange={(e) => setDeathDate(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+              />
+            )}
+            {deathType === 'year' && (
+              <input
+                className="auth-input"
+                placeholder="Год (2010)"
+                inputMode="numeric"
+                value={deathYear}
+                onChange={(e) => setDeathYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              />
+            )}
           </>
         )}
 
