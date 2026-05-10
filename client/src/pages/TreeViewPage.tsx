@@ -291,17 +291,22 @@ export const TreeViewPage = () => {
           setDeletePending(selectedPerson);
           setSelectedPerson(null);
         }}
-        // Wire "Запросить доступ к древу" only when the person has a phone
-        // — that's the join key for the request, no phone = no point.
-        onRequestAccess={
-          selectedPerson?.phone
-            ? () => {
-                setExpandPrefillPhone(selectedPerson.phone);
-                setExpandOpen(true);
-                setSelectedPerson(null);
-              }
-            : undefined
-        }
+        // Wire "Запросить доступ к древу" only when:
+        //   - the person has a phone (= the join key for the request), AND
+        //   - access ISN'T already granted (no tunnel on the card yet) —
+        //     once a grant exists the "Посмотреть древо" button takes
+        //     over; offering to re-request would be confusing.
+        onRequestAccess={(() => {
+          const phone = selectedPerson?.phone;
+          if (!phone) return undefined;
+          const key = phone.replace(/[^0-9]/g, '');
+          if (grantedTreesByPhone[key]) return undefined; // grant exists
+          return () => {
+            setExpandPrefillPhone(phone);
+            setExpandOpen(true);
+            setSelectedPerson(null);
+          };
+        })()}
         // "Посмотреть древо" — when this person's phone matches a granted
         // Click user, navigate into their own tree (same destination as
         // the tunnel icon on the card, but reachable from the details
