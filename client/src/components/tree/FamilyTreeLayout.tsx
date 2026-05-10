@@ -485,14 +485,15 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
             // Owner-centred (not bbox-centred) so the user always sees
             // their own card at the same spot regardless of how the tree
             // skews — descendant-heavy or ancestor-heavy.
-            // Brand-new tree (only the owner): push them HIGHER so the
-            // user immediately sees the "Add father / Add mother"
-            // placeholders below the card (cards stack vertically with
-            // owner at top, room to add family flows downward). Once
-            // the tree grows past 1 person, fall back to the regular
-            // -250 lift that just keeps owner in the upper third.
+            // Owner lift on first paint, two cases:
+            //   - Brand-new tree (only the owner): big lift so the empty
+            //     canvas leaves room BELOW for the parent placeholders
+            //     and future descendants.
+            //   - Anything else: base lift (-250) PLUS one CARD_H more,
+            //     so the user sees one extra generation row above the
+            //     viewport's vertical centre on every reshape.
             const ownerOnly = persons.length === 1;
-            const offsetY = ownerOnly ? -380 : -250;
+            const offsetY = ownerOnly ? -380 : -(250 + CARD_H);
             panZoom.fitAndCentreOnOwner(
               ownerXInFrame,
               ownerYInFrame,
