@@ -173,6 +173,22 @@ export const TreeViewPage = () => {
   return (
     <div style={{minHeight:'calc(100dvh - var(--safe-top, 0px))',display:'flex',flexDirection:'column'}}>
       <header style={{padding:'0 18px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid var(--border)'}}>
+        {/* Back button — visible only on a GUEST tree (arrived via tunnel
+            from elsewhere). Tap pops the route stack to return to the
+            user's own tree. On the user's own tree this slot is empty so
+            the layout doesn't shift between views. */}
+        {!isOwnTree && (
+          <button
+            onClick={() => nav(-1)}
+            aria-label="Назад к моему дереву"
+            style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,var(--accent),var(--accent-hover))', color: '#0a0a0d', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(251,191,36,0.4)' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg>
+          </button>
+        )}
         <div style={{flex:1,fontSize:17,fontWeight:800}}>{data.tree.name}</div>
         <button onClick={() => setSearchOpen(true)} aria-label="Поиск" style={{width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)',marginLeft:6,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
