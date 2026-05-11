@@ -19,7 +19,7 @@ export const SharedTreePage = () => {
   if (!data) return <div style={{padding:24}}>Загрузка…</div>;
 
   return (
-    <div style={{minHeight:'100dvh'}}>
+    <div style={{minHeight:'calc(100dvh - var(--safe-top, 0px))'}}>
       <header style={{padding:'12px 18px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:12}}>
         <div style={{flex:1,fontSize:15,fontWeight:800}}>{data.tree.name}</div>
         <div style={{fontSize:10,color:'var(--text-muted)'}}>Только просмотр</div>

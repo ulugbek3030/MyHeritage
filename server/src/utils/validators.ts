@@ -1,10 +1,20 @@
 import { z } from 'zod';
 
 export const phoneSchema = z.string().regex(/^\+?\d{9,15}$/, 'Invalid phone');
+export const emailSchema = z.string().email('Invalid email').max(254);
+// 8 chars min: keeps it usable while still above the OWASP minimum.
+export const passwordSchema = z.string().min(8, 'Password too short').max(200);
 
 export const requestOtpSchema = z.object({ phone: phoneSchema });
 export const verifyOtpSchema = z.object({ phone: phoneSchema, code: z.string().regex(/^\d{4,6}$/) });
 export const refreshSchema = z.object({ refreshToken: z.string().min(10) });
+
+export const registerSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  displayName: z.string().min(1).max(200).optional(),
+});
+export const loginEmailSchema = z.object({ email: emailSchema, password: passwordSchema });
 
 export const createTreeSchema = z.object({
   name: z.string().min(1).max(200),
@@ -21,14 +31,20 @@ export const createPersonSchema = z.object({
   middleName: z.string().max(100).optional(),
   maidenName: z.string().max(100).optional(),
   gender: genderSchema,
-  birthDate: z.string().date().optional(),
-  birthYear: z.number().int().min(1800).max(2100).optional(),
+  // Nullable so the client can explicitly CLEAR a previously-set date /
+  // year (PATCH semantics with JSON: undefined drops the key from the
+  // payload entirely; null tells the server "set this column to NULL").
+  birthDate: z.string().date().nullable().optional(),
+  birthYear: z.number().int().min(1800).max(2100).nullable().optional(),
   birthDateKnown: z.boolean().default(false),
   isAlive: z.boolean().default(true),
-  deathDate: z.string().date().optional(),
-  deathYear: z.number().int().min(1800).max(2100).optional(),
+  deathDate: z.string().date().nullable().optional(),
+  deathYear: z.number().int().min(1800).max(2100).nullable().optional(),
   deathDateKnown: z.boolean().default(false),
   note: z.string().optional(),
+  phone: z.string().regex(/^\+?\d{9,15}$/).optional(),
+  address: z.string().max(500).optional(),
+  maritalStatus: z.string().max(50).optional(),
   relationships: z
     .array(
       z.object({

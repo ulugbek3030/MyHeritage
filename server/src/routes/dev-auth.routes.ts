@@ -10,7 +10,7 @@ devAuthRoutes.post('/dev-login', async (req, res, next) => {
   try {
     const phone = (req.body?.phone as string | undefined) ?? '+998900000001';
     const user = await upsertUserByPhone(phone);
-    const payload = { sub: user.id, phone: user.phone };
+    const payload = { sub: user.id, ...(user.phone ? { phone: user.phone } : {}) };
     res.json({ user, accessToken: signAccess(payload), refreshToken: signRefresh(payload) });
   } catch (e) { next(e); }
 });

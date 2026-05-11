@@ -1,0 +1,57 @@
+/* Loader overlay — fixed full-screen, sits above the tree canvas and modals
+   below. Pointer-events:none in the off state so it doesn't block taps when
+   not visible (display:none would re-trigger fade-in on every flicker). */
+.cf-loader-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 5, 7, 0.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  /* Slight ramp-up delay so very fast operations don't flash a spinner. The
+     fade-in still lasts only 150ms once it triggers. */
+  transition: opacity 0.15s ease 0.12s;
+  z-index: 1000;
+}
+.cf-loader-overlay--on {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
+.cf-loader-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 28px;
+  background: linear-gradient(180deg, var(--surface-2), #0f0f12);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  min-width: 140px;
+}
+
+.cf-loader-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.12);
+  border-top-color: var(--accent);
+  animation: cf-loader-spin 0.7s linear infinite;
+}
+
+.cf-loader-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+@keyframes cf-loader-spin {
+  to { transform: rotate(360deg); }
+}

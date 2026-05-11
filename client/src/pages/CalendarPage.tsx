@@ -16,7 +16,9 @@ export const CalendarPage = () => {
   useEffect(() => {
     if (!treeId) return;
     const from = new Date().toISOString();
-    const to = new Date(Date.now() + 90 * 86400000).toISOString();
+    // 365-day window so every birthday in the next year shows up; previously
+    // the page was empty if no one's birthday fell in the next 3 months.
+    const to = new Date(Date.now() + 365 * 86400000).toISOString();
     listEvents(treeId, from, to).then(setEvents).finally(() => setLoading(false));
   }, [treeId]);
 
@@ -34,14 +36,14 @@ export const CalendarPage = () => {
   }, [filtered]);
 
   return (
-    <div style={{minHeight:'100dvh',display:'flex',flexDirection:'column'}}>
-      <header style={{padding:'12px 18px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid var(--border)'}}>
-        <button onClick={() => nav(-1 as any)} style={{width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)'}}>←</button>
-        <div style={{flex:1,fontSize:17,fontWeight:800}}>Календарь</div>
+    <div style={{minHeight:'calc(100dvh - var(--safe-top, 0px))',display:'flex',flexDirection:'column'}}>
+      <header style={{padding:'14px 18px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid var(--border)'}}>
+        <button onClick={() => nav(-1 as any)} style={{width:40,height:40,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)',fontSize:18,cursor:'pointer'}}>←</button>
+        <div style={{flex:1,fontSize:22,fontWeight:800,letterSpacing:'-0.02em'}}>Календарь</div>
       </header>
-      <div style={{display:'flex',gap:6,padding:'10px 18px',overflowX:'auto'}}>
+      <div style={{display:'flex',gap:8,padding:'12px 18px',overflowX:'auto'}}>
         {([['all','Все'],['birthday','🎂 ДР'],['anniversary','💍 Свадьбы'],['memorial','🕯 Память']] as const).map(([k, label]) => (
-          <button key={k} onClick={() => setFilter(k)} style={{padding:'7px 12px',borderRadius:18,fontSize:11,fontWeight:filter===k?800:600,whiteSpace:'nowrap',background:filter===k?'linear-gradient(135deg,var(--accent),var(--accent-hover))':'rgba(255,255,255,0.04)',color:filter===k?'#0a0a0d':'var(--text)',border:`1px solid ${filter===k?'transparent':'var(--border)'}`}}>{label}</button>
+          <button key={k} onClick={() => setFilter(k)} style={{padding:'9px 16px',borderRadius:20,fontSize:14,fontWeight:filter===k?800:600,whiteSpace:'nowrap',background:filter===k?'linear-gradient(135deg,var(--accent),var(--accent-hover))':'rgba(255,255,255,0.04)',color:filter===k?'#0a0a0d':'var(--text)',border:`1px solid ${filter===k?'transparent':'var(--border)'}`,cursor:'pointer'}}>{label}</button>
         ))}
       </div>
       <MonthMini events={events} monthOffset={monthOffset} onMonthChange={(d) => setMonthOffset(monthOffset + d)} />

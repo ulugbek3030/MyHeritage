@@ -3,6 +3,22 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './styles/tokens.css';
 import './styles/global.css';
+import { initMetrika } from './lib/metrika';
+
+// No-op when VITE_YM_COUNTER_ID is unset (e.g. dev), so this is safe to call
+// unconditionally.
+initMetrika();
+
+// In Click SuperApp the mini-app is rendered inside a WebView with Click's own
+// chrome (status row + "My Heritage" title bar + close button) overlaid on top.
+// Plain `env(safe-area-inset-top)` only covers the device status bar, so we
+// reserve extra room when we know we're inside Click. Detection mirrors the
+// places AuthContext checks for web_session: URL query, the click-web-session
+// cookie, or our own sessionStorage cache.
+const inClick = !!sessionStorage.getItem('cf_click_web_session')
+  || new URL(window.location.href).searchParams.has('web_session')
+  || /(?:^|;\s*)click-web-session=/.test(document.cookie);
+if (inClick) document.documentElement.classList.add('cf-click');
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

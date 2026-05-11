@@ -12,6 +12,8 @@ export const ShareModal = ({ open, onClose, treeId, existingToken, existingSetti
   const [busy, setBusy] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [showQr, setShowQr] = useState(false);
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const [imgBusy, setImgBusy] = useState(false);
 
   useEffect(() => {
     if (open && !token) { setBusy(true); enableShare(treeId, settings).then((r) => setToken(r.token)).finally(() => setBusy(false)); }
@@ -25,7 +27,20 @@ export const ShareModal = ({ open, onClose, treeId, existingToken, existingSetti
   const onImageExport = async () => {
     const tree = document.querySelector('.tree-stage') as HTMLElement | null;
     if (!tree) { alert('Откройте дерево перед экспортом'); return; }
-    const blob = await exportTreeAsPng(tree);
+    setImgBusy(true);
+    try {
+      const blob = await exportTreeAsPng(tree);
+      // Show in a preview overlay; user picks "Скачать" or just closes.
+      if (imgUrl) URL.revokeObjectURL(imgUrl);
+      setImgUrl(URL.createObjectURL(blob));
+    } finally {
+      setImgBusy(false);
+    }
+  };
+
+  const onImageDownload = async () => {
+    if (!imgUrl) return;
+    const blob = await fetch(imgUrl).then((r) => r.blob());
     downloadBlob(blob, 'family-tree.png');
   };
 
@@ -37,7 +52,10 @@ export const ShareModal = ({ open, onClose, treeId, existingToken, existingSetti
 
   return (
     <BottomSheet open={open} onClose={onClose}>
-      <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>Поделиться семьёй</div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+        <button onClick={onClose} type="button" aria-label="Назад" style={{width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)',fontSize:18,cursor:'pointer'}}>←</button>
+        <div style={{flex:1,fontSize:18,fontWeight:800}}>Поделиться семьёй</div>
+      </div>
       <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:14,lineHeight:1.4}}>Получатель увидит дерево <b>read-only</b>. Слияния деревьев нет — у каждого пользователя своё.</div>
 
       <div style={{padding:10,background:'linear-gradient(135deg,rgba(251,191,36,0.08),rgba(245,158,11,0.02))',border:'1px solid rgba(251,191,36,0.2)',borderRadius:12,display:'flex',gap:10,alignItems:'center',marginBottom:14}}>
@@ -50,10 +68,22 @@ export const ShareModal = ({ open, onClose, treeId, existingToken, existingSetti
         <button onClick={() => setShowQr(!showQr)} style={{padding:10,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:12,color:'var(--text)',fontSize:11,fontWeight:700,textAlign:'left'}}>
           <div style={{fontSize:18,marginBottom:4}}>⊞</div>QR-код
         </button>
-        <button onClick={onImageExport} style={{padding:10,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:12,color:'var(--text)',fontSize:11,fontWeight:700,textAlign:'left'}}>
-          <div style={{fontSize:18,marginBottom:4}}>🖼</div>Картинка
+        <button onClick={onImageExport} disabled={imgBusy} style={{padding:10,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:12,color:'var(--text)',fontSize:11,fontWeight:700,textAlign:'left'}}>
+          <div style={{fontSize:18,marginBottom:4}}>🖼</div>{imgBusy ? 'Готовим…' : 'Показать как картинку'}
         </button>
       </div>
+
+      {imgUrl && (
+        <div onClick={() => setImgUrl(null)} style={{position:'fixed',inset:0,zIndex:60,background:'rgba(0,0,0,0.85)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:16}}>
+          <div onClick={(e) => e.stopPropagation()} style={{maxWidth:'95vw',maxHeight:'85vh',overflow:'auto',background:'#fff',borderRadius:14,padding:8,marginBottom:14}}>
+            <img src={imgUrl} alt="Family tree" style={{display:'block',maxWidth:'100%',height:'auto'}} />
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button onClick={onImageDownload} style={{padding:'12px 22px',background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:'#0a0a0d',border:'none',borderRadius:14,fontSize:15,fontWeight:800}}>Скачать</button>
+            <button onClick={() => setImgUrl(null)} style={{padding:'12px 22px',background:'rgba(255,255,255,0.1)',color:'var(--text)',border:'1px solid var(--border)',borderRadius:14,fontSize:15,fontWeight:700}}>Закрыть</button>
+          </div>
+        </div>
+      )}
       {showQr && qrDataUrl && (
         <div style={{padding:14,background:'#fff',borderRadius:14,marginBottom:12,textAlign:'center'}}>
           <img src={qrDataUrl} alt="QR" style={{maxWidth:200}} />

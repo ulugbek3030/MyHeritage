@@ -1,32 +1,73 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getFullTree } from '../api/trees';
+import { deletePerson } from '../api/persons';
 import { listEvents } from '../api/events';
 import type { FullTree, Person, FamilyEvent } from '../types';
+import { eventIcon } from '../utils/eventIcons';
 import { FamilyTreeLayout } from '../components/tree/FamilyTreeLayout';
 import { PersonSheet } from '../components/tree/PersonSheet';
 import { AddPersonForm } from '../components/tree/AddPersonForm';
+import { EditPersonForm } from '../components/tree/EditPersonForm';
+import { BiographyEditor } from '../components/tree/BiographyEditor';
 import { ShareModal } from '../components/share/ShareModal';
-import { Hero } from '../components/home/Hero';
-import { NudgeProgress } from '../components/home/NudgeProgress';
+import { ExpandTreeModal } from '../components/share/ExpandTreeModal';
+import { NotificationsModal } from '../components/share/NotificationsModal';
+import { listIncomingRequests, listGrantedTrees, type GrantedTree } from '../api/treeAccess';
 import { QuickActions } from '../components/home/QuickActions';
-import { FAB } from '../components/home/FAB';
 import { Skeleton } from '../components/ui/Skeleton';
-import { LongPressMenu } from '../components/tree/LongPressMenu';
+import { Loader } from '../components/ui/Loader';
 import { TreeSearch } from '../components/tree/TreeSearch';
+import { BottomSheet } from '../components/ui/BottomSheet';
+import { useAuth } from '../context/AuthContext';
 
 export const TreeViewPage = () => {
   const { treeId } = useParams<{ treeId: string }>();
   const nav = useNavigate();
+  const { user } = useAuth();
   const [data, setData] = useState<FullTree | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [addOpen, setAddOpen] = useState<Person | null>(null);
+  // When set, AddPersonForm skips the role-picker step and lands directly on
+  // the form (used by the "Add father" / "Add mother" placeholders above
+  // parentless cards).
+  const [addPreset, setAddPreset] = useState<{ mode: 'parent'; gender: 'male' | 'female' } | null>(null);
+  const [editOpen, setEditOpen] = useState<Person | null>(null);
+  // window.confirm is blocked in Click's WebView, so deletion uses a custom
+  // BottomSheet confirm rendered below.
+  const [deletePending, setDeletePending] = useState<Person | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [bioOpen, setBioOpen] = useState<Person | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [expandOpen, setExpandOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // When set, opening the ExpandTreeModal pre-fills the phone from this
+  // person (used when "Запросить доступ к древу" is tapped on a card).
+  const [expandPrefillPhone, setExpandPrefillPhone] = useState<string | null>(null);
+  const [incomingCount, setIncomingCount] = useState(0);
+  const [grantedTrees, setGrantedTrees] = useState<GrantedTree[]>([]);
+  // Ids that get the tree-collapsed-pill in the layout (= married-in
+  // spouses whose ancestry is folded away). The "Посмотреть семью"
+  // button in PersonSheet is only meaningful for these — for everyone
+  // else the dive page would just show the same tree.
+  const [secondaryEntries, setSecondaryEntries] = useState<Set<string>>(new Set());
+  // After adding a relative we set this to the new person's id; the
+  // FamilyTreeLayout's autofit centres on that card instead of bbox-
+  // centring the whole tree, so the user immediately sees where the
+  // new card landed. Cleared via onFocusConsumed once autofit fires.
+  const [focusPersonId, setFocusPersonId] = useState<string | null>(null);
   const [events, setEvents] = useState<FamilyEvent[]>([]);
-  const [lpMenu, setLpMenu] = useState<{ person: Person; pos: { x: number; y: number } } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  // Tracks any active fetch (initial load or post-mutation reload). Used to
+  // show the Loader overlay so the user has feedback during the network +
+  // re-layout cycle that can otherwise look like a frozen screen.
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => { if (treeId) getFullTree(treeId).then(setData); }, [treeId]);
+  useEffect(() => {
+    if (!treeId) return;
+    setBusy(true);
+    getFullTree(treeId).then(setData).finally(() => setBusy(false));
+  }, [treeId]);
 
   useEffect(() => {
     if (!treeId) return;
@@ -35,7 +76,101 @@ export const TreeViewPage = () => {
     listEvents(treeId, from, to).then(setEvents).catch(() => {});
   }, [treeId]);
 
-  const reload = () => { if (treeId) getFullTree(treeId).then(setData); };
+  // Light-weight badge: how many pending access requests are waiting for the
+  // user's approval. Re-fetched whenever the Расширить modal closes (after
+  // an action it will be different) and on first paint.
+  useEffect(() => {
+    // Skip while either modal is open — the modal already shows the data
+    // and we don't want a parallel fetch to mutate state behind the back
+    // of a Принять / Отклонить click.
+    if (expandOpen || notificationsOpen) return;
+    const poll = () => {
+      listIncomingRequests()
+        .then((rs) => {
+          setIncomingCount(rs.length);
+          console.log('[notif poll] incoming=', rs.length);
+        })
+        .catch((e) => console.error('[notif poll] incoming failed', e));
+      // Re-fetch granted trees on the same trigger — after the user accepts
+      // a request the grant list grows and tunnel icons on matching cards
+      // should appear without a page reload.
+      listGrantedTrees()
+        .then(setGrantedTrees)
+        .catch((e) => console.error('[notif poll] grants failed', e));
+    };
+    poll();
+    // Periodic poll so the recipient sees a request without manually
+    // reloading the page. 30s is light enough not to be wasteful and
+    // tight enough to feel "live".
+    const interval = window.setInterval(poll, 30_000);
+    // Also re-poll when the tab/WebView comes back to the foreground —
+    // covers the case where the user backgrounded the app between the
+    // sender clicking Send and the recipient opening it.
+    const onVisible = () => { if (document.visibilityState === 'visible') poll(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [expandOpen, notificationsOpen]);
+
+  // Are we looking at the user's OWN tree, or did they arrive here via a
+  // tunnel icon from someone else's card? Drives where tunnel icons
+  // appear: on the own tree, on every connected user's card; on a guest
+  // tree, only on the card representing the CURRENT user (= the way
+  // home).
+  const isOwnTree = !!user && !!data && data.tree.userId === user.id;
+
+  // Map digits-only phone → tree id to navigate to when the tunnel on
+  // a card with that phone is tapped. Digits-only because the granted
+  // phone may come from users.phone in one format ("+998974035075") and
+  // the card phone in another ("998 974 035075" or no leading "+").
+  //
+  //   - On own tree: every granted user gets a tunnel pointing at their
+  //     tree.
+  //   - On a guest tree: only the card representing the CURRENT user
+  //     gets a tunnel — its treeId is the special sentinel "__back__"
+  //     which the onTunnel handler interprets as "go back to my tree".
+  const grantedTreesByPhone = useMemo(() => {
+    const m: Record<string, string> = {};
+    // Tunnels are an OWN-TREE-only affordance — on a guest tree the
+    // back button in the header is the way home, and tunnels on the
+    // user's own card would just be a duplicate "go back". So we leave
+    // the map empty here too.
+    if (isOwnTree) {
+      for (const g of grantedTrees) {
+        if (!g.phone) continue;
+        const key = g.phone.replace(/[^0-9]/g, '');
+        if (key) m[key] = g.treeId;
+      }
+    }
+    return m;
+  }, [grantedTrees, isOwnTree]);
+
+  const reload = () => {
+    if (!treeId) return;
+    setBusy(true);
+    getFullTree(treeId).then(setData).finally(() => setBusy(false));
+  };
+
+  // Per-person distinct icons for events in the current calendar month, so the
+  // tree mirrors the calendar's month view: a person with two events in the
+  // month gets two icons stacked next to their card.
+  const personEventIcons = useMemo<Record<string, string[]>>(() => {
+    const out: Record<string, string[]> = {};
+    const month = new Date().getMonth();
+    const push = (id: string, icon: string) => {
+      const arr = out[id] ?? (out[id] = []);
+      if (!arr.includes(icon)) arr.push(icon);
+    };
+    for (const e of events) {
+      if (new Date(e.date).getMonth() !== month) continue;
+      const icon = eventIcon(e.type);
+      if (e.personId) push(e.personId, icon);
+      if (e.personIds) for (const id of e.personIds) push(id, icon);
+    }
+    return out;
+  }, [events]);
 
   if (!data) return (
     <div style={{padding:24,display:'flex',flexDirection:'column',gap:8}}>
@@ -45,78 +180,285 @@ export const TreeViewPage = () => {
     </div>
   );
 
-  const upcoming = events.filter((e) => e.daysUntil >= 0).sort((a, b) => a.daysUntil - b.daysUntil)[0] ?? null;
-  const pct = Math.min(100, Math.round((data.persons.length / 45) * 100));
 
   return (
-    <div style={{minHeight:'100dvh',display:'flex',flexDirection:'column'}}>
-      <header style={{padding:'16px 18px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid var(--border)'}}>
-        <button onClick={() => nav('/')} style={{width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)'}}>←</button>
+    <div style={{minHeight:'calc(100dvh - var(--safe-top, 0px))',display:'flex',flexDirection:'column'}}>
+      <header style={{padding:'0 18px 16px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid var(--border)'}}>
+        {/* Back button — visible only on a GUEST tree (arrived via tunnel
+            from elsewhere). Tap pops the route stack to return to the
+            user's own tree. On the user's own tree this slot is empty so
+            the layout doesn't shift between views. */}
+        {!isOwnTree && (
+          <button
+            onClick={() => nav(-1)}
+            aria-label="Назад к моему дереву"
+            style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,var(--accent),var(--accent-hover))', color: '#0a0a0d', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(251,191,36,0.4)' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg>
+          </button>
+        )}
         <div style={{flex:1,fontSize:17,fontWeight:800}}>{data.tree.name}</div>
-        <button onClick={() => nav(`/trees/${treeId}/full`)} style={{fontSize:12,color:'var(--accent)',background:'transparent',border:'none'}}>Полное →</button>
-        <button onClick={() => setSearchOpen(true)} style={{width:32,height:32,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)',fontSize:14,marginLeft:6}}>⌕</button>
-        <button onClick={() => setShareOpen(true)} style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',border:'none',color:'#0a0a0d',fontWeight:800,fontSize:14,marginLeft:6}}>⤴</button>
+        <button onClick={() => setSearchOpen(true)} aria-label="Поиск" style={{width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'none',color:'var(--text)',marginLeft:6,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </button>
+        {/* Notification bell — opens a dedicated NotificationsModal that
+            shows ONLY incoming tree-access requests with Принять /
+            Отклонить buttons. Sending a NEW request is a separate flow
+            («Расширить» quick-action). Plain red dot in the corner
+            when incomingCount > 0. */}
+        <button
+          onClick={() => setNotificationsOpen(true)}
+          aria-label={incomingCount > 0 ? `Уведомления (${incomingCount})` : 'Уведомления'}
+          style={{ position: 'relative', width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: 'none', color: 'var(--text)', marginLeft: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+          {incomingCount > 0 && (
+            <span
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                top: 2,
+                right: 2,
+                width: 9,
+                height: 9,
+                borderRadius: '50%',
+                background: '#f87171',
+                border: '2px solid var(--bg)',
+                boxShadow: '0 0 6px rgba(248, 113, 113, 0.6)',
+              }}
+            />
+          )}
+        </button>
       </header>
-      <Hero
-        event={upcoming}
-        treeFillPct={pct}
-        onOpenCta={() => upcoming?.personId && setSelectedPerson(data.persons.find((p) => p.id === upcoming.personId) ?? null)}
+      {/* Entry banner — shows when the user lands on the tree with at least
+          one pending incoming request. Points them at the bell. */}
+      {incomingCount > 0 && (
+        <div style={{ margin: '0 18px 14px', padding: '12px 14px', borderRadius: 14, background: 'linear-gradient(180deg, rgba(251,191,36,0.18), rgba(251,191,36,0.06))', border: '1px solid rgba(251,191,36,0.4)', fontSize: 13, color: 'var(--text)', lineHeight: 1.45, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ fontSize: 18 }}>🔔</div>
+          <div style={{ flex: 1 }}>
+            <strong style={{ color: 'var(--accent)' }}>У вас новый запрос на просмотр древа.</strong>
+            {' '}Нажмите, пожалуйста, на значок уведомления в правом верхнем углу и посмотрите этот запрос.
+          </div>
+        </div>
+      )}
+      <QuickActions
+        onCalendar={() => nav(`/trees/${treeId}/calendar`)}
+        onExpand={() => setExpandOpen(true)}
+        eventCount={events.length}
+        expandBadge={incomingCount}
       />
-      <NudgeProgress pct={pct} hint={data.persons.length < 13 ? '+ бабушка раскроет 6 родственников' : '+ дядя по матери раскроет ещё ветку'} />
-      <div style={{padding:'12px 12px 24px',flex:1}}>
+      <div style={{padding:'24px 12px 24px',flex:1}}>
         <FamilyTreeLayout
           persons={data.persons}
           relationships={data.relationships}
           ownerId={data.tree.ownerPersonId}
+          personEventIcons={personEventIcons}
           onPersonClick={(id) => setSelectedPerson(data.persons.find((p) => p.id === id) ?? null)}
-          onPlusClick={(id) => { const p = data.persons.find((p) => p.id === id); if (p) setAddOpen(p); }}
-          onLongPress={(id, pos) => { const p = data.persons.find((x) => x.id === id); if (p) setLpMenu({ person: p, pos }); }}
+          // Guest mode: even the underlying handlers go away — passing
+          // `undefined` is belt-and-suspenders next to `readOnly={!isOwnTree}`
+          // hiding the canvas "+" buttons. Either layer alone should suffice;
+          // both together make it impossible to open Add forms on a foreign tree.
+          onPlusClick={isOwnTree ? (id) => { const p = data.persons.find((p) => p.id === id); if (p) { setAddPreset(null); setAddOpen(p); } } : undefined}
+          onAddParent={isOwnTree ? (id, gender) => {
+            const p = data.persons.find((pp) => pp.id === id);
+            if (!p) return;
+            setAddPreset({ mode: 'parent', gender });
+            setAddOpen(p);
+          } : undefined}
+          onDiveSubfamily={(id) => nav(`/trees/${treeId}/dive/${id}`)}
+          grantedTreesByPhone={grantedTreesByPhone}
+          onTunnel={(otherTreeId) => nav(`/trees/${otherTreeId}`)}
+          onSecondaryEntriesChange={setSecondaryEntries}
+          focusPersonId={focusPersonId}
+          onFocusConsumed={() => setFocusPersonId(null)}
+          readOnly={!isOwnTree}
         />
       </div>
-      <QuickActions
-        onCalendar={() => nav(`/trees/${treeId}/calendar`)}
-        onShare={() => setShareOpen(true)}
-        onGifts={() => alert('История подарков — Phase 2')}
-        eventCount={events.length}
-      />
-      <FAB onClick={() => data.tree.ownerPersonId && setAddOpen(data.persons.find((p) => p.id === data.tree.ownerPersonId) ?? null)} />
       <PersonSheet
         open={!!selectedPerson}
         onClose={() => setSelectedPerson(null)}
         person={selectedPerson}
-        onEdit={() => {}}
-        onAdd={() => { if (selectedPerson) { setAddOpen(selectedPerson); setSelectedPerson(null); } }}
-        onDelete={() => {}}
+        isOwner={!!selectedPerson && selectedPerson.id === data.tree.ownerPersonId}
+        // Guest mode (viewing someone else's tree via tunnel): edit /
+        // add-relative / delete / edit-bio all disabled. View-only.
+        onEdit={isOwnTree ? () => { if (selectedPerson) { setEditOpen(selectedPerson); setSelectedPerson(null); } } : undefined}
+        onEditBio={isOwnTree ? () => { if (selectedPerson) { setBioOpen(selectedPerson); setSelectedPerson(null); } } : undefined}
+        onAdd={isOwnTree ? () => { if (selectedPerson) { setAddOpen(selectedPerson); setSelectedPerson(null); } } : undefined}
+        onDelete={isOwnTree ? () => {
+          if (!selectedPerson) return;
+          setDeletePending(selectedPerson);
+          setSelectedPerson(null);
+        } : undefined}
+        // Wire "Запросить доступ к древу" only when:
+        //   - the person has a phone (= the join key for the request), AND
+        //   - access ISN'T already granted (no tunnel on the card yet) —
+        //     once a grant exists the "Посмотреть древо" button takes
+        //     over; offering to re-request would be confusing.
+        onRequestAccess={(() => {
+          const phone = selectedPerson?.phone;
+          if (!phone) return undefined;
+          const key = phone.replace(/[^0-9]/g, '');
+          if (grantedTreesByPhone[key]) return undefined; // grant exists
+          return () => {
+            setExpandPrefillPhone(phone);
+            setExpandOpen(true);
+            setSelectedPerson(null);
+          };
+        })()}
+        // "Посмотреть древо" — when this person's phone matches a granted
+        // Click user, navigate into their own tree (same destination as
+        // the tunnel icon on the card, but reachable from the details
+        // sheet too).
+        onViewTree={(() => {
+          if (!isOwnTree || !selectedPerson?.phone) return undefined;
+          const key = selectedPerson.phone.replace(/[^0-9]/g, '');
+          const treeIdForPerson = grantedTreesByPhone[key];
+          if (!treeIdForPerson) return undefined;
+          return () => {
+            setSelectedPerson(null);
+            nav(`/trees/${treeIdForPerson}`);
+          };
+        })()}
+        // "Посмотреть семью" — dive into the subfamily centred on this
+        // person. Only wired for persons that ALSO get the
+        // tree-collapsed-pill on top of their card (= married-in
+        // spouses whose ancestry is folded away). For everyone else
+        // the dive page would just show the same tree, so the button
+        // is suppressed.
+        onViewSubfamily={
+          selectedPerson && secondaryEntries.has(selectedPerson.id)
+            ? () => {
+                const id = selectedPerson.id;
+                setSelectedPerson(null);
+                nav(`/trees/${treeId}/dive/${id}`);
+              }
+            : undefined
+        }
       />
-      {addOpen && (
+      {/* All editing forms gated on `isOwnTree` — final defensive layer
+          that guarantees they can't mount on a foreign tree no matter what
+          state was set. */}
+      {isOwnTree && addOpen && (
         <AddPersonForm
           open
-          onClose={() => setAddOpen(null)}
+          onClose={() => { setAddOpen(null); setAddPreset(null); }}
           treeId={treeId!}
           targetPerson={addOpen}
           persons={data.persons}
           relationships={data.relationships}
-          onCreated={reload}
+          onCreated={(newPersonId) => {
+            // Flag the new card so the next autofit centres on it
+            // instead of the bbox. Cleared by onFocusConsumed after
+            // the autofit fires.
+            setFocusPersonId(newPersonId);
+            reload();
+          }}
+          presetRole={addPreset ?? undefined}
+        />
+      )}
+      {isOwnTree && editOpen && (
+        <EditPersonForm
+          open
+          onClose={() => setEditOpen(null)}
+          treeId={treeId!}
+          person={editOpen}
+          persons={data.persons}
+          relationships={data.relationships}
+          onSaved={reload}
+        />
+      )}
+      {isOwnTree && bioOpen && (
+        <BiographyEditor
+          open
+          onClose={() => setBioOpen(null)}
+          treeId={treeId!}
+          person={bioOpen}
+          onSaved={reload}
         />
       )}
       {shareOpen && <ShareModal open onClose={() => setShareOpen(false)} treeId={treeId!} existingToken={data.tree.shareToken} />}
-      {lpMenu && (
-        <LongPressMenu
+      {notificationsOpen && (
+        <NotificationsModal
           open
-          position={lpMenu.pos}
-          person={lpMenu.person}
-          hasUpcomingBirthday={false}
-          onClose={() => setLpMenu(null)}
-          onGift={() => alert('Phase 2')}
-          onGoBirthday={() => nav(`/trees/${treeId}/calendar`)}
-          onEdit={() => alert('TODO')}
-          onAddRelative={() => { setAddOpen(lpMenu.person); setLpMenu(null); }}
-          onHide={() => alert('TODO')}
-          onDelete={() => alert('TODO')}
-          onDive={() => { nav(`/trees/${treeId}/dive/${lpMenu.person.id}`); setLpMenu(null); }}
+          onClose={() => setNotificationsOpen(false)}
+          // After accept/decline, refresh the badge + granted-trees so
+          // the tunnel icons appear (or disappear) right away.
+          onChange={() => {
+            listIncomingRequests().then((rs) => setIncomingCount(rs.length)).catch(() => {});
+            listGrantedTrees().then(setGrantedTrees).catch(() => {});
+          }}
+        />
+      )}
+      {expandOpen && (
+        <ExpandTreeModal
+          open
+          onClose={() => { setExpandOpen(false); setExpandPrefillPhone(null); }}
+          initialPhone={expandPrefillPhone}
+          // All relatives (owner excluded) so the user can pick anyone
+          // from the tree to request access from. Phone is optional:
+          // when present, the modal prefills the phone field; when
+          // missing, the user types it after picking.
+          relatives={data.persons
+            .filter((p) => p.id !== data.tree.ownerPersonId)
+            .map((p) => ({
+              id: p.id,
+              name: [p.firstName, p.lastName].filter(Boolean).join(' '),
+              phone: p.phone ?? null,
+            }))}
         />
       )}
       {searchOpen && <TreeSearch persons={data.persons} onSelect={(id) => { document.querySelector(`[data-person-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onClose={() => setSearchOpen(false)} />}
+      <Loader visible={busy} label="Загружаем дерево…" />
+      {isOwnTree && deletePending && (() => {
+        const fullName = [deletePending.firstName, deletePending.lastName].filter(Boolean).join(' ');
+        const close = () => { if (!deleting) setDeletePending(null); };
+        const confirm = async () => {
+          if (!treeId || !deletePending) return;
+          setDeleting(true);
+          try {
+            await deletePerson(treeId, deletePending.id);
+            setDeletePending(null);
+            reload();
+          } catch (e) {
+            console.error('[delete] failed', e);
+            const msg = e instanceof Error ? e.message : 'неизвестная ошибка';
+            alert(`Не удалось удалить: ${msg}`);
+          } finally { setDeleting(false); }
+        };
+        return (
+          <BottomSheet open onClose={close}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14, padding: '24px 8px 8px' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>Удалить {fullName}?</div>
+              <div style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.5, maxWidth: 320 }}>
+                Все связи с этим человеком тоже будут удалены. Действие необратимо.
+              </div>
+              <button
+                onClick={confirm}
+                disabled={deleting}
+                style={{ width: '100%', padding: 14, marginTop: 12, background: '#f87171', color: '#0a0a0d', border: 'none', borderRadius: 14, fontWeight: 800, fontSize: 16, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
+              >
+                {deleting ? 'Удаление…' : 'Удалить'}
+              </button>
+              <button
+                onClick={close}
+                disabled={deleting}
+                style={{ width: '100%', padding: 14, background: 'rgba(255,255,255,0.04)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 14, fontWeight: 700, fontSize: 16, cursor: deleting ? 'not-allowed' : 'pointer' }}
+              >
+                Отмена
+              </button>
+            </div>
+          </BottomSheet>
+        );
+      })()}
     </div>
   );
 };

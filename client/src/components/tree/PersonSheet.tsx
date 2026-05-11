@@ -1,34 +1,148 @@
 import type { Person } from '../../types';
 import { BottomSheet } from '../ui/BottomSheet';
 import { formatBirthFull, formatDeathFull } from '../../utils/dateFormat';
+import { maritalStatusLabel } from '../../utils/maritalStatus';
+
+// Avatar sized at 25% larger than the previous 120px hero.
+const AVATAR = 150;
 
 interface Props {
   open: boolean;
   onClose: () => void;
   person: Person | null;
   upcomingBirthdayInDays?: number | null;
-  onEdit: () => void;
-  onAdd: () => void;
-  onDelete: () => void;
+  /** True when this card is the tree owner — hides the Delete button so the
+   *  user can't accidentally wipe themselves out and break the tree. */
+  isOwner?: boolean;
+  /** Each action below is optional: callers that pass `undefined` get the
+   *  corresponding button hidden. Used by guest-tree mode (viewing someone
+   *  else's tree via tunnel) to suppress edit / add / delete. */
+  onEdit?: () => void;
+  onAdd?: () => void;
+  onDelete?: () => void;
+  onEditBio?: () => void;
+  /** When set, "Запросить доступ к древу" button shows. Wires to the
+   *  ExpandTree modal with this person's phone pre-filled so the user can
+   *  send a tree-access request straight from the person card. Hidden if
+   *  the person has no phone or is the owner themselves. */
+  onRequestAccess?: () => void;
+  /** When set, "Посмотреть древо" button shows — leads into this
+   *  relative's own tree (only visible when there's a granted Click
+   *  user backing this card). */
+  onViewTree?: () => void;
+  /** Dive into the subfamily centred on this person. Always wired —
+   *  shows "Посмотреть семью" button. */
+  onViewSubfamily?: () => void;
 }
 
-export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onEdit, onAdd, onDelete }: Props) => {
+export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, isOwner, onEdit, onAdd, onDelete, onEditBio, onRequestAccess, onViewTree, onViewSubfamily }: Props) => {
   if (!person) return null;
   const fullName = [person.firstName, person.lastName, person.middleName].filter(Boolean).join(' ');
-  const lifespan = person.isAlive ? formatBirthFull(person) : `${formatBirthFull(person)} – ${formatDeathFull(person)}`;
   const showCta = person.isAlive && typeof upcomingBirthdayInDays === 'number' && upcomingBirthdayInDays >= 0 && upcomingBirthdayInDays <= 14;
 
   return (
     <BottomSheet open={open} onClose={onClose}>
-      <div style={{display:'flex',gap:12,marginBottom:14,alignItems:'flex-start'}}>
-        <div style={{width:60,height:60,borderRadius:'50%',background:person.gender==='female'?'linear-gradient(135deg,#fce7f3,#f9c8dd)':'linear-gradient(135deg,#dbeafe,#c3d9f7)',color:person.gender==='female'?'#e87ba8':'#4a90d9',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,fontWeight:800,flexShrink:0,border:`2px solid ${person.gender==='female'?'rgba(244,114,182,0.4)':'rgba(96,165,250,0.4)'}`,overflow:'hidden'}}>
-          {person.photoUrl ? <img src={person.photoUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} /> : person.firstName?.[0]}
-        </div>
-        <div style={{flex:1}}>
-          <div style={{fontSize:18,fontWeight:800,letterSpacing:'-0.02em'}}>{fullName}</div>
-          <div style={{fontSize:11,color:'var(--text-muted)',marginTop:3}}>{lifespan}{person.verified && <span style={{marginLeft:8,color:'var(--verified)',fontWeight:700}}>✓ гос-во</span>}</div>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+        <button
+          onClick={onClose}
+          type="button"
+          aria-label="Назад"
+          style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: 'none', color: 'var(--text)', fontSize: 18, cursor: 'pointer' }}
+        >
+          ←
+        </button>
       </div>
+      {/* Centered hero: avatar + name + birth date — no field labels. */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: 24 }}>
+        <div style={{ width: AVATAR, height: AVATAR, borderRadius: '50%', background: person.gender === 'female' ? 'linear-gradient(135deg,#fce7f3,#f9c8dd)' : 'linear-gradient(135deg,#dbeafe,#c3d9f7)', color: person.gender === 'female' ? '#e87ba8' : '#4a90d9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 56, fontWeight: 800, border: `2px solid ${person.gender === 'female' ? 'rgba(244,114,182,0.4)' : 'rgba(96,165,250,0.4)'}`, overflow: 'hidden', marginBottom: 16 }}>
+          {person.photoUrl ? <img src={person.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : person.firstName?.[0]}
+        </div>
+        <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.25 }}>{fullName}</div>
+        {(person.birthDateKnown && person.birthDate) || person.birthYear ? (
+          <div style={{ fontSize: 22, color: 'var(--text)', marginTop: 10, fontFeatureSettings: "'tnum' 1", fontWeight: 600, lineHeight: 1.35, padding: '0 8px' }}>
+            {formatBirthFull(person)}
+            {!person.isAlive && (person.deathDateKnown && person.deathDate ? ` — ${formatDeathFull(person)}` : person.deathYear ? ` — ${person.deathYear} г.` : '')}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Other details — centered values, no labels. */}
+      {(() => {
+        // Compute age, accounting for whether the birthday has happened this
+        // year. With only year available, fall back to year-diff (rough).
+        const today = new Date();
+        const computeAge = (refY: number, refM: number, refD: number): number | null => {
+          if (person.birthDateKnown && person.birthDate) {
+            const iso = person.birthDate.slice(0, 10);
+            const [byStr, bmStr, bdStr] = iso.split('-');
+            const by = Number(byStr); const bm = Number(bmStr); const bd = Number(bdStr);
+            if (!by || !bm || !bd) return null;
+            let age = refY - by;
+            if (refM < bm || (refM === bm && refD < bd)) age--;
+            return age;
+          }
+          if (person.birthYear) return refY - person.birthYear;
+          return null;
+        };
+        const age = person.isAlive
+          ? computeAge(today.getFullYear(), today.getMonth() + 1, today.getDate())
+          : (person.deathDate
+              ? (() => {
+                  const [dyStr, dmStr, ddStr] = person.deathDate!.slice(0, 10).split('-');
+                  return computeAge(Number(dyStr), Number(dmStr), Number(ddStr));
+                })()
+              : person.deathYear
+                ? (person.birthYear ? person.deathYear - person.birthYear : null)
+                : null);
+        const items: Array<string | null> = [
+          age !== null ? `${age} ${age % 10 === 1 && age % 100 !== 11 ? 'год' : age % 10 >= 2 && age % 10 <= 4 && (age % 100 < 10 || age % 100 >= 20) ? 'года' : 'лет'}${person.isAlive ? '' : ' (на момент смерти)'}` : null,
+          person.gender === 'male' ? 'Мужской' : 'Женский',
+          // Status line only for the deceased — for living people the birth
+          // date in the hero already says everything ("Жив" added no info).
+          !person.isAlive ? (person.gender === 'female' ? 'Умерла' : 'Умер') : null,
+          person.gender === 'female' && person.maidenName ? `Девичья: ${person.maidenName}` : null,
+        ].filter((x) => x && String(x).trim() !== '');
+        if (items.length === 0) return null;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 24, padding: '18px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
+            {items.map((v, i) => (
+              <div key={i} style={{ fontSize: 19, fontWeight: 600, textAlign: 'center' }}>{v}</div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* Marital status — only when set. Shown as a labeled row so a long
+          label like "Не проживают совместно" wraps cleanly instead of being
+          stuffed into the bullet-style items above. */}
+      {person.maritalStatus && (
+        <div style={{ marginBottom: 24, textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>Семейное положение</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>{maritalStatusLabel(person.maritalStatus)}</div>
+        </div>
+      )}
+
+      {/* Phone — tappable on mobile (tel: link). Always display with a
+          leading "+" regardless of how the value was stored (older rows
+          may not have one). */}
+      {person.phone && (() => {
+        const display = person.phone.startsWith('+') ? person.phone : '+' + person.phone.replace(/^\++/, '');
+        return (
+          <div style={{ marginBottom: 24, textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 }}>Телефон</div>
+            <a href={`tel:${display}`} style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', fontFeatureSettings: "'tnum' 1", textDecoration: 'none' }}>{display}</a>
+          </div>
+        );
+      })()}
+
+      {/* Short description / note. Pulled out of the centered items list so
+          it can wrap as proper paragraph text instead of a single bullet. */}
+      {person.note && person.note.trim() && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>Описание</div>
+          <div style={{ fontSize: 16, lineHeight: 1.5, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{person.note}</div>
+        </div>
+      )}
 
       {showCta && (
         <div style={{padding:12,marginBottom:14,borderRadius:16,border:'1px solid rgba(251,191,36,0.25)',background:'radial-gradient(140% 100% at 0% 0%,rgba(251,191,36,0.18),transparent 65%),linear-gradient(180deg,#1c1409,#0e0a04)'}}>
@@ -47,11 +161,47 @@ export const PersonSheet = ({ open, onClose, person, upcomingBirthdayInDays, onE
         </div>
       )}
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
-        <button onClick={onEdit} style={{padding:12,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:12,color:'var(--text)',fontWeight:700}}>Редактировать</button>
-        <button onClick={onAdd} style={{padding:12,background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:'#0a0a0d',border:'none',borderRadius:12,fontWeight:800}}>+ Родственник</button>
-      </div>
-      <button onClick={onDelete} style={{width:'100%',padding:10,background:'transparent',border:'1px solid rgba(248,113,113,0.3)',borderRadius:12,color:'#f87171',fontSize:12}}>Удалить</button>
+      {/* Edit / add-relative pair — only when the caller wired the
+          handlers (= own tree). Guest-tree mode omits them so the user
+          can't mutate someone else's data. */}
+      {(onEdit || onAdd) && (
+        <div style={{display:'grid',gridTemplateColumns: onEdit && onAdd ? '1fr 1fr' : '1fr',gap:10,marginBottom:10}}>
+          {onEdit && <button onClick={onEdit} style={{padding:16,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:14,color:'var(--text)',fontWeight:700,fontSize:16}}>Редактировать</button>}
+          {onAdd && <button onClick={onAdd} style={{padding:16,background:'linear-gradient(135deg,var(--accent),var(--accent-hover))',color:'#0a0a0d',border:'none',borderRadius:14,fontWeight:800,fontSize:16}}>+ Родственник</button>}
+        </div>
+      )}
+      {onEditBio && (
+        <button onClick={onEditBio} style={{width:'100%',padding:14,background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',borderRadius:14,color:'var(--text)',fontSize:15,fontWeight:700,marginBottom:10}}>📝 Описание</button>
+      )}
+      {/* "Посмотреть семью" — dive into the subfamily centred on this
+          person (existing /trees/:treeId/dive/:personId page). Always
+          wired by the caller. */}
+      {onViewSubfamily && (
+        <button onClick={onViewSubfamily} style={{ width: '100%', padding: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 14, color: 'var(--text)', fontSize: 15, fontWeight: 700, marginBottom: 10, cursor: 'pointer' }}>
+          👥 Посмотреть семью
+        </button>
+      )}
+      {/* "Посмотреть древо" — only shows when there's a granted Click
+          user backing this card; jumps into their own tree. Sits in the
+          same gold style as the tunnel itself so the visual link is
+          obvious. */}
+      {onViewTree && (
+        <button onClick={onViewTree} style={{ width: '100%', padding: 14, background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))', border: 'none', borderRadius: 14, color: '#0a0a0d', fontSize: 15, fontWeight: 800, marginBottom: 10, cursor: 'pointer', boxShadow: '0 4px 14px rgba(251,191,36,0.35)' }}>
+          🌳 Посмотреть древо
+        </button>
+      )}
+      {/* "Запросить доступ к древу" — visible only when caller wires
+          onRequestAccess (which it does only for non-owner persons that
+          have a phone number = potential Click user). Tapping opens the
+          ExpandTree modal pre-filled with this person's phone. */}
+      {onRequestAccess && !isOwner && (
+        <button onClick={onRequestAccess} style={{ width: '100%', padding: 14, background: 'linear-gradient(135deg, rgba(251,191,36,0.18), rgba(251,191,36,0.08))', border: '1px solid rgba(251,191,36,0.35)', borderRadius: 14, color: 'var(--accent)', fontSize: 15, fontWeight: 800, marginBottom: 10, cursor: 'pointer' }}>
+          🌳 Запросить доступ к древу
+        </button>
+      )}
+      {!isOwner && onDelete && (
+        <button onClick={onDelete} style={{width:'100%',padding:14,background:'transparent',border:'1px solid rgba(248,113,113,0.3)',borderRadius:14,color:'#f87171',fontSize:15}}>Удалить</button>
+      )}
     </BottomSheet>
   );
 };

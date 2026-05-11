@@ -1,4 +1,4 @@
-export interface User { id: string; phone: string; displayName: string | null; avatarUrl: string | null; }
+export interface User { id: string; phone: string | null; email: string | null; displayName: string | null; avatarUrl: string | null; clickClientId: number | null; }
 export interface Tree { id: string; userId: string; name: string; description: string | null; ownerPersonId: string | null; visibility: 'private' | 'link' | 'family' | 'public'; shareToken: string | null; personCount?: number; }
 export interface Person {
   id: string; treeId: string; firstName: string; lastName: string | null; middleName: string | null; maidenName: string | null;
@@ -6,6 +6,9 @@ export interface Person {
   birthDate: string | null; birthYear: number | null; birthDateKnown: boolean;
   isAlive: boolean; deathDate: string | null; deathYear: number | null; deathDateKnown: boolean;
   verified: boolean; note: string | null; photoUrl: string | null;
+  phone: string | null;
+  address: string | null;
+  maritalStatus: string | null;
 }
 export type CoupleStatus = 'married' | 'civil' | 'dating' | 'divorced' | 'widowed' | 'other';
 export type ChildRelation = 'biological' | 'adopted' | 'foster' | 'guardianship' | 'stepchild';

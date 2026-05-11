@@ -1,51 +1,174 @@
-.tree-stage { background: radial-gradient(80% 60% at 50% 0%, rgba(251,191,36,0.04), transparent 70%), #050507; border: 1px solid var(--border); border-radius: 22px; }
-.pcard { width: 64px; background: linear-gradient(180deg, var(--surface-2), #0f0f12); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 6px 3px 7px; text-align: center; font-size: 10px; position: relative; }
+/* touch-action: explicitly opt OUT of native pinch-zoom inside the tree so
+   our JS pinch handler in useZoom is the only one that fires. Pan still
+   works (native scroll + manual useDrag), only the browser's two-finger
+   page-zoom is suppressed. */
+.tree-stage { background: radial-gradient(80% 60% at 50% 0%, rgba(251,191,36,0.04), transparent 70%), #050507; border: 1px solid var(--border); border-radius: 22px; min-height: 75dvh; scrollbar-width: none; -ms-overflow-style: none; touch-action: pan-x pan-y; }
+.tree-stage::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.pcard { min-width: 86px; max-width: 154px; width: max-content; background: linear-gradient(180deg, var(--surface-2), #0f0f12); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px 10px 14px; text-align: center; font-size: 12px; position: relative; }
 .pcard.male::before, .pcard.female::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
 .pcard.male::before { background: linear-gradient(180deg, rgba(96,165,250,0.55), transparent 60%); }
 .pcard.female::before { background: linear-gradient(180deg, rgba(244,114,182,0.55), transparent 60%); }
-/* deceased — same brightness as alive; only the † badge differentiates them */
-.pcard.deceased::after { content: '†'; position: absolute; top: 4px; left: 5px; color: var(--text-muted); font-size: 10px; font-weight: 800; }
+/* deceased — same brightness as alive; the "Умер/Умерла" pill on the bottom of the card is the indicator */
 .pcard.me { background: linear-gradient(180deg, #2a230b, #1a1408); border-color: rgba(251,191,36,0.4); box-shadow: 0 0 0 1px rgba(251,191,36,0.25), 0 6px 20px rgba(251,191,36,0.2); }
 .pcard.me::before { display: none; }
-.pcard-av { width: 28px; height: 28px; border-radius: 50%; margin: 0 auto 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: rgba(255,255,255,0.04); border: 1px solid var(--border); overflow: hidden; }
-.pcard.male .pcard-av { color: var(--male); }
-.pcard.female .pcard-av { color: var(--female); }
+.pcard-av { width: 38px; height: 38px; border-radius: 50%; margin: 0 auto 7px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; background: rgba(255,255,255,0.04); border: 1px solid var(--border); overflow: hidden; }
+.pcard.male .pcard-av { color: rgba(96,165,250,0.7); background: linear-gradient(135deg, rgba(96,165,250,0.14), rgba(96,165,250,0.03)); border-color: rgba(96,165,250,0.3); }
+.pcard.female .pcard-av { color: rgba(244,114,182,0.7); background: linear-gradient(135deg, rgba(244,114,182,0.14), rgba(244,114,182,0.03)); border-color: rgba(244,114,182,0.3); }
 .pcard.me .pcard-av { background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #0a0a0d; border: none; }
 .pcard-av img { width: 100%; height: 100%; object-fit: cover; }
-.pcard-name { font-weight: 700; color: var(--text); line-height: 1.15; letter-spacing: -0.01em; font-size: 9.5px; }
-.pcard-year { color: var(--text-dim); font-size: 8px; margin-top: 2px; font-feature-settings: 'tnum' 1; }
-.pcard-verified { position: absolute; top: 4px; right: 4px; width: 11px; height: 11px; background: var(--verified); color: #050507; border-radius: 50%; font-size: 7px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+.pcard-name { font-weight: 700; color: var(--text); line-height: 1.18; letter-spacing: -0.01em; font-size: 12px; }
+.pcard-year { color: var(--text-dim); font-size: 10px; margin-top: 3px; font-feature-settings: 'tnum' 1; }
+.pcard-status { font-size: 8px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 3px; padding: 1px 5px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 5px; display: inline-block; }
+.pcard-verified { position: absolute; top: 4px; right: 4px; width: 12px; height: 12px; background: var(--verified); color: #050507; border-radius: 50%; font-size: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
 .pcard.me .pcard-verified { background: #0a0a0d; color: var(--accent); }
-.pcard-cake { position: absolute; bottom: -4px; right: -3px; background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #0a0a0d; width: 14px; height: 14px; border-radius: 50%; font-size: 8px; display: flex; align-items: center; justify-content: center; border: 1.5px solid #050507; box-shadow: 0 0 8px rgba(251,191,36,0.5); }
-/* "+" tab attached to bottom of the card — pentagon-style, looks like a card extension */
-.pcard-plus {
+.pcard-events { position: absolute; top: -10px; right: -8px; display: flex; gap: 2px; padding: 3px 5px; background: #050507; border: 1px solid var(--border); border-radius: 12px; font-size: 14px; line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+.pcard-events span { display: inline-block; }
+/* Tunnel — small pill on the top-left of a card with a tunnel-shape glyph.
+   Visible only on cards whose phone matches a granted Click user; tapping
+   navigates into THAT user's tree (read-only). */
+.pcard-tunnel {
   position: absolute;
-  bottom: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 70%;
-  height: 22px;
-  background: linear-gradient(180deg, var(--surface-2), #0f0f12);
-  border: 1px solid var(--border);
-  border-top: none;
-  border-radius: 0 0 12px 12px;
+  /* Sits ABOVE the card on its left edge — half above, half overlapping
+     the top of the card so it reads as a "doorway through" rather than a
+     pin attached to the corner. */
+  top: -18px;
+  left: -4px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  font-weight: 800;
-  color: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: #0a0a0d;
+  border: 2px solid #050507;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.45);
+  transition: transform 0.15s ease;
+  z-index: 2;
+}
+.pcard-tunnel:hover { transform: scale(1.1); }
+.pcard-tunnel:active { transform: scale(0.95); }
+/* Empty-slot card for missing parents — clicking it opens AddPersonForm
+   pre-targeted to "Add father" / "Add mother". Sized to match .pcard so it
+   sits cleanly in the same NODE_W × NODE_H grid wrapper. */
+/* Notched-card placeholder: SVG body with a U-cutout at top, '+' button
+   sits half above / half in the notch, label tucks under. */
+.pcard-placeholder { position: relative; width: 60px; height: 82px; padding-top: 18px; cursor: pointer; text-align: center; }
+.pcard-placeholder-notch { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transition: filter 0.15s; }
+.pcard-placeholder-notch path { transition: stroke 0.15s, fill 0.15s; }
+.pcard-placeholder:hover .pcard-placeholder-notch path,
+.pcard-placeholder:active .pcard-placeholder-notch path { stroke: rgba(251,191,36,0.55); fill: rgba(251,191,36,0.05); }
+.pcard-placeholder-plus {
+  position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(20,20,24,1);
+  border: 1.5px dashed rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.55);
+  font-size: 18px; font-weight: 800; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.pcard-placeholder:hover .pcard-placeholder-plus,
+.pcard-placeholder:active .pcard-placeholder-plus { border-color: rgba(251,191,36,0.55); color: rgba(251,191,36,1); background: #050507; }
+.pcard-placeholder-label { display: block; position: relative; padding: 18px 4px 8px; font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.7); line-height: 1.2; text-align: center; letter-spacing: -0.005em; }
+
+/* Onboarding hint that bobs above the "Add mother" placeholder until the
+   user has added their first relative. The wrapping div handles positioning
+   so the keyframe only animates translateY. */
+@keyframes cf-hint-bob {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50%      { transform: translateY(-3px); opacity: 0.85; }
+}
+/* "+" sits inside the bottom half of a horizontal ellipse — flat top edge
+   tucks 4px into the card so the top stroke is hidden, the arc forms the
+   visible bowl below. */
+.pcard-plus {
+  position: absolute;
+  bottom: -14px;       /* small gap below the card so its bottom line stays visible */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   z-index: 1;
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition: transform 0.15s ease;
 }
-.pcard-plus:hover {
-  background: linear-gradient(180deg, rgba(251,191,36,0.18), rgba(245,158,11,0.08));
-  transform: translateX(-50%) translateY(2px);
+.pcard-plus-shape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
-/* On the owner card, give the tab a golden tint to match the highlighted card frame */
-.pcard.me .pcard-plus {
-  background: linear-gradient(180deg, #2a230b, #1a1408);
-  border-color: rgba(251,191,36,0.4);
-  color: var(--accent);
+.pcard-plus-shape .pcard-plus-fill {
+  fill: #13131a;
+  stroke: none;
+  transition: fill 0.15s ease;
 }
+.pcard-plus-shape .pcard-plus-arc {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 0.15s ease;
+}
+.pcard-plus-icon {
+  position: relative;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-muted);
+  /* Visual centre of half-ellipse sits a touch above the geometric centre */
+  margin-top: -2px;
+}
+.pcard-plus:hover .pcard-plus-shape .pcard-plus-fill { fill: rgba(255,255,255,0.04); }
+.pcard-plus:hover .pcard-plus-shape .pcard-plus-arc { stroke: rgba(255,255,255,0.45); }
+.pcard-plus:hover .pcard-plus-icon { color: var(--text); }
+
+/* Collapsed-parents pill — sits above a married-in spouse's card. Two grey
+   slabs with a short bar between them, no labels. Tap dives into that
+   spouse's parental subfamily on a separate page. Positioned top-centre over
+   the card so it doesn't collide with .pcard-events (which lives top-right). */
+.tree-collapsed-pill {
+  position: absolute;
+  /* Lifted above the card. Cards vary in height by content (single vs
+     multi-line names), so top:10 keeps a comfortable gap even for the
+     tallest card variant. */
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  z-index: 5;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+.tree-collapsed-pill:hover { background: rgba(251,191,36,0.08); }
+.tree-collapsed-pill:active { background: rgba(251,191,36,0.14); }
+.tree-collapsed-pill-rect {
+  width: 18px;
+  height: 11px;
+  background: #5b6373;
+  border-radius: 1.5px;
+  transition: background 0.15s ease;
+}
+.tree-collapsed-pill-bar {
+  width: 5px;
+  height: 1.6px;
+  background: #5b6373;
+  border-radius: 1.6px;
+  margin: 0 1.5px;
+  transition: background 0.15s ease;
+}
+.tree-collapsed-pill:hover .tree-collapsed-pill-rect,
+.tree-collapsed-pill:hover .tree-collapsed-pill-bar,
+.tree-collapsed-pill:active .tree-collapsed-pill-rect,
+.tree-collapsed-pill:active .tree-collapsed-pill-bar { background: var(--accent); }

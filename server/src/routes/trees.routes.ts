@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate.js';
-import { authorizeTree } from '../middleware/authorizeTree.js';
+import { authorizeTree, requireTreeOwner } from '../middleware/authorizeTree.js';
 import { validate } from '../middleware/validate.js';
 import { createTreeSchema } from '../utils/validators.js';
 import { listTrees, createTree, getTree, updateTree, deleteTree, getFullTree } from '../services/trees.service.js';
@@ -20,6 +20,6 @@ treesRoutes.get('/:id', authorizeTree, async (req, res, next) => { try { res.jso
 
 treesRoutes.get('/:id/full', authorizeTree, async (req, res, next) => { try { res.json(await getFullTree(req.tree!.id)); } catch (e) { next(e); }});
 
-treesRoutes.put('/:id', authorizeTree, async (req, res, next) => { try { res.json(await updateTree(req.tree!.id, req.body)); } catch (e) { next(e); }});
+treesRoutes.put('/:id', authorizeTree, requireTreeOwner, async (req, res, next) => { try { res.json(await updateTree(req.tree!.id, req.body)); } catch (e) { next(e); }});
 
-treesRoutes.delete('/:id', authorizeTree, async (req, res, next) => { try { await deleteTree(req.tree!.id); res.json({ ok: true }); } catch (e) { next(e); }});
+treesRoutes.delete('/:id', authorizeTree, requireTreeOwner, async (req, res, next) => { try { await deleteTree(req.tree!.id); res.json({ ok: true }); } catch (e) { next(e); }});
