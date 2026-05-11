@@ -19,6 +19,19 @@ declare global {
  *      req.tree.readOnly is true (controllers can early-return Forbidden).
  *   3. Anyone else → 403.
  */
+/**
+ * Hard-stops a request when the caller only has read-only access to the
+ * tree (via a `tree_access_grants` row, i.e. «Расширить древо» grantee).
+ * Place AFTER `authorizeTree` on every mutating route — POST/PUT/DELETE
+ * for persons/relationships/photos/share/etc. — so non-owners can browse
+ * a friend's tree but never write to it.
+ */
+export const requireTreeOwner = (req: Request, _res: Response, next: NextFunction) => {
+  if (!req.tree) return next(new ForbiddenError('Tree not authorized'));
+  if (req.tree.readOnly) return next(new ForbiddenError('Read-only access to this tree'));
+  return next();
+};
+
 export const authorizeTree = async (req: Request, _res: Response, next: NextFunction) => {
   const id = req.params.treeId ?? req.params.id;
   if (!id) return next(new NotFoundError('Tree id required'));

@@ -104,7 +104,11 @@ export const SubfamilyPage = () => {
           setSelectedPerson(null);
         } : undefined}
       />
-      {addOpen && (
+      {/* All editing forms gated on `isOwnTree` — final defensive layer
+          that guarantees they can't mount on a foreign tree no matter what
+          state was set (e.g. via a 2nd-level dive that re-rendered the
+          page with stale state). */}
+      {isOwnTree && addOpen && (
         <AddPersonForm
           open
           onClose={() => { setAddOpen(null); setAddPreset(null); }}
@@ -116,7 +120,7 @@ export const SubfamilyPage = () => {
           presetRole={addPreset ?? undefined}
         />
       )}
-      {editOpen && (
+      {isOwnTree && editOpen && (
         <EditPersonForm
           open
           onClose={() => setEditOpen(null)}
@@ -127,7 +131,7 @@ export const SubfamilyPage = () => {
           onSaved={reload}
         />
       )}
-      {bioOpen && (
+      {isOwnTree && bioOpen && (
         <BiographyEditor
           open
           onClose={() => setBioOpen(null)}
@@ -136,7 +140,7 @@ export const SubfamilyPage = () => {
           onSaved={reload}
         />
       )}
-      {deletePending && (() => {
+      {isOwnTree && deletePending && (() => {
         const fullName = [deletePending.firstName, deletePending.lastName].filter(Boolean).join(' ');
         const close = () => { if (!deleting) setDeletePending(null); };
         const confirm = async () => {

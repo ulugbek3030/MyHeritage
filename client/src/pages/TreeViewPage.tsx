@@ -263,13 +263,17 @@ export const TreeViewPage = () => {
           ownerId={data.tree.ownerPersonId}
           personEventIcons={personEventIcons}
           onPersonClick={(id) => setSelectedPerson(data.persons.find((p) => p.id === id) ?? null)}
-          onPlusClick={(id) => { const p = data.persons.find((p) => p.id === id); if (p) { setAddPreset(null); setAddOpen(p); } }}
-          onAddParent={(id, gender) => {
+          // Guest mode: even the underlying handlers go away — passing
+          // `undefined` is belt-and-suspenders next to `readOnly={!isOwnTree}`
+          // hiding the canvas "+" buttons. Either layer alone should suffice;
+          // both together make it impossible to open Add forms on a foreign tree.
+          onPlusClick={isOwnTree ? (id) => { const p = data.persons.find((p) => p.id === id); if (p) { setAddPreset(null); setAddOpen(p); } } : undefined}
+          onAddParent={isOwnTree ? (id, gender) => {
             const p = data.persons.find((pp) => pp.id === id);
             if (!p) return;
             setAddPreset({ mode: 'parent', gender });
             setAddOpen(p);
-          }}
+          } : undefined}
           onDiveSubfamily={(id) => nav(`/trees/${treeId}/dive/${id}`)}
           grantedTreesByPhone={grantedTreesByPhone}
           onTunnel={(otherTreeId) => nav(`/trees/${otherTreeId}`)}
@@ -340,7 +344,10 @@ export const TreeViewPage = () => {
             : undefined
         }
       />
-      {addOpen && (
+      {/* All editing forms gated on `isOwnTree` — final defensive layer
+          that guarantees they can't mount on a foreign tree no matter what
+          state was set. */}
+      {isOwnTree && addOpen && (
         <AddPersonForm
           open
           onClose={() => { setAddOpen(null); setAddPreset(null); }}
@@ -358,7 +365,7 @@ export const TreeViewPage = () => {
           presetRole={addPreset ?? undefined}
         />
       )}
-      {editOpen && (
+      {isOwnTree && editOpen && (
         <EditPersonForm
           open
           onClose={() => setEditOpen(null)}
@@ -369,7 +376,7 @@ export const TreeViewPage = () => {
           onSaved={reload}
         />
       )}
-      {bioOpen && (
+      {isOwnTree && bioOpen && (
         <BiographyEditor
           open
           onClose={() => setBioOpen(null)}
@@ -411,7 +418,7 @@ export const TreeViewPage = () => {
       )}
       {searchOpen && <TreeSearch persons={data.persons} onSelect={(id) => { document.querySelector(`[data-person-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} onClose={() => setSearchOpen(false)} />}
       <Loader visible={busy} label="Загружаем дерево…" />
-      {deletePending && (() => {
+      {isOwnTree && deletePending && (() => {
         const fullName = [deletePending.firstName, deletePending.lastName].filter(Boolean).join(' ');
         const close = () => { if (!deleting) setDeletePending(null); };
         const confirm = async () => {
