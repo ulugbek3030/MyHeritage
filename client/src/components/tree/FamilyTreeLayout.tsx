@@ -1099,8 +1099,12 @@ export const FamilyTreeLayout = ({ persons, relationships, ownerId, personEventI
 
         {/* Dashed connectors. Each topRowSlots entry → T-junction down to its
             child. ownerSpouseSlot (when present) → short couple line between
-            the existing parent and the placeholder. */}
-        {(topRowSlots.length > 0 || ownerSpouseSlot) && (() => {
+            the existing parent and the placeholder.
+            Guest mode (`readOnly`) hides the placeholder rectangles themselves
+            above (see the `!readOnly && topRowSlots.flatMap(...)` guards), so
+            the lines going TO those placeholders also need to vanish — otherwise
+            you get orphan dashed line-art floating above the card. */}
+        {!readOnly && (topRowSlots.length > 0 || ownerSpouseSlot) && (() => {
           const stroke = { stroke: 'rgba(255,255,255,0.3)', strokeWidth: '1.4', strokeDasharray: '3 3' };
           const PLACEHOLDER_H = 82;
           const PERSON_H = CARD_H;
