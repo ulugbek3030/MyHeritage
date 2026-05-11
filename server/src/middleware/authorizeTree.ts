@@ -27,8 +27,17 @@ declare global {
  * a friend's tree but never write to it.
  */
 export const requireTreeOwner = (req: Request, _res: Response, next: NextFunction) => {
-  if (!req.tree) return next(new ForbiddenError('Tree not authorized'));
-  if (req.tree.readOnly) return next(new ForbiddenError('Read-only access to this tree'));
+  if (!req.tree) {
+    console.log('[guard] requireTreeOwner: no req.tree set');
+    return next(new ForbiddenError('Tree not authorized'));
+  }
+  if (req.tree.readOnly) {
+    // TEMP diagnostic: log every read-only-blocked mutation so we can see who's
+    // hitting it and why. Remove once the «Жахонгир can't add parents» case
+    // is understood.
+    console.log(`[guard] 403 readOnly: user=${req.user?.id} tree=${req.tree.id} treeOwner=${req.tree.userId} ${req.method} ${req.originalUrl}`);
+    return next(new ForbiddenError('Read-only access to this tree'));
+  }
   return next();
 };
 
